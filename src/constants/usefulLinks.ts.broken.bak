@@ -31,8 +31,8 @@ function detectFacultyCodes(studies: Study[]): Set<string> {
 export function sortUsefulLinks(studies: Study[]): UsefulLink[] {
   const faculties = detectFacultyCodes(studies);
   return [...USEFUL_LINKS].sort((a, b) => {
-    const aScore = a.scope === 'FACULTY' ? (faculties.has(a.facultyCode ?? '') ? 0 : 3) : 1;
-    const bScore = b.scope === 'FACULTY' ? (faculties.has(b.facultyCode ?? '') ? 0 : 3) : 1;
+    const aScore = a.scope === 'FACULTY'  (faculties.has(a.facultyCode  '')  0 : 3) : 1;
+    const bScore = b.scope === 'FACULTY'  (faculties.has(b.facultyCode  '')  0 : 3) : 1;
     if (aScore !== bScore) return aScore - bScore;
     return a.title.localeCompare(b.title, 'pl');
   });

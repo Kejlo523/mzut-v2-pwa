@@ -10,7 +10,7 @@ import type {
   ViewMode,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const API_BASE = import.meta.env.VITE_API_BASE  '/api';
 const CARR = [...'23456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'];
 const CARR2 = [...'vwxyz23456789ABCDEFGHJKkmnopqrstuvwxyzabcdefghijWXYZLMNPQRSTUV'];
 
@@ -33,7 +33,7 @@ function ensureArray<T>(value: unknown): T[] {
 function normalizeLoginIdentifier(rawLogin: string): string {
   const trimmed = rawLogin.trim();
   const at = trimmed.indexOf('@');
-  return at >= 0 ? trimmed.slice(0, at).trim() : trimmed;
+  return at >= 0  trimmed.slice(0, at).trim() : trimmed;
 }
 
 function randomString(length: number, alphabet: string[]): string {
@@ -69,7 +69,7 @@ function generateToken(login: string, password: string): string {
     .join('');
 }
 
-async function proxyMzut<T = Record<string, unknown>>(fn: string, params: Record<string, string>): Promise<T> {
+async function proxyMzut<T = Record<string, unknown>>(fn: string, params: Record<string, string>): Promise<T | null> {
   const response = await fetch(`${API_BASE}/proxy/mzut`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -80,7 +80,7 @@ async function proxyMzut<T = Record<string, unknown>>(fn: string, params: Record
   if (!response.ok) {
     throw new Error(body.error || `mZUT proxy HTTP ${response.status}`);
   }
-  return body.data ?? ({} as T);
+  return body.data  null;
 }
 
 async function proxyPlanStudent(query: Record<string, string>): Promise<Record<string, unknown>[]> {
@@ -94,7 +94,7 @@ async function proxyPlanStudent(query: Record<string, string>): Promise<Record<s
   if (!response.ok) {
     throw new Error(body.error || `Plan proxy HTTP ${response.status}`);
   }
-  return Array.isArray(body.data) ? body.data : [];
+  return Array.isArray(body.data)  body.data : [];
 }
 
 async function proxyRssXml(): Promise<string> {
@@ -113,10 +113,10 @@ function normalizeStudyId(value: unknown): string | null {
 }
 
 function parseFlexibleDouble(value: unknown): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'number') return Number.isFinite(value)  value : 0;
   if (typeof value === 'string') {
     const parsed = Number.parseFloat(value.trim().replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : 0;
+    return Number.isFinite(parsed)  parsed : 0;
   }
   return 0;
 }
@@ -179,9 +179,9 @@ export async function fetchStudies(session: SessionData): Promise<Study[]> {
       const przynaleznoscId = normalizeStudyId(row.przynaleznoscId);
       const nazwa = firstNonEmpty(row.nazwa);
       const poziom = firstNonEmpty(row.poziom);
-      const label = poziom ? `${nazwa} (${poziom})` : nazwa;
+      const label = poziom  `${nazwa} (${poziom})` : nazwa;
       return {
-        przynaleznoscId: przynaleznoscId ?? '',
+        przynaleznoscId: przynaleznoscId  '',
         label: label || przynaleznoscId || 'Kierunek',
       };
     })
@@ -225,7 +225,7 @@ export async function fetchGrades(session: SessionData, semesterId: string): Pro
     const date = firstNonEmpty(row.data);
 
     return {
-      subjectName: form ? `${subject} (${form})`.trim() : subject,
+      subjectName: form  `${subject} (${form})`.trim() : subject,
       grade: firstNonEmpty(row.ocena),
       weight: parseEcts(row),
       type: form,
@@ -291,7 +291,7 @@ function addDays(date: Date, days: number): Date {
 
 function parseYmdOrToday(value: string): Date {
   const parsed = new Date(`${value}T00:00:00`);
-  return Number.isFinite(parsed.getTime()) ? startOfDay(parsed) : startOfDay(new Date());
+  return Number.isFinite(parsed.getTime())  startOfDay(parsed) : startOfDay(new Date());
 }
 
 function formatYmd(date: Date): string {
@@ -309,7 +309,7 @@ function toOffsetIso(date: Date): string {
   const mm = String(date.getMinutes()).padStart(2, '0');
   const ss = String(date.getSeconds()).padStart(2, '0');
   const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? '+' : '-';
+  const sign = offset >= 0  '+' : '-';
   const abs = Math.abs(offset);
   const oh = String(Math.floor(abs / 60)).padStart(2, '0');
   const om = String(abs % 60).padStart(2, '0');
@@ -381,7 +381,7 @@ function parsePlanEventRow(row: Record<string, unknown>): Record<string, string>
 
 function parseEventDate(value: string): Date | null {
   const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed : null;
+  return Number.isFinite(parsed.getTime())  parsed : null;
 }
 
 function minutesFromMidnight(date: Date): number {
@@ -521,11 +521,6 @@ export async function fetchPlan(
         nextDate: formatYmd(next),
         todayDate: formatYmd(startOfDay(new Date())),
         headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
-        debug: {
-          album: '',
-          entriesTotal: 0,
-          daysWithData: [],
-        },
       };
     }
 
@@ -553,7 +548,7 @@ export async function fetchPlan(
     const eventStart = parseEventDate(event.start);
     if (!eventStart) continue;
     const key = formatYmd(eventStart);
-    const list = grouped.get(key) ?? [];
+    const list = grouped.get(key)  [];
     list.push(event);
     grouped.set(key, list);
   }
@@ -564,7 +559,7 @@ export async function fetchPlan(
   if (viewMode !== 'month') {
     for (let day = new Date(rangeStart); day <= rangeEnd; day = addDays(day, 1)) {
       const key = formatYmd(day);
-      const dayEventsBase = (grouped.get(key) ?? []).map((event) => {
+      const dayEventsBase = (grouped.get(key)  []).map((event) => {
         const start = parseEventDate(event.start) as Date;
         const end = parseEventDate(event.end) as Date;
         const startMin = minutesFromMidnight(start);
@@ -640,7 +635,7 @@ export async function fetchPlan(
 }
 
 export async function fetchPlanSuggestions(kind: string, query: string): Promise<string[]> {
-  const response = await fetch(`${API_BASE}/proxy/plan-suggest?kind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
+  const response = await fetch(`${API_BASE}/proxy/plan-suggestkind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
   const body = (await response.json().catch(() => ({}))) as { data: Array<{ item: string }> };
   const rows = ensureArray<{ item: string }>(body.data);
   return rows.map((row) => firstNonEmpty(row.item)).filter(Boolean);
@@ -655,13 +650,13 @@ export async function fetchNews(): Promise<NewsItem[]> {
   const items = Array.from(doc.querySelectorAll('item'));
 
   return items.map((item, index) => {
-    const title = firstNonEmpty(item.querySelector('title')?.textContent ?? '');
-    const link = firstNonEmpty(item.querySelector('link')?.textContent ?? '');
-    const pubDateRaw = firstNonEmpty(item.querySelector('pubDate')?.textContent ?? '');
+    const title = firstNonEmpty(item.querySelector('title').textContent  '');
+    const link = firstNonEmpty(item.querySelector('link').textContent  '');
+    const pubDateRaw = firstNonEmpty(item.querySelector('pubDate').textContent  '');
 
-    const descriptionHtml = firstNonEmpty(item.querySelector('description')?.textContent ?? '');
-    const contentNode = item.getElementsByTagName('content:encoded')[0] ?? item.getElementsByTagName('encoded')[0];
-    const contentHtml = firstNonEmpty(contentNode?.textContent ?? '');
+    const descriptionHtml = firstNonEmpty(item.querySelector('description').textContent  '');
+    const contentNode = item.getElementsByTagName('content:encoded')[0]  item.getElementsByTagName('encoded')[0];
+    const contentHtml = firstNonEmpty(contentNode.textContent  '');
 
     const descriptionText = String(descriptionHtml)
       .replace(/<[^>]+>/g, ' ')
@@ -674,21 +669,21 @@ export async function fetchNews(): Promise<NewsItem[]> {
       .replace(/\s+/g, ' ')
       .trim();
 
-    const snippet = descriptionText.length > 220 ? `${descriptionText.slice(0, 217)}...` : descriptionText;
+    const snippet = descriptionText.length > 220  `${descriptionText.slice(0, 217)}...` : descriptionText;
 
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
-    const thumbRaw = imgMatch?.[1] ?? '';
+    const thumbRaw = imgMatch.[1]  '';
     const thumbUrl = thumbRaw.startsWith('http')
-      ? thumbRaw
+       thumbRaw
       : thumbRaw.startsWith('/')
-        ? `https://www.zut.edu.pl${thumbRaw}`
+         `https://www.zut.edu.pl${thumbRaw}`
         : thumbRaw
-          ? `https://www.zut.edu.pl/${thumbRaw}`
+           `https://www.zut.edu.pl/${thumbRaw}`
           : '';
 
     const parsedDate = new Date(pubDateRaw);
     const date = Number.isFinite(parsedDate.getTime())
-      ? new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(parsedDate)
+       new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(parsedDate)
       : pubDateRaw;
 
     return {

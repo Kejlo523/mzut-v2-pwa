@@ -1,9 +1,17 @@
-html,
-body,
-#root {
-  min-height: 100%;
+/* Minimal base — all styles are in App.css */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  /* Support for iOS safe areas (notch/dynamic island) */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-body {
+html, body, #root {
+  height: 100%;
   margin: 0;
 }
+
+body { margin: 0; }
+
+/* Prevent pull-to-refresh on mobile */
+body { overscroll-behavior-y: none; }

@@ -4,8 +4,8 @@ export interface SessionData {
   userId: string;
   username: string;
   authKey: string;
-  imageUrl?: string;
-  activeStudyId?: string | null;
+  imageUrl: string;
+  activeStudyId: string | null;
 }
 
 export interface Study {
@@ -103,7 +103,7 @@ export interface PlanResult {
   nextDate: string;
   todayDate: string;
   headerLabel: string;
-  debug?: {
+  debug: {
     album: string;
     entriesTotal: number;
     daysWithData: string[];
@@ -137,4 +137,5 @@ export type ScreenKey =
   | 'news-detail'
   | 'attendance'
   | 'links'
-  | 'settings';
+  | 'settings'
+  | 'about';

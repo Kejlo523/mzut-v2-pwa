@@ -46,11 +46,11 @@ export function loadSettings(): AppSettings {
     if (!raw) return { ...defaultSettings };
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
     return {
-      language: parsed.language === 'en' ? 'en' : 'pl',
-      notificationsEnabled: typeof parsed.notificationsEnabled === 'boolean' ? parsed.notificationsEnabled : true,
-      refreshMinutes: [30, 60, 120].includes(parsed.refreshMinutes ?? 30) ? (parsed.refreshMinutes as 30 | 60 | 120) : 30,
+      language: parsed.language === 'en'  'en' : 'pl',
+      notificationsEnabled: typeof parsed.notificationsEnabled === 'boolean'  parsed.notificationsEnabled : true,
+      refreshMinutes: [30, 60, 120].includes(parsed.refreshMinutes  30)  (parsed.refreshMinutes as 30 | 60 | 120) : 30,
       compactPlan: Boolean(parsed.compactPlan),
-      gradesGrouping: typeof parsed.gradesGrouping === 'boolean' ? parsed.gradesGrouping : true,
+      gradesGrouping: typeof parsed.gradesGrouping === 'boolean'  parsed.gradesGrouping : true,
     };
   } catch {
     return { ...defaultSettings };
@@ -92,7 +92,7 @@ const TTL_MS = {
 };
 
 function ck(name: string, suffix = ''): string {
-  return `mzutv2_c_${name}${suffix ? `_${suffix}` : ''}`;
+  return `mzutv2_c_${name}${suffix  `_${suffix}` : ''}`;
 }
 
 function saveC<T>(key: string, data: T): void {

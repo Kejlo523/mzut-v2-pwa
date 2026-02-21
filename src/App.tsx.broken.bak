@@ -36,7 +36,7 @@ import { sortUsefulLinks } from './constants/usefulLinks';
 import { useAppNavigation, useExitAttemptToast } from './hooks/useAppNavigation';
 import { useSwipeGestures } from './hooks/useSwipeBack';
 
-// ─────────────────────────────────────────────────────────── helpers ──────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€
 
 function todayYmd(): string {
   const d = new Date();
@@ -67,9 +67,9 @@ function fmtHour(min: number): string {
 
 function screenTitle(s: ScreenKey): string {
   const m: Record<ScreenKey, string> = {
-    login: 'mzutv2', home: 'mzutv2', plan: 'Plan zajęć', grades: 'Oceny',
-    info: 'Dane studenta', news: 'Aktualności', 'news-detail': 'Aktualność',
-    attendance: 'Obecności', links: 'Przydatne strony', settings: 'Ustawienia', about: 'O aplikacji',
+    login: 'mzutv2', home: 'mzutv2', plan: 'Plan zajÄ™Ä‡', grades: 'Oceny',
+    info: 'Dane studenta', news: 'AktualnoĹ›ci', 'news-detail': 'AktualnoĹ›Ä‡',
+    attendance: 'ObecnoĹ›ci', links: 'Przydatne strony', settings: 'Ustawienia', about: 'O aplikacji',
   };
   return m[s];
 }
@@ -84,7 +84,7 @@ function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
 
 function parseGradeNum(g: string): number | null {
   const v = Number.parseFloat(g.replace(',', '.'));
-  return Number.isFinite(v) ? v : null;
+  return Number.isFinite(v)  v : null;
 }
 
 function fmtDec(v: number, d: number): string {
@@ -100,16 +100,16 @@ function initials(name: string): string {
 }
 
 function planCacheKey(viewMode: ViewMode, date: string, studyId: string | null | undefined): string {
-  return `${viewMode}_${date}_${studyId ?? 'nostudy'}`;
+  return `${viewMode}_${date}_${studyId  'nostudy'}`;
 }
 
 function sumUniqueEcts(items: Grade[]): number {
   const bySubject = new Map<string, number>();
   for (const g of items) {
-    const ects = Number.isFinite(g.weight) && g.weight > 0 ? g.weight : 0;
+    const ects = Number.isFinite(g.weight) && g.weight > 0  g.weight : 0;
     if (!ects) continue;
     const subject = g.subjectName || 'przedmiot';
-    const prev = bySubject.get(subject) ?? 0;
+    const prev = bySubject.get(subject)  0;
     if (ects > prev) bySubject.set(subject, ects);
   }
   let total = 0;
@@ -117,7 +117,7 @@ function sumUniqueEcts(items: Grade[]): number {
   return total;
 }
 
-// ─────────────────────────────────────────────────────────── SVG icons ───
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ SVG icons â”€â”€â”€
 
 const SV = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
@@ -147,7 +147,7 @@ function Ic({ n }: { n: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>;
 }
 
-// ─────────────────────────────────────────────────────────── Spinner ──────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Spinner â”€â”€â”€â”€â”€â”€
 
 function Spinner({ text }: { text: string }) {
   return (
@@ -158,7 +158,7 @@ function Spinner({ text }: { text: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────── Toggle ───────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -169,7 +169,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-// ─────────────────────────────────────────────────────────── App ──────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface NewsDetailParams { item: NewsItem; }
 interface SelectedPlanEvent {
@@ -177,7 +177,7 @@ interface SelectedPlanEvent {
   event: PlanResult['dayColumns'][number]['events'][number];
 }
 
-const MONTH_WEEKDAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+const MONTH_WEEKDAYS = ['Pon', 'Wt', 'Ĺšr', 'Czw', 'Pt', 'Sob', 'Nd'];
 
 function App() {
   const [session, setSession]           = useState<SessionData | null>(() => loadSession());
@@ -188,7 +188,7 @@ function App() {
   const [globalError, setGlobalError]   = useState('');
   const [toast, setToast]               = useState('');
 
-  const nav   = useAppNavigation<ScreenKey>(session ? 'home' : 'login');
+  const nav   = useAppNavigation<ScreenKey>(session  'home' : 'login');
   const screen = nav.current.key;
 
   const [drawerOpen, setDrawerOpen]     = useState(false);
@@ -223,9 +223,9 @@ function App() {
   // Attendance
   const [attendanceMap, setAttendMap]   = useState<Record<string, AttendanceItem>>(() => loadAttendanceMap());
 
-  const activeStudyId = session?.activeStudyId ?? studies[0]?.przynaleznoscId ?? null;
+  const activeStudyId = session.activeStudyId  studies[0].przynaleznoscId  null;
 
-  // ── Online/offline tracking ──────────────────────────────────────────────
+  // â”€â”€ Online/offline tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const on  = () => setIsOnline(true);
     const off = () => setIsOnline(false);
@@ -234,7 +234,7 @@ function App() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // ── Toast auto-clear ─────────────────────────────────────────────────────
+  // â”€â”€ Toast auto-clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(''), 2200);
@@ -243,7 +243,7 @@ function App() {
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
-  // ── Keyboard drawer close ─────────────────────────────────────────────────
+  // â”€â”€ Keyboard drawer close â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!drawerOpen) return;
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false); };
@@ -258,18 +258,18 @@ function App() {
     return () => window.removeEventListener('keydown', fn);
   }, [selectedPlanEvent]);
 
-  // ── Sync settings & attendance ────────────────────────────────────────────
+  // â”€â”€ Sync settings & attendance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => { saveSettings(settings); }, [settings]);
   useEffect(() => { saveAttendanceMap(attendanceMap); }, [attendanceMap]);
 
-  // ── Session → navigation sync ─────────────────────────────────────────────
+  // â”€â”€ Session â†’ navigation sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     saveSession(session);
-    if (!session && screen !== 'login') nav.reset('login', undefined);
-    if (session && screen === 'login') nav.reset('home', undefined);
+    if (!session && screen !== 'login') nav.reset('login');
+    if (session && screen === 'login') nav.reset('home');
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Close drawer on screen change ────────────────────────────────────────
+  // â”€â”€ Close drawer on screen change â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     setDrawerOpen(false);
     if (screen !== 'plan') {
@@ -278,12 +278,12 @@ function App() {
     }
   }, [screen]);
 
-  // ── Exit toast ────────────────────────────────────────────────────────────
+  // â”€â”€ Exit toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useExitAttemptToast(() => showToast('Nacinij ponownie aby wyj'));
 
   const canBack = nav.canGoBack && screen !== 'home';
 
-  // ── Swipe gestures ────────────────────────────────────────────────────────
+  // â”€â”€ Swipe gestures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const swipe = useSwipeGestures({
     canGoBack: canBack,
     onBack: nav.goBack,
@@ -291,18 +291,18 @@ function App() {
     onOpenDrawer: () => setDrawerOpen(true),
   });
 
-  // ── Session management ────────────────────────────────────────────────────
+  // â”€â”€ Session management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const applySession = useCallback((s: SessionData | null) => setSession(s), []);
 
   const updateActiveStudy = useCallback((id: string | null) => {
-    setSession(prev => (prev ? { ...prev, activeStudyId: id } : prev));
+    setSession(prev => prev  { ...prev, activeStudyId: id } : prev);
   }, []);
 
-  // ── Data loading with cache-first strategy ────────────────────────────────
+  // â”€â”€ Data loading with cache-first strategy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const loadStudiesData = useCallback(async (sess: SessionData) => {
     // Show cached first
-    const cached = cache.loadStudiesForce() ?? [];
+    const cached = cache.loadStudiesForce();
     if (cached.length) {
       setStudies(cached);
       if (!sess.activeStudyId && cached[0].przynaleznoscId) {
@@ -321,7 +321,7 @@ function App() {
           updateActiveStudy(fresh[0].przynaleznoscId);
         }
       } catch (e) {
-        if (!cached.length) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać kierunków.');
+        if (!cached.length) setGlobalError(e instanceof Error  e.message : 'Nie moĹĽna pobraÄ‡ kierunkĂłw.');
       } finally {
         setGlobalLoad(false);
       }
@@ -333,7 +333,7 @@ function App() {
     void loadStudiesData(session);
   }, [session, loadStudiesData]);
 
-  const loadPlanData = useCallback(async (search: { category: string; query: string } = { category: 'number', query: '' }) => {
+  const loadPlanData = useCallback(async (search: { category: string; query: string }) => {
     if (!session) return;
     const cacheKey = planCacheKey(planViewMode, planDate, activeStudyId);
 
@@ -351,7 +351,7 @@ function App() {
       setPlanResult(result);
       if (!search && result.currentDate) setPlanDate(result.currentDate);
     } catch (e) {
-      if (!planResult) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać planu.');
+      if (!planResult) setGlobalError(e instanceof Error  e.message : 'Nie moĹĽna pobraÄ‡ planu.');
     } finally {
       setPlanLoading(false);
     }
@@ -366,10 +366,10 @@ function App() {
       return;
     }
 
-    const cachedSem = cache.loadSemestersForce(activeStudyId) ?? [];
+    const cachedSem = cache.loadSemestersForce(activeStudyId);
     if (cachedSem.length) setSemesters(cachedSem);
 
-    const semId = selSemId || cachedSem?.[0]?.listaSemestrowId;
+    const semId = selSemId || cachedSem.[0].listaSemestrowId;
     if (semId) {
       const cachedG = cache.loadGradesForce(semId);
       if (cachedG) setGrades(cachedG);
@@ -385,7 +385,7 @@ function App() {
         setSemesters(sems);
       }
 
-      const safeSems = sems ?? [];
+      const safeSems = sems  [];
       const curSemId = selSemId || safeSems[0].listaSemestrowId;
       if (!curSemId) {
         setGrades([]);
@@ -424,10 +424,10 @@ function App() {
             semGrades = await fetchGrades(session, sem.listaSemestrowId);
             cache.saveGrades(sem.listaSemestrowId, semGrades);
           } catch {
-            semGrades = cache.loadGradesForce(sem.listaSemestrowId) ?? [];
+            semGrades = cache.loadGradesForce(sem.listaSemestrowId)  [];
           }
         }
-        total += sumUniqueEcts(semGrades ?? []);
+        total += sumUniqueEcts(semGrades  []);
       }
 
       setTotalEctsAll(total);
@@ -437,7 +437,7 @@ function App() {
         // noop
       }
     } catch (e) {
-      if (!grades.length) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać ocen.');
+      if (!grades.length) setGlobalError(e instanceof Error  e.message : 'Nie moĹĽna pobraÄ‡ ocen.');
     } finally {
       setGradesLoad(false);
     }
@@ -456,14 +456,14 @@ function App() {
       setDetails(payload.details);
       setHistory(payload.history);
     } catch (e) {
-      if (!forceCached) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać danych.');
+      if (!forceCached) setGlobalError(e instanceof Error  e.message : 'Nie moĹĽna pobraÄ‡ danych.');
     } finally {
       setInfoLoading(false);
     }
   }, [session, activeStudyId]);
 
   const loadNewsData = useCallback(async () => {
-    const forced = cache.loadNewsForce() ?? [];
+    const forced = cache.loadNewsForce();
     if (forced.length) setNews(forced);
     if (cache.loadNews()) return;
     setNewsLoading(true);
@@ -473,13 +473,13 @@ function App() {
       cache.saveNews(items);
       setNews(items);
     } catch (e) {
-      if (!forced.length) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać aktualności.');
+      if (!forced.length) setGlobalError(e instanceof Error  e.message : 'Nie moĹĽna pobraÄ‡ aktualnoĹ›ci.');
     } finally {
       setNewsLoading(false);
     }
   }, []);
 
-  // ── Load on screen enter ──────────────────────────────────────────────────
+  // â”€â”€ Load on screen enter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const prevScreen = useRef<ScreenKey | null>(null);
   useEffect(() => {
     if (!session || screen === prevScreen.current) return;
@@ -518,12 +518,12 @@ function App() {
     if (screen === 'info')   void loadInfoData();
   }, [session, activeStudyId, screen, loadPlanData, loadGradesData, loadInfoData]);
 
-  // ── Refresh when plan date/view changes ──────────────────────────────────
+  // â”€â”€ Refresh when plan date/view changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (screen === 'plan' && session) void loadPlanData();
   }, [planViewMode, planDate, activeStudyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Refresh grades when semester selected changes ─────────────────────────
+  // â”€â”€ Refresh grades when semester selected changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (screen === 'grades' && session && selSemId && selSemId !== selSemPrev.current) {
       selSemPrev.current = selSemId;
@@ -540,13 +540,13 @@ function App() {
     }
   }, [selSemId, screen, session]);
 
-  // ── Computed values ───────────────────────────────────────────────────────
+  // â”€â”€ Computed values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const groupedGrades = useMemo(() => {
     const m = new Map<string, Grade[]>();
     for (const g of grades) {
       const k = g.subjectName || 'Przedmiot';
-      m.set(k, [...(m.get(k) ?? []), g]);
+      m.set(k, [...(m.get(k)  []), g]);
     }
     return [...m.entries()].map(([s, items]) => ({ s, items })).sort((a, b) => a.s.localeCompare(b.s, 'pl'));
   }, [grades]);
@@ -559,12 +559,12 @@ function App() {
       if (v !== null) { total += v; count++; }
     }
     const ects = sumUniqueEcts(grades);
-    return { avg: count > 0 ? fmtDec(total / count, 2) : '-', ects: fmtDec(ects, 1) };
+    return { avg: count > 0  fmtDec(total / count, 2) : '-', ects: fmtDec(ects, 1) };
   }, [grades]);
 
   const attendanceItems = useMemo(() => {
     const m = new Map<string, AttendanceItem>();
-    for (const col of planResult?.dayColumns ?? []) {
+    for (const col of planResult.dayColumns  []) {
       for (const ev of col.events) {
         const k = ev.subjectKey || ev.title;
         if (!k || m.has(k)) continue;
@@ -572,42 +572,42 @@ function App() {
       }
     }
     for (const [k, stored] of Object.entries(attendanceMap)) {
-      const base = m.get(k) ?? { key: k, subjectName: stored.subjectName, subjectType: stored.subjectType, absenceCount: 0, totalHours: 0 };
+      const base = m.get(k)  { key: k, subjectName: stored.subjectName, subjectType: stored.subjectType, absenceCount: 0, totalHours: 0 };
       m.set(k, { ...base, absenceCount: stored.absenceCount, totalHours: stored.totalHours });
     }
     return [...m.values()].sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'pl'));
-  }, [planResult?.dayColumns, attendanceMap]);
+  }, [planResult.dayColumns, attendanceMap]);
 
   const links = useMemo(() => sortUsefulLinks(studies), [studies]);
   const totalAbsences = useMemo(() => attendanceItems.reduce((a, i) => a + i.absenceCount, 0), [attendanceItems]);
 
   const weekLayout = useMemo(() => {
     let minS = Infinity, maxE = 0;
-    for (const col of planResult?.dayColumns ?? []) {
+    for (const col of planResult.dayColumns  []) {
       for (const ev of col.events) { minS = Math.min(minS, ev.startMin); maxE = Math.max(maxE, ev.endMin); }
     }
-    const s0 = Number.isFinite(minS) ? minS : 7 * 60;
-    const e0 = maxE > 0 ? maxE : 21 * 60;
+    const s0 = Number.isFinite(minS)  minS : 7 * 60;
+    const e0 = maxE > 0  maxE : 21 * 60;
     const startMin = Math.max(6 * 60, Math.floor((s0 - 30) / 60) * 60);
     const endMin   = Math.max(startMin + 60, Math.min(23 * 60, Math.ceil((e0 + 30) / 60) * 60));
-    const hh = settings.compactPlan ? 44 : 56;
+    const hh = settings.compactPlan  44 : 56;
     const slots: number[] = [];
     for (let m = startMin; m < endMin; m += 60) slots.push(m);
     if (!slots.length) slots.push(startMin);
     return { startMin, endMin, hourHeight: hh, slots };
-  }, [planResult?.dayColumns, settings.compactPlan]);
+  }, [planResult.dayColumns, settings.compactPlan]);
 
   const weekTrackH   = weekLayout.slots.length * weekLayout.hourHeight;
   const min2px       = weekLayout.hourHeight / 60;
 
   const updateAttendance = useCallback((key: string, patch: Partial<AttendanceItem>) => {
     setAttendMap(prev => {
-      const cur = prev[key] ?? { key, subjectName: patch.subjectName ?? key, subjectType: patch.subjectType ?? 'Zajęcia', absenceCount: 0, totalHours: 0 };
+      const cur = prev[key]  { key, subjectName: patch.subjectName  key, subjectType: patch.subjectType  'ZajÄ™cia', absenceCount: 0, totalHours: 0 };
       return {
         ...prev, [key]: {
           ...cur, ...patch,
-          absenceCount: Math.max(0, patch.absenceCount ?? cur.absenceCount),
-          totalHours: Math.max(0, Number.isFinite(patch.totalHours ?? cur.totalHours) ? (patch.totalHours ?? cur.totalHours) : cur.totalHours),
+          absenceCount: Math.max(0, patch.absenceCount  cur.absenceCount),
+          totalHours: Math.max(0, Number.isFinite(patch.totalHours  cur.totalHours)  (patch.totalHours  cur.totalHours) : cur.totalHours),
         },
       };
     });
@@ -619,20 +619,20 @@ function App() {
       return;
     }
     if (s === 'home') {
-      nav.reset('home', undefined);
+      nav.reset('home');
     } else {
-      nav.push(s, undefined);
+      nav.push(s);
     }
     setDrawerOpen(false);
   }, [nav, screen]);
 
-  // ── Login ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [loginVal, setLoginVal]         = useState('');
   const [password, setPassword]         = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
   async function onLoginSubmit() {
-    if (!loginVal || !password) { setGlobalError('Wpisz login i hasło.'); return; }
+    if (!loginVal || !password) { setGlobalError('Wpisz login i hasĹ‚o.'); return; }
     setLoginLoading(true);
     setGlobalError('');
     try {
@@ -641,48 +641,48 @@ function App() {
       setPassword('');
       showToast('Zalogowano poprawnie');
     } catch (e) {
-      setGlobalError(e instanceof Error ? e.message : 'Logowanie nieudane.');
+      setGlobalError(e instanceof Error  e.message : 'Logowanie nieudane.');
     } finally {
       setLoginLoading(false);
     }
   }
 
-  // ── AppBar logic ──────────────────────────────────────────────────────────
-  const onNavIcon = canBack ? nav.goBack : () => setDrawerOpen(true);
+  // â”€â”€ AppBar logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const onNavIcon = canBack  nav.goBack : () => setDrawerOpen(true);
 
-  // ── Drawer items ──────────────────────────────────────────────────────────
+  // â”€â”€ Drawer items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   type DrawerKey = Exclude<ScreenKey, 'login' | 'news-detail'>;
   const drawerItems: Array<{ key: DrawerKey; label: string; icon: string }> = [
-    { key: 'home',       label: 'Strona główna',    icon: 'home'     },
-    { key: 'plan',       label: 'Plan zajęć',        icon: 'calendar' },
+    { key: 'home',       label: 'Strona gĹ‚Ăłwna',    icon: 'home'     },
+    { key: 'plan',       label: 'Plan zajÄ™Ä‡',        icon: 'calendar' },
     { key: 'grades',     label: 'Oceny',             icon: 'grade'    },
-    { key: 'attendance', label: 'Obecności',          icon: 'present'  },
+    { key: 'attendance', label: 'ObecnoĹ›ci',          icon: 'present'  },
     { key: 'info',       label: 'Dane studenta',      icon: 'user'     },
-    { key: 'news',       label: 'Aktualności',        icon: 'news'     },
+    { key: 'news',       label: 'AktualnoĹ›ci',        icon: 'news'     },
     { key: 'links',      label: 'Przydatne strony',   icon: 'link'     },
     { key: 'settings',   label: 'Ustawienia',         icon: 'settings' },
     { key: 'about',      label: 'O aplikacji',        icon: 'about'    },
   ];
 
-  // ─────────────────────────────────────────────────────── render screens ──
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ render screens â”€â”€
 
   function renderLogin() {
     return (
       <section className="screen login-screen">
         <div className="login-logo">mZUT</div>
         <div className="login-title">mzutv2</div>
-        <div className="login-subtitle">Zaloguj się kontem ZUT</div>
+        <div className="login-subtitle">Zaloguj siÄ™ kontem ZUT</div>
         <div className="login-form">
           <label className="field-label">
             Login
             <input value={loginVal} onChange={e => setLoginVal(e.target.value)} placeholder="s12345 lub email" autoComplete="username" onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()} />
           </label>
           <label className="field-label">
-            Hasło
-            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="•••••••" type="password" autoComplete="current-password" onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()} />
+            HasĹ‚o
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="â€˘â€˘â€˘â€˘â€˘â€˘â€˘" type="password" autoComplete="current-password" onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()} />
           </label>
           <button type="button" onClick={() => void onLoginSubmit()} disabled={loginLoading}>
-            {loginLoading ? 'Logowanie…' : 'Zaloguj się'}
+            {loginLoading  'Logowanieâ€¦' : 'Zaloguj siÄ™'}
           </button>
         </div>
       </section>
@@ -694,18 +694,18 @@ function App() {
       <section className="screen">
         <div className="card home-hero">
           <div className="hero-greeting">Witaj</div>
-          <div className="hero-name">{session?.username || 'Studencie'} 👋</div>
-          <div className="hero-sub">Wybierz moduł, aby przejść dalej</div>
+          <div className="hero-name">{session.username || 'Studencie'} đź‘‹</div>
+          <div className="hero-sub">Wybierz moduĹ‚, aby przejĹ›Ä‡ dalej</div>
           {!isOnline && <span className="offline-badge" style={{marginTop: 8}}><Ic n="wifi-off"/>Tryb offline</span>}
         </div>
 
-        <div className="section-title">Skróty</div>
+        <div className="section-title">SkrĂłty</div>
         <div className="tile-grid">
           {([
-            { key: 'plan'  as DrawerKey, label: 'Plan zajęć',    desc: 'Dzień, tydzień, miesiąc', icon: 'calendar' },
-            { key: 'grades'as DrawerKey, label: 'Oceny',          desc: 'Średnia i punkty ECTS',   icon: 'grade'    },
+            { key: 'plan'  as DrawerKey, label: 'Plan zajÄ™Ä‡',    desc: 'DzieĹ„, tydzieĹ„, miesiÄ…c', icon: 'calendar' },
+            { key: 'grades'as DrawerKey, label: 'Oceny',          desc: 'Ĺšrednia i punkty ECTS',   icon: 'grade'    },
             { key: 'info'  as DrawerKey, label: 'Dane studenta',  desc: 'Kierunek i przebieg',      icon: 'user'     },
-            { key: 'news'  as DrawerKey, label: 'Aktualności',    desc: 'Komunikaty uczelni',       icon: 'news'     },
+            { key: 'news'  as DrawerKey, label: 'AktualnoĹ›ci',    desc: 'Komunikaty uczelni',       icon: 'news'     },
           ] as const).map(t => (
             <button key={t.key} type="button" className="tile" onClick={() => openScreen(t.key)}>
               <div className="tile-icon"><Ic n={t.icon}/></div>
@@ -718,7 +718,7 @@ function App() {
         <div className="section-title">Inne</div>
         <div className="list-menu">
           {([
-            { key: 'attendance' as DrawerKey, label: 'Obecności',        icon: 'present'  },
+            { key: 'attendance' as DrawerKey, label: 'ObecnoĹ›ci',        icon: 'present'  },
             { key: 'links'      as DrawerKey, label: 'Przydatne strony', icon: 'link'     },
             { key: 'settings'   as DrawerKey, label: 'Ustawienia',       icon: 'settings' },
           ] as const).map(i => (
@@ -734,7 +734,7 @@ function App() {
   }
 
   function renderPlan() {
-    const cols = planResult?.dayColumns ?? [];
+    const cols = planResult.dayColumns  [];
     const today = todayYmd();
 
     return (
@@ -742,18 +742,18 @@ function App() {
         {studies.length > 0 && (
           <label className="field-label">
             Kierunek
-            <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+            <select value={activeStudyId  ''} onChange={e => updateActiveStudy(e.target.value || null)}>
               {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
             </select>
           </label>
         )}
 
         <div className="plan-date-header">
-          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult?.prevDate ?? planDate)} aria-label="Poprzedni">
+          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult.prevDate  planDate)} aria-label="Poprzedni">
             <Ic n="chevL"/>
           </button>
-          <div className="plan-date-label">{planResult?.headerLabel || planDate}</div>
-          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult?.nextDate ?? planDate)} aria-label="Następny">
+          <div className="plan-date-label">{planResult.headerLabel || planDate}</div>
+          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult.nextDate  planDate)} aria-label="NastÄ™pny">
             <Ic n="chevR"/>
           </button>
         </div>
@@ -761,12 +761,12 @@ function App() {
         <div className="plan-top-row">
           <div className="segmented" style={{ flex: 1 }}>
             {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-              <button key={m} type="button" className={planViewMode === m ? 'active' : ''} onClick={() => setPlanViewMode(m)}>
-                {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
+              <button key={m} type="button" className={planViewMode === m  'active' : ''} onClick={() => setPlanViewMode(m)}>
+                {m === 'day'  'DzieĹ„' : m === 'week'  'TydzieĹ„' : 'MiesiÄ…c'}
               </button>
             ))}
           </div>
-          <button type="button" className="plan-today-btn" onClick={() => setPlanDate(today)}>Dziś</button>
+          <button type="button" className="plan-today-btn" onClick={() => setPlanDate(today)}>DziĹ›</button>
         </div>
 
         {planSearchOpen && (
@@ -774,7 +774,7 @@ function App() {
             <div className="search-row">
               <select value={planSearchCat} onChange={e => setPlanSearchCat(e.target.value)}>
                 <option value="number">Album</option>
-                <option value="teacher">Prowadzący</option>
+                <option value="teacher">ProwadzÄ…cy</option>
                 <option value="group">Grupa</option>
                 <option value="room">Sala</option>
                 <option value="subject">Przedmiot</option>
@@ -791,13 +791,13 @@ function App() {
                 Szukaj
               </button>
               <button type="button" className="ghost" onClick={() => { setPlanSearchQ(''); void loadPlanData(); }}>
-                Wyczyść
+                WyczyĹ›Ä‡
               </button>
             </div>
           </div>
         )}
 
-        {planLoading && <Spinner text="Pobieranie planu…"/>}
+        {planLoading && <Spinner text="Pobieranie planuâ€¦"/>}
 
         {!planLoading && planViewMode === 'day' && (
           <div className="list-stack">
@@ -805,11 +805,11 @@ function App() {
               <div key={col.date} className="card day-tl-card">
                 <div className="day-tl-head">
                   <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
-                  {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
+                  {col.date === today && <span className="day-tl-today-badge">DziĹ›</span>}
                 </div>
 
-                {col.events.length === 0 ? (
-                  <div className="day-empty">Brak zajęć</div>
+                {col.events.length === 0  (
+                  <div className="day-empty">Brak zajÄ™Ä‡</div>
                 ) : (
                   <div className="day-tl-body">
                     <div className="day-time-col">
@@ -848,7 +848,7 @@ function App() {
                           >
                             <div className="day-event-time">{ev.startStr} - {ev.endStr}</div>
                             <div className="day-event-title">{ev.title}</div>
-                            <div className="day-event-meta">{ev.room} {ev.group ? `· ${ev.group}` : ''}</div>
+                            <div className="day-event-meta">{ev.room} {ev.group  `Â· ${ev.group}` : ''}</div>
                           </div>
                         );
                       })}
@@ -859,8 +859,8 @@ function App() {
             ))}
             {cols.length === 0 && (
               <div className="empty-state">
-                <div className="empty-icon">📅</div>
-                <p>Brak zajęć w wybranym dniu</p>
+                <div className="empty-icon">ðŸ“…</div>
+                <p>Brak zajÄ™Ä‡ w wybranym dniu</p>
               </div>
             )}
           </div>
@@ -868,12 +868,12 @@ function App() {
 
         {!planLoading && planViewMode === 'week' && (
           <div className="card week-card">
-            {cols.length > 0 ? (
+            {cols.length > 0  (
               <>
                 <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${cols.length}, 1fr)` }}>
                   <div className="week-head-time">Godz.</div>
                   {cols.map(col => (
-                    <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
+                    <div key={`h-${col.date}`} className={`week-head-day ${col.date === today  'today' : ''}`}>
                       <strong>{fmtWeekdayShort(col.date)}</strong>
                       <span>{fmtDayMonth(col.date)}</span>
                     </div>
@@ -935,10 +935,10 @@ function App() {
           <div className="month-shell">
             <div className="month-weekdays">{MONTH_WEEKDAYS.map(d => <span key={d}>{d}</span>)}</div>
             <div className="month-grid">
-              {(planResult?.monthGrid ?? []).flat().map(cell => (
+              {(planResult.monthGrid  []).flat().map(cell => (
                 <div
                   key={cell.date}
-                  className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
+                  className={`month-cell ${cell.inCurrentMonth  '' : 'out'} ${cell.hasPlan  'has' : ''} ${cell.date === today  'today' : ''}`}
                   onClick={() => {
                     setPlanDate(cell.date);
                     setPlanViewMode('day');
@@ -968,16 +968,16 @@ function App() {
     return (
       <section className="screen">
         <div className="metrics-row">
-          <div className="metric-card"><div className="metric-label">Średnia</div><div className="metric-value">{gradesSummary.avg}</div></div>
+          <div className="metric-card"><div className="metric-label">Ĺšrednia</div><div className="metric-value">{gradesSummary.avg}</div></div>
           <div className="metric-card"><div className="metric-label">ECTS semestr</div><div className="metric-value">{gradesSummary.ects}</div></div>
-          <div className="metric-card"><div className="metric-label">ECTS łącznie</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+          <div className="metric-card"><div className="metric-label">ECTS Ĺ‚Ä…cznie</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
         </div>
 
         <div className="grades-filters">
           {studies.length > 0 && (
             <label className="field-label">
               Kierunek
-              <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+              <select value={activeStudyId  ''} onChange={e => updateActiveStudy(e.target.value || null)}>
                 {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
               </select>
             </label>
@@ -997,26 +997,26 @@ function App() {
         </div>
 
         <div className="grades-toggle-row">
-          <div className="grades-toggle-label">Grupowanie przedmiotów</div>
+          <div className="grades-toggle-label">Grupowanie przedmiotĂłw</div>
           <button
             type="button"
             className="grades-toggle-btn"
             onClick={() => setSettings(prev => ({ ...prev, gradesGrouping: !prev.gradesGrouping }))}
           >
-            {settings.gradesGrouping ? 'Włączone' : 'Wyłączone'}
+            {settings.gradesGrouping  'WĹ‚Ä…czone' : 'WyĹ‚Ä…czone'}
           </button>
         </div>
 
-        {gradesLoading && <Spinner text="Pobieranie ocen…"/>}
+        {gradesLoading && <Spinner text="Pobieranie ocenâ€¦"/>}
         {!gradesLoading && grades.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">🎓</div><p>Brak ocen dla wybranego semestru</p></div>
+          <div className="empty-state"><div className="empty-state-icon">đźŽ“</div><p>Brak ocen dla wybranego semestru</p></div>
         )}
 
         <div className="list-stack">
-          {settings.gradesGrouping ? (
+          {settings.gradesGrouping  (
             groupedGrades.map(({ s, items }) => {
               const nums = items.map(g => parseGradeNum(g.grade)).filter((v): v is number => v !== null);
-              const avg = nums.length ? fmtDec(nums.reduce((sum, v) => sum + v, 0) / nums.length, 2) : '-';
+              const avg = nums.length  fmtDec(nums.reduce((sum, v) => sum + v, 0) / nums.length, 2) : '-';
               return (
                 <div key={s} className="grade-group">
                   <div className="grade-group-head">
@@ -1026,12 +1026,12 @@ function App() {
                   <div className="grade-group-items">
                     {items.map((g, i) => (
                       <div key={`${s}-${i}`} className="grade-row">
-                        <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
+                        <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || 'â€“'}</span>
                         <div className="grade-info">
-                          <div className="grade-date-teacher">{g.date || '–'}</div>
+                          <div className="grade-date-teacher">{g.date || 'â€“'}</div>
                           {g.teacher && <div className="grade-date-teacher">{g.teacher}</div>}
                         </div>
-                        <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
+                        <div className="grade-ects">{g.weight > 0  `${fmtDec(g.weight, 1)} ECTS` : 'â€“'}</div>
                       </div>
                     ))}
                   </div>
@@ -1042,14 +1042,14 @@ function App() {
             <div className="grade-group">
               {grades.map((g, i) => (
                 <div key={`flat-${i}-${g.subjectName}`} className="grade-row">
-                  <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
+                  <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || 'â€“'}</span>
                   <div className="grade-info">
                     <div>{g.subjectName || 'Przedmiot'}</div>
                     <div className="grade-date-teacher">
-                      {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
+                      {g.date || 'â€“'}{g.teacher  ` Â· ${g.teacher}` : ''}
                     </div>
                   </div>
-                  <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
+                  <div className="grade-ects">{g.weight > 0  `${fmtDec(g.weight, 1)} ECTS` : 'â€“'}</div>
                 </div>
               ))}
             </div>
@@ -1065,21 +1065,21 @@ function App() {
         {studies.length > 0 && (
           <label className="field-label">
             Kierunek
-            <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+            <select value={activeStudyId  ''} onChange={e => updateActiveStudy(e.target.value || null)}>
               {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
             </select>
           </label>
         )}
-        {infoLoading && <Spinner text="Ładowanie danych…"/>}
+        {infoLoading && <Spinner text="Ĺadowanie danychâ€¦"/>}
         {details && (
           <div className="info-card">
             {([
               { l: 'Album',         v: details.album },
-              { l: 'Wydział',       v: details.wydzial },
+              { l: 'WydziaĹ‚',       v: details.wydzial },
               { l: 'Kierunek',      v: details.kierunek },
               { l: 'Forma',         v: details.forma },
               { l: 'Poziom',        v: details.poziom },
-              { l: 'Specjalność',   v: details.specjalnosc },
+              { l: 'SpecjalnoĹ›Ä‡',   v: details.specjalnosc },
               { l: 'Specjalizacja', v: details.specjalizacja },
               { l: 'Status',        v: details.status },
               { l: 'Rok akadem.',   v: details.rokAkademicki },
@@ -1094,7 +1094,7 @@ function App() {
         )}
         {history.length > 0 && (
           <div className="info-card" style={{marginTop:0}}>
-            <div style={{padding:'10px 14px',fontWeight:700,fontSize:14,borderBottom:'1px solid var(--mz-border-soft)'}}>Przebieg studiów</div>
+            <div style={{padding:'10px 14px',fontWeight:700,fontSize:14,borderBottom:'1px solid var(--mz-border-soft)'}}>Przebieg studiĂłw</div>
             {history.map((h, i) => (
               <div key={i} className="history-row">
                 <span className="history-label">{h.label}</span>
@@ -1104,7 +1104,7 @@ function App() {
           </div>
         )}
         {!infoLoading && !details && (
-          <div className="empty-state"><div className="empty-state-icon">👤</div><p>Brak danych studenta</p></div>
+          <div className="empty-state"><div className="empty-state-icon">đź‘¤</div><p>Brak danych studenta</p></div>
         )}
       </section>
     );
@@ -1113,14 +1113,14 @@ function App() {
   function renderNews() {
     return (
       <section className="screen">
-        {newsLoading && <Spinner text="Pobieranie aktualności…"/>}
+        {newsLoading && <Spinner text="Pobieranie aktualnoĹ›ciâ€¦"/>}
         {!newsLoading && news.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">📰</div><p>Brak aktualności</p></div>
+          <div className="empty-state"><div className="empty-state-icon">đź“°</div><p>Brak aktualnoĹ›ci</p></div>
         )}
         <div className="list-stack">
           {news.map(item => (
             <button key={item.id} type="button" className="news-card" onClick={() => nav.push('news-detail', { item } as unknown as NewsDetailParams)}>
-              {item.thumbUrl ? (
+              {item.thumbUrl  (
                 <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               ) : (
                 <div className="news-thumb-placeholder"><Ic n="news"/></div>
@@ -1138,9 +1138,9 @@ function App() {
   }
 
   function renderNewsDetail() {
-    const p = (nav.current.params ?? {}) as NewsDetailParams;
+    const p = (nav.current.params  {}) as NewsDetailParams;
     const item = p.item;
-    if (!item) return <section className="screen"><div className="empty-state"><p>Brak treści</p></div></section>;
+    if (!item) return <section className="screen"><div className="empty-state"><p>Brak treĹ›ci</p></div></section>;
     const fullHtml = item.contentHtml || item.descriptionHtml;
     return (
       <section className="screen">
@@ -1148,7 +1148,7 @@ function App() {
         <div className="card">
           <div className="news-detail-title">{item.title}</div>
           <div className="news-detail-date">{item.date}</div>
-          {fullHtml ? (
+          {fullHtml  (
             <div className="news-detail-body" dangerouslySetInnerHTML={{ __html: fullHtml }} />
           ) : (
             <div className="news-detail-body">{item.descriptionText || item.snippet}</div>
@@ -1156,7 +1156,7 @@ function App() {
         </div>
         {item.link && (
           <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
-            Otwórz w przeglądarce ↗
+            OtwĂłrz w przeglÄ…darce â†—
           </a>
         )}
       </section>
@@ -1167,11 +1167,11 @@ function App() {
     return (
       <section className="screen">
         <div className="attendance-summary">
-          <div className="attendance-total-label">Łącznie nieobecności</div>
+          <div className="attendance-total-label">ĹÄ…cznie nieobecnoĹ›ci</div>
           <div className="attendance-total-num">{totalAbsences}</div>
         </div>
         {attendanceItems.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">✅</div><p>Brak zarejestrowanych zajęć. Przejdź do planu, aby załadować listę przedmiotów.</p></div>
+          <div className="empty-state"><div className="empty-state-icon">âś…</div><p>Brak zarejestrowanych zajÄ™Ä‡. PrzejdĹş do planu, aby zaĹ‚adowaÄ‡ listÄ™ przedmiotĂłw.</p></div>
         )}
         <div className="list-stack">
           {attendanceItems.map(item => (
@@ -1183,15 +1183,15 @@ function App() {
                   <Ic n="minus"/>
                 </button>
                 <div className="attendance-count">{item.absenceCount}</div>
-                <button type="button" className="attendance-count-btn" onClick={() => updateAttendance(item.key, { ...item, absenceCount: item.absenceCount + 1 })} aria-label="Zwiększ">
+                <button type="button" className="attendance-count-btn" onClick={() => updateAttendance(item.key, { ...item, absenceCount: item.absenceCount + 1 })} aria-label="ZwiÄ™ksz">
                   <Ic n="plus"/>
                 </button>
                 <div style={{flex:1,fontSize:12,color:'var(--mz-muted)',textAlign:'right'}}>
-                  {item.totalHours > 0 ? `${item.totalHours}h` : ''}
+                  {item.totalHours > 0  `${item.totalHours}h` : ''}
                 </div>
               </div>
               <div className="attendance-hours-row">
-                <span className="attendance-hours-label">Godzin łącznie:</span>
+                <span className="attendance-hours-label">Godzin Ĺ‚Ä…cznie:</span>
                 <input type="number" min={0} className="attendance-hours-input" value={item.totalHours} onChange={e => updateAttendance(item.key, { ...item, totalHours: Number(e.target.value) })} />
               </div>
             </div>
@@ -1206,7 +1206,7 @@ function App() {
     const faculties = links.filter(l => l.scope === 'FACULTY');
     return (
       <section className="screen">
-        {faculties.length > 0 && <div className="link-category">Twój wydział</div>}
+        {faculties.length > 0 && <div className="link-category">TwĂłj wydziaĹ‚</div>}
         {faculties.map(l => (
           <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
             <div className="link-card-title">{l.title}</div>
@@ -1230,10 +1230,10 @@ function App() {
         <div className="settings-card">
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Język</div>
-              <div className="settings-row-sub">Język interfejsu</div>
+              <div className="settings-row-label">JÄ™zyk</div>
+              <div className="settings-row-sub">JÄ™zyk interfejsu</div>
             </div>
-            <select value={settings.language} onChange={e => setSettings(p => ({ ...p, language: e.target.value === 'en' ? 'en' : 'pl' }))}>
+            <select value={settings.language} onChange={e => setSettings(p => ({ ...p, language: e.target.value === 'en'  'en' : 'pl' }))}>
               <option value="pl">Polski</option>
               <option value="en">English</option>
             </select>
@@ -1241,14 +1241,14 @@ function App() {
           <div className="settings-row">
             <div>
               <div className="settings-row-label">Powiadomienia</div>
-              <div className="settings-row-sub">Włącz push notifications</div>
+              <div className="settings-row-sub">WĹ‚Ä…cz push notifications</div>
             </div>
             <Toggle checked={settings.notificationsEnabled} onChange={v => setSettings(p => ({ ...p, notificationsEnabled: v }))} />
           </div>
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Odświeżanie</div>
-              <div className="settings-row-sub">Interwał synchronizacji</div>
+              <div className="settings-row-label">OdĹ›wieĹĽanie</div>
+              <div className="settings-row-sub">InterwaĹ‚ synchronizacji</div>
             </div>
             <select value={settings.refreshMinutes} onChange={e => setSettings(p => ({ ...p, refreshMinutes: Number(e.target.value) as 30|60|120 }))}>
               <option value={30}>30 min</option>
@@ -1259,7 +1259,7 @@ function App() {
           <div className="settings-row">
             <div>
               <div className="settings-row-label">Kompaktowy plan</div>
-              <div className="settings-row-sub">Mniejsza wysokość godzin</div>
+              <div className="settings-row-sub">Mniejsza wysokoĹ›Ä‡ godzin</div>
             </div>
             <Toggle checked={settings.compactPlan} onChange={v => setSettings(p => ({ ...p, compactPlan: v }))} />
           </div>
@@ -1273,7 +1273,7 @@ function App() {
         </div>
 
         <button type="button" className="danger-ghost" style={{marginTop:8,width:'100%',textAlign:'left',borderRadius:'var(--r-inner)',border:'1.5px solid rgba(220,38,38,0.3)',background:'var(--mz-danger-10)'}} onClick={() => { applySession(null); setDrawerOpen(false); }}>
-          Wyloguj się
+          Wyloguj siÄ™
         </button>
       </section>
     );
@@ -1285,7 +1285,7 @@ function App() {
         <div className="about-hero card">
           <div className="about-logo">mZUT</div>
           <div className="about-app-name">mzutv2 PWA</div>
-          <div className="about-version">Wersja 2.0 • Progressive Web App</div>
+          <div className="about-version">Wersja 2.0 â€˘ Progressive Web App</div>
         </div>
 
         <div className="info-card">
@@ -1303,8 +1303,8 @@ function App() {
         </div>
 
         <div className="card" style={{fontSize:13,color:'var(--mz-muted)',lineHeight:1.6}}>
-          <p>Nieoficjalny klient mobilny dla studentów Zachodniopomorskiego Uniwersytetu Technologicznego w Szczecinie.</p>
-          <p style={{marginTop:8}}>Aplikacja działa w pełni offline — wszystkie dane są cachowane lokalnie w przeglądarce.</p>
+          <p>Nieoficjalny klient mobilny dla studentĂłw Zachodniopomorskiego Uniwersytetu Technologicznego w Szczecinie.</p>
+          <p style={{marginTop:8}}>Aplikacja dziaĹ‚a w peĹ‚ni offline â€” wszystkie dane sÄ… cachowane lokalnie w przeglÄ…darce.</p>
         </div>
       </section>
     );
@@ -1316,13 +1316,13 @@ function App() {
 
     return (
       <div className="event-sheet-overlay" onClick={() => setSelectedPlanEvent(null)}>
-        <div className="event-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szczegóły zajęć">
+        <div className="event-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="SzczegĂłĹ‚y zajÄ™Ä‡">
           <div className="event-sheet-handle" />
-          <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'Zajęcia'}</div>
+          <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'ZajÄ™cia'}</div>
           <div className="event-sheet-title">{event.title}</div>
           <div className="event-sheet-row">
             <Ic n="calendar" />
-            <span>{fmtDateLabel(date)} · {event.startStr} - {event.endStr}</span>
+            <span>{fmtDateLabel(date)} Â· {event.startStr} - {event.endStr}</span>
           </div>
           {!!event.room && (
             <div className="event-sheet-row">
@@ -1367,26 +1367,26 @@ function App() {
     }
   }
 
-  // ── AppBar action buttons ─────────────────────────────────────────────────
+  // â”€â”€ AppBar action buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function renderAppBarActions() {
     if (screen === 'login') return null;
     const actions: Array<{ key: string; icon: string; label: string; onClick: () => void; active: boolean }> = [];
 
     if (screen === 'plan') {
       actions.push({ key: 'search', icon: 'search', label: 'Szukaj w planie', onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadPlanData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'OdĹ›wieĹĽ', onClick: () => void loadPlanData() });
     } else if (screen === 'grades') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadGradesData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'OdĹ›wieĹĽ', onClick: () => void loadGradesData() });
     } else if (screen === 'info') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadInfoData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'OdĹ›wieĹĽ', onClick: () => void loadInfoData() });
     } else if (screen === 'news') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadNewsData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'OdĹ›wieĹĽ', onClick: () => void loadNewsData() });
     }
 
     return (
       <div className="appbar-actions">
         {actions.map(a => (
-          <button key={a.key} type="button" className={`icon-btn ${a.active ? 'active' : ''}`} onClick={a.onClick} aria-label={a.label} title={a.label}>
+          <button key={a.key} type="button" className={`icon-btn ${a.active  'active' : ''}`} onClick={a.onClick} aria-label={a.label} title={a.label}>
             <Ic n={a.icon}/>
           </button>
         ))}
@@ -1394,7 +1394,7 @@ function App() {
     );
   }
 
-  // ─────────────────────────────────────────────── render ──────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div
       className="app-shell"
@@ -1406,8 +1406,8 @@ function App() {
       {/* AppBar */}
       {screen !== 'login' && (
         <header className="android-appbar">
-          <button type="button" className="icon-btn" onClick={onNavIcon} aria-label={canBack ? 'Wróć' : 'Otwórz menu'}>
-            <Ic n={canBack ? 'back' : 'menu'}/>
+          <button type="button" className="icon-btn" onClick={onNavIcon} aria-label={canBack  'WrĂłÄ‡' : 'OtwĂłrz menu'}>
+            <Ic n={canBack  'back' : 'menu'}/>
           </button>
           <h1>{screenTitle(screen)}</h1>
           {renderAppBarActions()}
@@ -1418,7 +1418,7 @@ function App() {
       {globalLoading && (
         <div className="banner">
           <div className="spinner" style={{width:16,height:16,borderWidth:2}}/>
-          Ładowanie danych…
+          Ĺadowanie danychâ€¦
         </div>
       )}
       {globalError && (
@@ -1441,12 +1441,12 @@ function App() {
 
       {/* Navigation Drawer */}
       {screen !== 'login' && (
-        <div className={`app-drawer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen} aria-modal={drawerOpen}>
+        <div className={`app-drawer ${drawerOpen  'open' : ''}`} aria-hidden={!drawerOpen} aria-modal={drawerOpen}>
           <button type="button" className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Zamknij menu"/>
-          <aside className="drawer-panel" role="navigation" aria-label="Nawigacja główna">
+          <aside className="drawer-panel" role="navigation" aria-label="Nawigacja gĹ‚Ăłwna">
             <div className="drawer-header">
-              <div className="drawer-avatar">{initials(session?.username || 'S')}</div>
-              <div className="drawer-name">{session?.username || 'Student'}</div>
+              <div className="drawer-avatar">{initials(session.username || 'S')}</div>
+              <div className="drawer-name">{session.username || 'Student'}</div>
               <div className="drawer-sub">mzutv2 PWA</div>
             </div>
 
@@ -1454,7 +1454,7 @@ function App() {
 
             <div className="drawer-list">
               {drawerItems.map(item => (
-                <button key={item.key} type="button" className={`drawer-item ${screen === item.key ? 'active' : ''}`} onClick={() => openScreen(item.key)}>
+                <button key={item.key} type="button" className={`drawer-item ${screen === item.key  'active' : ''}`} onClick={() => openScreen(item.key)}>
                   <span className="drawer-item-icon"><Ic n={item.icon}/></span>
                   {item.label}
                 </button>
@@ -1464,7 +1464,7 @@ function App() {
             <div className="drawer-footer">
               <button type="button" className="drawer-logout" onClick={() => { applySession(null); setDrawerOpen(false); }}>
                 <Ic n="logout"/>
-                Wyloguj się
+                Wyloguj siÄ™
               </button>
             </div>
           </aside>
@@ -1475,6 +1475,7 @@ function App() {
 }
 
 export default App;
+
 
 
 
