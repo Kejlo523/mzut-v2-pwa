@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import type {
-  AttendanceItem,
   Grade,
   NewsItem,
   PlanResult,
@@ -18,16 +17,15 @@ import {
   fetchInfo,
   fetchNews,
   fetchPlan,
+  fetchPlanSuggestions,
   fetchSemesters,
   fetchStudies,
   login,
 } from './services/api';
 import {
   cache,
-  loadAttendanceMap,
   loadSession,
   loadSettings,
-  saveAttendanceMap,
   saveSession,
   saveSettings,
   type AppSettings,
@@ -98,7 +96,6 @@ function screenTitle(s: ScreenKey): string {
     info: 'Dane studenta',
     news: 'Aktualności',
     'news-detail': 'Aktualność',
-    attendance: 'Obecności',
     links: 'Przydatne strony',
     settings: 'Ustawienia',
     about: 'O aplikacji',
@@ -232,9 +229,12 @@ function App() {
   const [planResult, setPlanResult]     = useState<PlanResult | null>(null);
   const [planLoading, setPlanLoading]   = useState(false);
   const [planSearchOpen, setPlanSearchOpen] = useState(false);
-  const [planSearchCat, setPlanSearchCat]   = useState('number');
+  const [planSearchCat, setPlanSearchCat]   = useState('album');
   const [planSearchQ, setPlanSearchQ]       = useState('');
+  const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
+  const [planSearchLoading, setPlanSearchLoading] = useState(false);
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
+  const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Grades
   const [semesters, setSemesters]       = useState<Semester[]>([]);
@@ -256,9 +256,6 @@ function App() {
   // News
   const [news, setNews]                 = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading]   = useState(false);
-
-  // Attendance
-  const [attendanceMap, setAttendMap]   = useState<Record<string, AttendanceItem>>(() => loadAttendanceMap());
 
   const activeStudyId = session?.activeStudyId ?? studies[0]?.przynaleznoscId ?? null;
 
@@ -339,9 +336,8 @@ function App() {
     return () => window.removeEventListener('keydown', fn);
   }, [selectedPlanEvent]);
 
-  // ── Sync settings & attendance ────────────────────────────────────────────
+  // ── Sync settings ─────────────────────────────────────────────────────────
   useEffect(() => { saveSettings(settings); }, [settings]);
-  useEffect(() => { saveAttendanceMap(attendanceMap); }, [attendanceMap]);
 
   // ── Session → navigation sync ─────────────────────────────────────────────
   useEffect(() => {
@@ -361,8 +357,6 @@ function App() {
 
   // ── Exit toast ────────────────────────────────────────────────────────────
   useExitAttemptToast(() => showToast('Naciśnij ponownie, aby wyjść'));
-
-  const canBack = nav.canGoBack && screen !== 'home';
 
   // ── Swipe gestures ────────────────────────────────────────────────────────
   const swipe = useSwipeGestures({
@@ -418,7 +412,7 @@ function App() {
     if (!session) return;
     const cacheKey = planCacheKey(planViewMode, planDate, activeStudyId);
     const isSearch = !!(search?.query?.trim());
-    const searchParam = isSearch ? search : { category: 'number', query: '' };
+    const searchParam = isSearch && search ? search : { category: 'album', query: '' };
 
     // Create unique request ID to cancel old requests
     const requestId = Math.random().toString(36).substr(2, 9);
@@ -468,6 +462,25 @@ function App() {
     }
   }, [session, planViewMode, planDate, activeStudyId, planResult]);
 
+  // Fetch plan search suggestions with debouncing (300ms)
+  const fetchPlanSearchSuggestions = useCallback(async (category: string, query: string) => {
+    if (!query.trim()) {
+      setPlanSearchSuggestions([]);
+      setPlanSearchLoading(false);
+      return;
+    }
+
+    setPlanSearchLoading(true);
+    try {
+      const suggestions = await fetchPlanSuggestions(category, query);
+      setPlanSearchSuggestions(suggestions);
+    } catch (e) {
+      setPlanSearchSuggestions([]);
+    } finally {
+      setPlanSearchLoading(false);
+    }
+  }, []);
+
   const loadGradesData = useCallback(async (resetSemId = false, forceRefresh = false) => {
     if (!session || !activeStudyId) {
       setSemesters([]);
@@ -481,7 +494,7 @@ function App() {
     if (cachedSem.length && !forceRefresh) setSemesters(cachedSem);
 
     const activeSemId = resetSemId ? '' : selSemId;
-    const semId = activeSemId || cachedSem?.[0]?.listaSemestrowId;
+    const semId = activeSemId || cachedSem?.[cachedSem.length - 1]?.listaSemestrowId;
     if (semId && !forceRefresh) {
       const cachedG = cache.loadGradesForce(semId);
       if (cachedG) setGrades(cachedG);
@@ -498,7 +511,7 @@ function App() {
       }
 
       const safeSems = sems ?? [];
-      const curSemId = activeSemId || safeSems[0].listaSemestrowId;
+      const curSemId = activeSemId || safeSems[safeSems.length - 1]?.listaSemestrowId;
       if (!curSemId) {
         setGrades([]);
         setSelSemId('');
@@ -607,7 +620,6 @@ function App() {
     if (screen === 'grades')     void loadGradesData();
     if (screen === 'info')       void loadInfoData();
     if (screen === 'news')       void loadNewsData();
-    if (screen === 'attendance') void loadPlanData(); // Load plan to show all subjects
   }, [screen, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const prevStudyId = useRef<string | null>(null);
@@ -724,24 +736,7 @@ function App() {
     return { avg: count > 0 ? fmtDec(total / count, 2) : '-', ects: fmtDec(ects, 1) };
   }, [grades]);
 
-  const attendanceItems = useMemo(() => {
-    const m = new Map<string, AttendanceItem>();
-    for (const col of planResult?.dayColumns ?? []) {
-      for (const ev of col.events) {
-        const k = ev.subjectKey || ev.title;
-        if (!k || m.has(k)) continue;
-        m.set(k, { key: k, subjectName: ev.title, subjectType: ev.typeLabel, absenceCount: 0, totalHours: 0 });
-      }
-    }
-    for (const [k, stored] of Object.entries(attendanceMap)) {
-      const base = m.get(k) ?? { key: k, subjectName: stored.subjectName, subjectType: stored.subjectType, absenceCount: 0, totalHours: 0 };
-      m.set(k, { ...base, absenceCount: stored.absenceCount, totalHours: stored.totalHours });
-    }
-    return [...m.values()].sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'pl'));
-  }, [planResult?.dayColumns, attendanceMap]);
-
   const links = useMemo(() => sortUsefulLinks(studies), [studies]);
-  const totalAbsences = useMemo(() => attendanceItems.reduce((a, i) => a + i.absenceCount, 0), [attendanceItems]);
 
   const weekLayout = useMemo(() => {
     let minS = Infinity, maxE = 0;
@@ -770,19 +765,6 @@ function App() {
 
   const weekTrackH   = weekLayout.slots.length * weekLayout.hourHeight;
   const min2px       = weekLayout.hourHeight / 60;
-
-  const updateAttendance = useCallback((key: string, patch: Partial<AttendanceItem>) => {
-    setAttendMap(prev => {
-      const cur = prev[key] ?? { key, subjectName: patch.subjectName ?? key, subjectType: patch.subjectType ?? 'Zajęcia', absenceCount: 0, totalHours: 0 };
-      return {
-        ...prev, [key]: {
-          ...cur, ...patch,
-          absenceCount: Math.max(0, patch.absenceCount ?? cur.absenceCount),
-          totalHours: Math.max(0, Number.isFinite(patch.totalHours ?? cur.totalHours) ? (patch.totalHours ?? cur.totalHours) : cur.totalHours),
-        },
-      };
-    });
-  }, []);
 
   const openScreen = useCallback((s: Exclude<ScreenKey, 'login' | 'news-detail'>) => {
     if (s === screen) {
@@ -827,7 +809,6 @@ function App() {
     { key: 'home',       label: 'Strona główna',    icon: 'home'     },
     { key: 'plan',       label: 'Plan zajęć',        icon: 'calendar' },
     { key: 'grades',     label: 'Oceny',             icon: 'grade'    },
-    { key: 'attendance', label: 'Obecności',          icon: 'present'  },
     { key: 'info',       label: 'Dane studenta',      icon: 'user'     },
     { key: 'news',       label: 'Aktualności',        icon: 'news'     },
     { key: 'links',      label: 'Przydatne strony',   icon: 'link'     },
@@ -889,7 +870,6 @@ function App() {
         <div className="section-title">Inne</div>
         <div className="list-menu">
           {([
-            { key: 'attendance' as DrawerKey, label: 'Obecności',        icon: 'present'  },
             { key: 'links'      as DrawerKey, label: 'Przydatne strony', icon: 'link'     },
             { key: 'settings'   as DrawerKey, label: 'Ustawienia',       icon: 'settings' },
           ] as const).map(i => (
@@ -932,33 +912,6 @@ function App() {
           <button type="button" className="plan-today-btn" onClick={() => setPlanDate(today)}>Dziś</button>
         </div>
 
-        {planSearchOpen && (
-          <div className="card plan-search-card">
-            <div className="search-row">
-              <select value={planSearchCat} onChange={e => setPlanSearchCat(e.target.value)}>
-                <option value="number">Album</option>
-                <option value="teacher">Prowadzący</option>
-                <option value="group">Grupa</option>
-                <option value="room">Sala</option>
-                <option value="subject">Przedmiot</option>
-              </select>
-              <input
-                value={planSearchQ}
-                onChange={e => setPlanSearchQ(e.target.value)}
-                placeholder="Szukaj w planie..."
-                onKeyDown={e => e.key === 'Enter' && planSearchQ.trim() && void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() })}
-              />
-            </div>
-            <div className="search-btns">
-              <button type="button" onClick={() => void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() })} disabled={!planSearchQ.trim()}>
-                Szukaj
-              </button>
-              <button type="button" className="ghost" onClick={() => { setPlanSearchQ(''); void loadPlanData(); }}>
-                Wyczyść
-              </button>
-            </div>
-          </div>
-        )}
 
         {planLoading && <Spinner text="Pobieranie planu…"/>}
 
@@ -1362,44 +1315,6 @@ function App() {
     );
   }
 
-  function renderAttendance() {
-    return (
-      <section className="screen">
-        <div className="attendance-summary">
-          <div className="attendance-total-label">Łącznie nieobecności</div>
-          <div className="attendance-total-num">{totalAbsences}</div>
-        </div>
-        {attendanceItems.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">✅</div><p>Brak zarejestrowanych zajęć. Przejdź do planu, aby załadować listę przedmiotów.</p></div>
-        )}
-        <div className="list-stack">
-          {attendanceItems.map(item => (
-            <div key={item.key} className="attendance-card">
-              <div className="attendance-subject">{item.subjectName}</div>
-              <div className="attendance-type">{item.subjectType}</div>
-              <div className="attendance-controls">
-                <button type="button" className="attendance-count-btn" onClick={() => updateAttendance(item.key, { ...item, absenceCount: item.absenceCount - 1 })} aria-label="Zmniejsz">
-                  <Ic n="minus"/>
-                </button>
-                <div className="attendance-count">{item.absenceCount}</div>
-                <button type="button" className="attendance-count-btn" onClick={() => updateAttendance(item.key, { ...item, absenceCount: item.absenceCount + 1 })} aria-label="Zwiększ">
-                  <Ic n="plus"/>
-                </button>
-                <div style={{flex:1,fontSize:12,color:'var(--mz-muted)',textAlign:'right'}}>
-                  {item.totalHours > 0 ? `${item.totalHours}h` : ''}
-                </div>
-              </div>
-              <div className="attendance-hours-row">
-                <span className="attendance-hours-label">Godzin łącznie:</span>
-                <input type="number" min={0} className="attendance-hours-input" value={item.totalHours} onChange={e => updateAttendance(item.key, { ...item, totalHours: Number(e.target.value) })} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
   function renderLinks() {
     const globals  = links.filter(l => l.scope === 'GLOBAL');
     const faculties = links.filter(l => l.scope === 'FACULTY');
@@ -1564,6 +1479,148 @@ function App() {
     );
   }
 
+  function renderPlanSearchSheet() {
+    if (!planSearchOpen) return null;
+
+    const handleQueryChange = (value: string) => {
+      setPlanSearchQ(value);
+
+      // Clear existing debounce timer
+      if (planSearchDebounceRef.current) {
+        clearTimeout(planSearchDebounceRef.current);
+      }
+
+      // For album category, don't fetch suggestions
+      if (planSearchCat === 'album') {
+        setPlanSearchSuggestions([]);
+        return;
+      }
+
+      // Debounce suggestion fetching (300ms)
+      planSearchDebounceRef.current = setTimeout(() => {
+        if (value.trim()) {
+          void fetchPlanSearchSuggestions(planSearchCat, value.trim());
+        } else {
+          setPlanSearchSuggestions([]);
+        }
+      }, 300);
+    };
+
+    const handleCategoryChange = (newCat: string) => {
+      setPlanSearchCat(newCat);
+      setPlanSearchSuggestions([]);
+      if (planSearchQ.trim() && newCat !== 'album') {
+        if (planSearchDebounceRef.current) {
+          clearTimeout(planSearchDebounceRef.current);
+        }
+        planSearchDebounceRef.current = setTimeout(() => {
+          void fetchPlanSearchSuggestions(newCat, planSearchQ.trim());
+        }, 300);
+      }
+    };
+
+    const handleSuggestionClick = (suggestion: string) => {
+      setPlanSearchQ(suggestion);
+      setPlanSearchSuggestions([]);
+    };
+
+    const handleSearch = () => {
+      if (planSearchQ.trim()) {
+        void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() });
+        setPlanSearchOpen(false);
+      }
+    };
+
+    const handleClear = () => {
+      setPlanSearchQ('');
+      setPlanSearchSuggestions([]);
+      void loadPlanData();
+      setPlanSearchOpen(false);
+    };
+
+    return (
+      <div className="event-sheet-overlay" onClick={() => setPlanSearchOpen(false)}>
+        <div className="event-sheet search-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szukaj w planie">
+          <div className="event-sheet-handle" />
+          <div className="search-container">
+            <h2 className="search-title">Szukaj w planie</h2>
+
+            {/* Category row */}
+            <div className="search-field-group">
+              <label className="search-label">Kategoria</label>
+              <select
+                value={planSearchCat}
+                onChange={e => handleCategoryChange(e.target.value)}
+                className="search-select"
+              >
+                <option value="album">Album</option>
+                <option value="teacher">Prowadzący</option>
+                <option value="group">Grupa</option>
+                <option value="room">Sala</option>
+                <option value="subject">Przedmiot</option>
+              </select>
+            </div>
+
+            {/* Query row with spinner */}
+            <div className="search-field-group">
+              <label className="search-label">Wyszukaj</label>
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  value={planSearchQ}
+                  onChange={e => handleQueryChange(e.target.value)}
+                  placeholder="Wpisz aby szukać..."
+                  className="search-input"
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                />
+                {planSearchLoading && <span className="search-spinner-inline" />}
+              </div>
+            </div>
+
+            {/* Suggestions list */}
+            {(planSearchSuggestions.length > 0 || (!planSearchQ.trim() && planSearchCat !== 'album')) && (
+              <div className="search-suggestions-container">
+                {planSearchSuggestions.length > 0 ? (
+                  planSearchSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="search-suggestion-item"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  ))
+                ) : planSearchCat !== 'album' && !planSearchQ.trim() ? (
+                  <div className="search-placeholder">Wpisz aby szukać</div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="search-actions">
+              <button
+                type="button"
+                className="search-btn-primary"
+                onClick={handleSearch}
+                disabled={!planSearchQ.trim()}
+              >
+                Szukaj
+              </button>
+              <button
+                type="button"
+                className="search-btn-secondary"
+                onClick={handleClear}
+              >
+                Wyczyść
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderScreen() {
     switch (screen) {
       case 'login':       return renderLogin();
@@ -1573,7 +1630,6 @@ function App() {
       case 'info':        return renderInfo();
       case 'news':        return renderNews();
       case 'news-detail': return renderNewsDetail();
-      case 'attendance':  return renderAttendance();
       case 'links':       return renderLinks();
       case 'settings':    return renderSettings();
       case 'about':       return renderAbout();
@@ -1652,6 +1708,7 @@ function App() {
       {toast && <div className="toast">{toast}</div>}
 
       {renderPlanEventSheet()}
+      {renderPlanSearchSheet()}
 
       {/* Navigation Drawer */}
       {screen !== 'login' && (

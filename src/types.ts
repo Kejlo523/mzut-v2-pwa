@@ -119,14 +119,6 @@ export interface UsefulLink {
   facultyCode?: string;
 }
 
-export interface AttendanceItem {
-  key: string;
-  subjectName: string;
-  subjectType: string;
-  absenceCount: number;
-  totalHours: number;
-}
-
 export type ScreenKey =
   | 'login'
   | 'home'
@@ -135,7 +127,6 @@ export type ScreenKey =
   | 'info'
   | 'news'
   | 'news-detail'
-  | 'attendance'
   | 'links'
   | 'settings'
   | 'about';

@@ -1,8 +1,7 @@
-import type { AttendanceItem, Grade, NewsItem, PlanResult, Semester, SessionData, Study, StudyDetails, StudyHistoryItem } from '../types';
+import type { Grade, NewsItem, PlanResult, Semester, SessionData, Study, StudyDetails, StudyHistoryItem } from '../types';
 
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
-const ATTENDANCE_KEY = 'mzutv2_pwa_attendance';
 
 export interface AppSettings {
   language: 'pl' | 'en';
@@ -59,20 +58,6 @@ export function loadSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings): void {
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-export function loadAttendanceMap(): Record<string, AttendanceItem> {
-  try {
-    const raw = window.localStorage.getItem(ATTENDANCE_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, AttendanceItem>;
-  } catch {
-    return {};
-  }
-}
-
-export function saveAttendanceMap(items: Record<string, AttendanceItem>): void {
-  window.localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(items));
 }
 
 // ── API cache with TTL ────────────────────────────────────────────────────────
