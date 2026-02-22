@@ -2,19 +2,42 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const appBase = (() => {
+  const raw = (process.env.VITE_APP_BASE || '').trim();
+  if (!raw) return '/';
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${normalized.replace(/\/+$/, '')}/`;
+})();
+
+const appBaseNoSlash = appBase === '/' ? '' : appBase.slice(0, -1);
+
+function withBase(pathname: string): string {
+  return `${appBase}${pathname.replace(/^\/+/, '')}`;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const scopedApiPrefix = appBase === '/' ? '/api/' : `${appBaseNoSlash}/api/`;
+const apiDenylist = appBase === '/'
+  ? [/^\/api\//]
+  : [new RegExp(`^${escapeRegex(scopedApiPrefix)}`), /^\/api\//];
+
 export default defineConfig({
+  base: appBase,
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'],
       manifest: {
-        id: '/?source=pwa',
+        id: `${appBase}?source=pwa`,
         name: 'mzutv2',
         short_name: 'mzutv2',
-        description: 'Nieoficjalny klient ZUT dla studentów – plan zajęć, oceny, aktualności',
-        start_url: '/?source=pwa',
-        scope: '/',
+        description: 'Nieoficjalny klient ZUT dla studentow - plan zajec, oceny, aktualnosci',
+        start_url: `${appBase}?source=pwa`,
+        scope: appBase,
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait-primary',
@@ -23,17 +46,17 @@ export default defineConfig({
         lang: 'pl',
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: withBase('icons/icon-192.png'),
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/icons/icon-512.png',
+            src: withBase('icons/icon-512.png'),
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: '/icons/icon-maskable-512.png',
+            src: withBase('icons/icon-maskable-512.png'),
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -42,21 +65,19 @@ export default defineConfig({
         categories: ['education', 'utilities'],
         shortcuts: [
           {
-            name: 'Plan zajęć',
+            name: 'Plan zajec',
             short_name: 'Plan',
-            description: 'Otwórz plan zajęć',
-            url: '/?source=pwa',
-            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+            description: 'Otworz plan zajec',
+            url: `${appBase}?source=pwa`,
+            icons: [{ src: withBase('icons/icon-192.png'), sizes: '192x192' }],
           },
         ],
       },
       workbox: {
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
-        // Cache all app shell assets
+        navigateFallback: withBase('index.html'),
+        navigateFallbackDenylist: apiDenylist,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
-          // HTML pages – network first
           {
             urlPattern: ({ request }) => request.destination === 'document',
             handler: 'NetworkFirst',
@@ -66,9 +87,10 @@ export default defineConfig({
               expiration: { maxAgeSeconds: 86400, maxEntries: 10 },
             },
           },
-          // API proxy – network first with fallback to cache
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/api/') ||
+              url.pathname.startsWith(scopedApiPrefix),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -77,7 +99,6 @@ export default defineConfig({
               cacheableResponse: { statuses: [200] },
             },
           },
-          // Images – cache first (long TTL)
           {
             urlPattern: ({ request }) => request.destination === 'image',
             handler: 'CacheFirst',
@@ -87,7 +108,6 @@ export default defineConfig({
               cacheableResponse: { statuses: [200] },
             },
           },
-          // External resources (ZUT images, RSS thumbnails)
           {
             urlPattern: ({ url }) => url.hostname.endsWith('zut.edu.pl'),
             handler: 'StaleWhileRevalidate',
@@ -100,7 +120,7 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        enabled: false, // Enable in dev if you want to test SW
+        enabled: false,
       },
     }),
   ],
