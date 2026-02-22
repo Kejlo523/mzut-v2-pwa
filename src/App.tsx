@@ -1008,6 +1008,7 @@ function App() {
           }}>Dziś</button>
         </div>
 
+        <div className="plan-wrapper">
         <div
           className="plan-container"
           onTouchStart={handlePlanDragStart}
@@ -1186,6 +1187,7 @@ function App() {
             </div>
           </div>
         )}
+        </div>
         </div>
       </section>
     );
