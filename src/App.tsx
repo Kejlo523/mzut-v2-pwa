@@ -236,6 +236,12 @@ function App() {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Plan drag/swipe
+  const [planDragOffset, setPlanDragOffset] = useState(0);
+  const [planIsAnimating, setPlanIsAnimating] = useState(false);
+  const planDragStartRef = useRef({ x: 0, y: 0 });
+  const planDragActiveRef = useRef(false);
+
   // Grades
   const [semesters, setSemesters]       = useState<Semester[]>([]);
   const [selSemId, setSelSemId]         = useState('');
@@ -408,9 +414,10 @@ function App() {
     void loadStudiesData(session);
   }, [session, loadStudiesData]);
 
-  const loadPlanData = useCallback(async (search?: { category: string; query: string }, forceRefresh = false) => {
+  const loadPlanData = useCallback(async (search?: { category: string; query: string }, forceRefresh = false, newDate?: string) => {
     if (!session) return;
-    const cacheKey = planCacheKey(planViewMode, planDate, activeStudyId);
+    const dateToUse = newDate || planDate;
+    const cacheKey = planCacheKey(planViewMode, dateToUse, activeStudyId);
     const isSearch = !!(search?.query?.trim());
     const searchParam = isSearch && search ? search : { category: 'album', query: '' };
 
@@ -434,7 +441,7 @@ function App() {
     }
     setGlobalError('');
     try {
-      const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: planDate, studyId: activeStudyId, search: searchParam });
+      const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: dateToUse, studyId: activeStudyId, search: searchParam });
 
       // Check if this request is still current (not cancelled by newer request)
       if (planRequestIdRef.current !== requestId) {
@@ -443,7 +450,7 @@ function App() {
 
       if (!isSearch) cache.savePlan(cacheKey, result);
       setPlanResult(result);
-      if (!isSearch && result.currentDate) setPlanDate(result.currentDate);
+      if (!isSearch && result.currentDate && !newDate) setPlanDate(result.currentDate);
     } catch (e) {
       if (planRequestIdRef.current === requestId) {
         const errorMsg = e instanceof Error ? e.message : 'Nie można pobrać planu.';
@@ -816,6 +823,72 @@ function App() {
     { key: 'about',      label: 'O aplikacji',        icon: 'about'    },
   ];
 
+  // ── Plan drag/swipe handlers ───────────────────────────────────────────────
+  const handlePlanDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if (planIsAnimating || !planResult) return;
+    planDragActiveRef.current = true;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    planDragStartRef.current = { x: clientX, y: clientY };
+  };
+
+  const handlePlanDragMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!planDragActiveRef.current || !planResult) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const deltaX = clientX - planDragStartRef.current.x;
+    const deltaY = clientY - planDragStartRef.current.y;
+
+    // Only allow horizontal drag if it's more horizontal than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      e.preventDefault?.();
+      setPlanDragOffset(Math.max(-100, Math.min(100, deltaX)));
+    }
+  };
+
+  const handlePlanDragEnd = async () => {
+    if (!planDragActiveRef.current || !planResult) return;
+    planDragActiveRef.current = false;
+
+    const threshold = 30; // pixels to trigger navigation
+    if (Math.abs(planDragOffset) < threshold) {
+      // Snap back to original position
+      setPlanIsAnimating(true);
+      setPlanDragOffset(0);
+      setTimeout(() => setPlanIsAnimating(false), 300);
+      return;
+    }
+
+    // Determine direction and get next/previous date
+    const isNext = planDragOffset < -threshold;
+    const targetDate = isNext ? planResult.nextDate : planResult.prevDate;
+
+    if (!targetDate) {
+      // Can't go further, snap back
+      setPlanIsAnimating(true);
+      setPlanDragOffset(0);
+      setTimeout(() => setPlanIsAnimating(false), 300);
+      return;
+    }
+
+    // Animate to the edge
+    setPlanIsAnimating(true);
+    setPlanDragOffset(isNext ? -window.innerWidth : window.innerWidth);
+
+    // After animation, change date and reset
+    setTimeout(() => {
+      // If we're in search mode, preserve the search when changing dates
+      const isSearch = !!(planSearchQ?.trim());
+      if (isSearch) {
+        void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, targetDate);
+      } else {
+        setPlanDate(targetDate);
+      }
+      setPlanDragOffset(0);
+      setPlanIsAnimating(false);
+    }, 300);
+  };
+
   // ─────────────────────────────────────────────────────── render screens ──
 
   function renderLogin() {
@@ -844,14 +917,14 @@ function App() {
   function renderHome() {
     return (
       <section className="screen">
-        <div className="card home-hero">
-          <div className="hero-greeting">Witaj</div>
-          <div className="hero-name">{session?.username || 'Studencie'} 👋</div>
-          <div className="hero-sub">Wybierz moduł, aby przejść dalej</div>
+        <div className="home-hero-container">
+          <div className="home-hero-label">mZUT v2</div>
+          <div className="home-hero-greeting">Cześć{session?.username ? `, ${session.username.split(' ')[0]}` : ''} 👋</div>
+          <div className="home-hero-sub">Wybierz moduł, aby przejść dalej</div>
           {!isOnline && <span className="offline-badge" style={{marginTop: 8}}><Ic n="wifi-off"/>Tryb offline</span>}
         </div>
 
-        <div className="section-title">Skróty</div>
+        <div className="home-section-title">Skróty</div>
         <div className="tile-grid">
           {([
             { key: 'plan'  as DrawerKey, label: 'Plan zajęć',    desc: 'Dzień, tydzień, miesiąc', icon: 'calendar' },
@@ -892,11 +965,27 @@ function App() {
     return (
       <section className="screen">
         <div className="plan-date-header">
-          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult?.prevDate ?? planDate)} aria-label="Poprzedni">
+          <button type="button" className="plan-nav-btn" onClick={() => {
+            const newDate = planResult?.prevDate ?? planDate;
+            const isSearch = !!(planSearchQ?.trim());
+            if (isSearch) {
+              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+            } else {
+              setPlanDate(newDate);
+            }
+          }} aria-label="Poprzedni">
             <Ic n="chevL"/>
           </button>
           <div className="plan-date-label">{planResult?.headerLabel || planDate}</div>
-          <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult?.nextDate ?? planDate)} aria-label="Następny">
+          <button type="button" className="plan-nav-btn" onClick={() => {
+            const newDate = planResult?.nextDate ?? planDate;
+            const isSearch = !!(planSearchQ?.trim());
+            if (isSearch) {
+              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+            } else {
+              setPlanDate(newDate);
+            }
+          }} aria-label="Następny">
             <Ic n="chevR"/>
           </button>
         </div>
@@ -909,11 +998,32 @@ function App() {
               </button>
             ))}
           </div>
-          <button type="button" className="plan-today-btn" onClick={() => setPlanDate(today)}>Dziś</button>
+          <button type="button" className="plan-today-btn" onClick={() => {
+            const isSearch = !!(planSearchQ?.trim());
+            if (isSearch) {
+              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, today);
+            } else {
+              setPlanDate(today);
+            }
+          }}>Dziś</button>
         </div>
 
-
-        {planLoading && <Spinner text="Pobieranie planu…"/>}
+        <div
+          className="plan-container"
+          onTouchStart={handlePlanDragStart}
+          onTouchMove={handlePlanDragMove}
+          onTouchEnd={handlePlanDragEnd}
+          onMouseDown={handlePlanDragStart}
+          onMouseMove={handlePlanDragMove}
+          onMouseUp={handlePlanDragEnd}
+          onMouseLeave={handlePlanDragEnd}
+          style={{
+            transform: `translateX(${planDragOffset}px)`,
+            transition: planIsAnimating ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            cursor: planDragActiveRef.current ? 'grabbing' : 'grab',
+          }}
+        >
+          {planLoading && <Spinner text="Pobieranie planu…"/>}
 
         {!planLoading && planViewMode === 'day' && (
           <div className="list-stack">
@@ -1076,6 +1186,7 @@ function App() {
             </div>
           </div>
         )}
+        </div>
       </section>
     );
   }
@@ -1394,46 +1505,60 @@ function App() {
       <section className="screen">
         <div className="about-hero card">
           <img src="/icons/mzutv2-logo.png" alt="Logo mZUT v2" className="about-logo-img" />
-          <div className="about-app-name">mzutv2</div>
-          <div className="about-version">Wersja PWA • układ zgodny z aplikacją Android</div>
+          <div className="about-app-name">mZUT v2</div>
+          <div className="about-version">v1.2.0 (PWA)</div>
+          <div className="about-note">Wersja progresywnej aplikacji webowej</div>
         </div>
 
-        <div className="about-card card">
-          <div className="about-section-title">Ekrany aplikacji</div>
-          <div className="about-page-row">
-            <div className="about-page-name">Plan zajęć</div>
-            <div className="about-page-desc">Widok dnia, tygodnia i miesiąca oraz szczegóły zajęć po kliknięciu.</div>
-          </div>
-          <div className="about-page-row">
-            <div className="about-page-name">Oceny</div>
-            <div className="about-page-desc">Ocena końcowa przedmiotu z rozwijanymi składowymi: wykład, laboratorium i inne.</div>
-          </div>
-          <div className="about-page-row">
-            <div className="about-page-name">Dane studenta</div>
-            <div className="about-page-desc">Zdjęcie, dane kierunku i przebieg studiów.</div>
-          </div>
-          <div className="about-page-row">
-            <div className="about-page-name">Aktualności</div>
-            <div className="about-page-desc">Pełna treść wpisów RSS z przejściem do źródła.</div>
-          </div>
-          <div className="about-page-row">
-            <div className="about-page-name">Przydatne strony</div>
-            <div className="about-page-desc">Szybkie linki do zasobów uczelni i wydziału.</div>
-          </div>
-          <div className="about-page-row">
-            <div className="about-page-name">Ustawienia</div>
-            <div className="about-page-desc">Konfiguracja działania aplikacji i widoków.</div>
-          </div>
+        <div className="about-actions">
+          <a href="https://play.google.com/store/apps/details?id=pl.kejlo.mzutv2" target="_blank" rel="noreferrer" className="about-action-card">
+            <div className="about-action-icon" style={{ background: '#26FFA000' }}>⭐</div>
+            <div className="about-action-content">
+              <div className="about-action-title">Oceń aplikację</div>
+              <div className="about-action-desc">Twoja opinia pomaga nam rozwijać mZUT!</div>
+            </div>
+            <div className="about-action-arrow">→</div>
+          </a>
+
+          <a href="https://github.com/Kejlo523/mzut-v2" target="_blank" rel="noreferrer" className="about-action-card">
+            <div className="about-action-icon" style={{ background: 'var(--mz-border-soft)', color: 'var(--mz-text)' }}>📝</div>
+            <div className="about-action-content">
+              <div className="about-action-title">Kod źródłowy</div>
+              <div className="about-action-desc">Sprawdź projekt na GitHubie</div>
+            </div>
+            <div className="about-action-arrow">→</div>
+          </a>
         </div>
 
-        <div className="about-card card">
-          <div className="about-section-title">Jak to działa</div>
-          <ol className="about-steps">
-            <li>Logujesz się kontem ZUT.</li>
-            <li>Aplikacja pobiera dane z usług uczelni i zapisuje je lokalnie.</li>
-            <li>Zmiana kierunku odświeża dane we wszystkich zakładkach.</li>
-            <li>Odświeżenie danych wykonasz ikoną odświeżania w nagłówku.</li>
-          </ol>
+        <div className="about-links">
+          <a href="https://mzut.endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
+            <span className="about-link-icon">ℹ️</span>
+            <span className="about-link-text">Strona projektu: mzut.endozero.pl</span>
+            <span className="about-link-arrow">→</span>
+          </a>
+
+          <a href="https://endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
+            <span className="about-link-icon">👤</span>
+            <span className="about-link-text">Strona autora: endozero.pl</span>
+            <span className="about-link-arrow">→</span>
+          </a>
+
+          <a href="https://mzut.endozero.pl/privacy_policy.html" target="_blank" rel="noreferrer" className="about-link-item">
+            <span className="about-link-icon">🔒</span>
+            <span className="about-link-text">Polityka prywatności</span>
+            <span className="about-link-arrow">→</span>
+          </a>
+
+          <a href="mailto:kejlo@endozero.pl" className="about-link-item">
+            <span className="about-link-icon">📧</span>
+            <span className="about-link-text">E-mail: kejlo@endozero.pl</span>
+            <span className="about-link-arrow">→</span>
+          </a>
+        </div>
+
+        <div className="about-description">
+          <p>mZUT v2 został stworzony jako nieoficjalna, lekka alternatywa do szybkiego podglądu planu, ocen i informacji o studiach na ZUT, bez konieczności przeklikiwania się przez ciężkie panele www.</p>
+          <p style={{ marginTop: '12px', opacity: 0.8, fontSize: '12px' }}>Made with ❤️ by Kejlo</p>
         </div>
       </section>
     );
@@ -1716,9 +1841,11 @@ function App() {
           <button type="button" className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Zamknij menu"/>
           <aside className="drawer-panel" role="navigation" aria-label="Nawigacja główna">
             <div className="drawer-header">
-              <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="drawer-avatar" />
-              <div className="drawer-name">{session?.username || 'Student'}</div>
-              <div className="drawer-sub">mzutv2 PWA</div>
+              <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="drawer-header-logo" />
+              <div className="drawer-header-info">
+                <div className="drawer-header-title">mZUT v2</div>
+                <div className="drawer-header-user">{session?.username || 'Student'}</div>
+              </div>
             </div>
 
             <div className="drawer-divider"/>
