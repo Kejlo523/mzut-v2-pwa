@@ -36,6 +36,24 @@ function normalizeLoginIdentifier(rawLogin: string): string {
   return at >= 0 ? trimmed.slice(0, at).trim() : trimmed;
 }
 
+function fixImageUrls(html: string): string {
+  return html.replace(/<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (_match, before, src, after) => {
+    let fixedSrc = src;
+    if (!fixedSrc.startsWith('http') && !fixedSrc.startsWith('data:')) {
+      if (fixedSrc.startsWith('/')) {
+        fixedSrc = `https://www.zut.edu.pl${fixedSrc}`;
+      } else {
+        fixedSrc = `https://www.zut.edu.pl/${fixedSrc}`;
+      }
+    }
+    // Use image proxy to avoid CORS issues - rewrite zut.edu.pl URLs through /image-proxy/
+    if (fixedSrc.includes('zut.edu.pl')) {
+      fixedSrc = fixedSrc.replace('https://www.zut.edu.pl/', '/image-proxy/').replace('https://www.zut.edu.pl', '/image-proxy/');
+    }
+    return `<img${before}src="${fixedSrc}"${after}>`;
+  });
+}
+
 function randomString(length: number, alphabet: string[]): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
@@ -659,9 +677,9 @@ export async function fetchNews(): Promise<NewsItem[]> {
     const link = firstNonEmpty(item.querySelector('link')?.textContent ?? '');
     const pubDateRaw = firstNonEmpty(item.querySelector('pubDate')?.textContent ?? '');
 
-    const descriptionHtml = firstNonEmpty(item.querySelector('description')?.textContent ?? '');
+    const descriptionHtml = fixImageUrls(firstNonEmpty(item.querySelector('description')?.textContent ?? ''));
     const contentNode = item.getElementsByTagName('content:encoded')[0] ?? item.getElementsByTagName('encoded')[0];
-    const contentHtml = firstNonEmpty(contentNode?.textContent ?? '');
+    const contentHtml = fixImageUrls(firstNonEmpty(contentNode?.textContent ?? ''));
 
     const descriptionText = String(descriptionHtml)
       .replace(/<[^>]+>/g, ' ')
@@ -677,14 +695,22 @@ export async function fetchNews(): Promise<NewsItem[]> {
     const snippet = descriptionText.length > 220 ? `${descriptionText.slice(0, 217)}...` : descriptionText;
 
     const imgMatch = contentHtml.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
-    const thumbRaw = imgMatch?.[1] ?? '';
-    const thumbUrl = thumbRaw.startsWith('http')
-      ? thumbRaw
-      : thumbRaw.startsWith('/')
-        ? `https://www.zut.edu.pl${thumbRaw}`
-        : thumbRaw
-          ? `https://www.zut.edu.pl/${thumbRaw}`
-          : '';
+    let thumbRaw = imgMatch?.[1] ?? '';
+
+    // Convert relative URLs to absolute for thumbnail
+    if (thumbRaw && !thumbRaw.startsWith('http') && !thumbRaw.startsWith('data:')) {
+      if (thumbRaw.startsWith('/')) {
+        thumbRaw = `https://www.zut.edu.pl${thumbRaw}`;
+      } else {
+        thumbRaw = `https://www.zut.edu.pl/${thumbRaw}`;
+      }
+    }
+
+    // Use image proxy to avoid CORS issues - rewrite zut.edu.pl URLs through /image-proxy/
+    let thumbUrl = thumbRaw;
+    if (thumbUrl.includes('zut.edu.pl')) {
+      thumbUrl = thumbUrl.replace('https://www.zut.edu.pl/', '/image-proxy/').replace('https://www.zut.edu.pl', '/image-proxy/');
+    }
 
     const parsedDate = new Date(pubDateRaw);
     const date = Number.isFinite(parsedDate.getTime())

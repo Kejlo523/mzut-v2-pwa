@@ -37,7 +37,7 @@
   --ev-class:     #6e85c2; --ev-class-l:     #ffffff;
 
   --appbar-h:      56px;
-  --drawer-w:      min(300px, 88vw);
+  --drawer-w:      min(260px, 80vw);
   --r-card:        16px;
   --r-inner:       12px;
   --shadow-1:      0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
@@ -97,7 +97,13 @@ input, select, button, textarea { font: inherit; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 0 6px;
 }
-.appbar-actions { display: flex; align-items: center; padding-right: 4px; }
+.appbar-actions { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
+
+.grades-grouping-toggle { display: flex; align-items: center; }
+.grades-toggle-compact { width: 40px; height: 40px; padding: 0; background: transparent; color: var(--mz-muted); border: none; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; transition: color 150ms; }
+.grades-toggle-compact:active { background: rgba(127,127,127,.18); }
+.grades-toggle-compact.active { color: var(--mz-primary); }
+.grades-toggle-compact svg { width: 18px; height: 18px; display: inline; vertical-align: middle; }
 
 /* ── Icon button ─────────────────────────────────────────────────────── */
 .icon-btn {
@@ -684,10 +690,6 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .grades-surface { background: var(--mz-surface); border-radius: 20px; border: 1px solid var(--mz-border-soft); padding: 10px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .grades-surface .list-stack { flex: 1; overflow-y: auto; }
 
-.grades-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; margin-bottom: 0; }
-.grades-toggle-label { font-size: 13px; font-weight: 600; color: var(--mz-muted); }
-.grades-toggle-btn { background: var(--mz-primary-10); color: var(--mz-primary); border: 1px solid var(--mz-primary-20); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
-.grades-toggle-btn:active { background: var(--mz-primary-20); }
 
 /* Grouped grades */
 .grade-group { background: var(--mz-surface); border-radius: 18px; box-shadow: var(--shadow-1); border: 1px solid var(--mz-border-soft); overflow: hidden; contain: layout; margin-bottom: 10px; }
@@ -796,7 +798,7 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .news-detail-title { font-size: 20px; font-weight: 700; line-height: 1.3; }
 .news-detail-date { font-size: 12px; color: var(--mz-muted); margin-top: 6px; margin-bottom: 12px; }
 .news-detail-body { font-size: 14px; line-height: 1.75; color: var(--mz-text-soft); }
-.news-detail-body img { max-width: 100%; border-radius: 8px; height: auto; margin: 10px 0; object-fit: contain; }
+.news-detail-body img { max-width: 100%; border-radius: 8px; height: auto; margin: 10px 0; object-fit: contain; background: var(--mz-card-soft); min-height: 40px; }
 .news-detail-body a { color: var(--mz-primary); }
 .news-detail-body p { margin-bottom: 10px; }
 .news-detail-body h1, .news-detail-body h2, .news-detail-body h3, .news-detail-body h4, .news-detail-body h5 { margin: 14px 0 6px; font-weight: 600; }

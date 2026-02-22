@@ -155,7 +155,7 @@ function Ic({ n }: { n: string }) {
   if (n === 'menu')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M3 6h18M3 12h18M3 18h18"/></svg>;
   if (n === 'back')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M19 12H5M12 5l-7 7 7 7"/></svg>;
   if (n === 'search')   return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="11" cy="11" r="7"/><path {...SV} d="m21 21-4.35-4.35"/></svg>;
-  if (n === 'refresh')  return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M20 11A8 8 0 1 0 22 16"/><path {...SV} d="M20 4v7h-7"/></svg>;
+  if (n === 'refresh')  return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M1 4v6h6M23 20v-6h-6"/><path {...SV} d="M20.49 9A9 9 0 0 0 5.64 5.64M3.51 15A9 9 0 0 0 18.36 18.36"/></svg>;
   if (n === 'more')     return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>;
   if (n === 'chevL')    return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M15 18l-6-6 6-6"/></svg>;
   if (n === 'chevR')    return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M9 18l6-6-6-6"/></svg>;
@@ -164,6 +164,7 @@ function Ic({ n }: { n: string }) {
   if (n === 'home')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline {...SV} points="9 22 9 12 15 12 15 22"/></svg>;
   if (n === 'calendar') return <svg viewBox="0 0 24 24" aria-hidden><rect {...SV} x="3" y="4" width="18" height="18" rx="2"/><line {...SV} x1="16" y1="2" x2="16" y2="6"/><line {...SV} x1="8" y1="2" x2="8" y2="6"/><line {...SV} x1="3" y1="10" x2="21" y2="10"/></svg>;
   if (n === 'grade')    return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M22 10v6M2 10l10-5 10 5-10 5z"/><path {...SV} d="M6 12v5c3 3 9 3 12 0v-5"/></svg>;
+  if (n === 'group')    return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle {...SV} cx="9" cy="7" r="4"/><path {...SV} d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>;
   if (n === 'user')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle {...SV} cx="12" cy="7" r="4"/></svg>;
   if (n === 'news')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path {...SV} d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>;
   if (n === 'present')  return <svg viewBox="0 0 24 24" aria-hidden><polyline {...SV} points="9 11 12 14 22 4"/><path {...SV} d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>;
@@ -1214,17 +1215,6 @@ function App() {
           </div>
         </div>
 
-        <div className="grades-toggle-row">
-          <div className="grades-toggle-label">Grupowanie przedmiotów</div>
-          <button
-            type="button"
-            className="grades-toggle-btn"
-            onClick={() => setSettings(prev => ({ ...prev, gradesGrouping: !prev.gradesGrouping }))}
-          >
-            {settings.gradesGrouping ? 'Włączone' : 'Wyłączone'}
-          </button>
-        </div>
-
         <div className="grades-surface">
           {gradesLoading && <Spinner text="Pobieranie ocen…"/>}
           {!gradesLoading && grades.length === 0 && (
@@ -1377,7 +1367,7 @@ function App() {
           {news.map(item => (
             <button key={item.id} type="button" className="news-card" onClick={() => nav.push('news-detail', { item } as unknown as NewsDetailParams)}>
               {item.thumbUrl ? (
-                <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" crossOrigin="anonymous" />
               ) : (
                 <div className="news-thumb-placeholder"><Ic n="news"/></div>
               )}
@@ -1403,10 +1393,13 @@ function App() {
     if (fullHtml) {
       fullHtml = fullHtml
         // Ensure images have proper attributes for mobile display
-        .replace(/<img([^>]*?)>/g, (_match, attrs) => {
-          // Add loading="lazy" if not present, and ensure proper styling
+        .replace(/<img([^>]*?)>/gi, (_match, attrs) => {
+          // Add loading="lazy" if not present
           if (!attrs.includes('loading=')) attrs += ' loading="lazy"';
+          // Add decoding="async" if not present
           if (!attrs.includes('decoding=')) attrs += ' decoding="async"';
+          // Add crossorigin="anonymous" for better CORS handling
+          if (!attrs.includes('crossorigin=')) attrs += ' crossorigin="anonymous"';
           return `<img${attrs}>`;
         })
         // Remove iframes and scripts for security
@@ -1423,7 +1416,7 @@ function App() {
         <div className="card">
           <div className="news-detail-title">{item.title}</div>
           <div className="news-detail-date">{item.date}</div>
-          {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" loading="lazy" decoding="async" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+          {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" loading="lazy" decoding="async" crossOrigin="anonymous" />}
           {fullHtml ? (
             <div className="news-detail-body" dangerouslySetInnerHTML={{ __html: fullHtml }} />
           ) : (
@@ -1793,6 +1786,19 @@ function App() {
 
     return (
       <div className="appbar-actions">
+        {screen === 'grades' && (
+          <div className="grades-grouping-toggle">
+            <button
+              type="button"
+              className={`grades-toggle-compact ${settings.gradesGrouping ? 'active' : ''}`}
+              onClick={() => setSettings(prev => ({ ...prev, gradesGrouping: !prev.gradesGrouping }))}
+              title={settings.gradesGrouping ? 'Wyłącz grupowanie' : 'Włącz grupowanie'}
+              aria-label="Grupowanie przedmiotów"
+            >
+              <Ic n="group"/>
+            </button>
+          </div>
+        )}
         {actions.map(a => (
           <button key={a.key} type="button" className={`icon-btn ${a.active ? 'active' : ''}`} onClick={a.onClick} aria-label={a.label} title={a.label}>
             <Ic n={a.icon}/>
