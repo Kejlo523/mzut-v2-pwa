@@ -372,12 +372,14 @@ function App() {
     void loadStudiesData(session);
   }, [session, loadStudiesData]);
 
-  const loadPlanData = useCallback(async (search: { category: string; query: string } = { category: 'number', query: '' }) => {
+  const loadPlanData = useCallback(async (search?: { category: string; query: string }) => {
     if (!session) return;
     const cacheKey = planCacheKey(planViewMode, planDate, activeStudyId);
+    const isSearch = !!(search?.query?.trim());
+    const searchParam = isSearch ? search : { category: 'number', query: '' };
 
     // Show cached immediately
-    if (!search) {
+    if (!isSearch) {
       const cached = cache.loadPlanForce(cacheKey);
       if (cached) { setPlanResult(cached); }
     }
@@ -385,10 +387,10 @@ function App() {
     setPlanLoading(true);
     setGlobalError('');
     try {
-      const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: planDate, studyId: activeStudyId, search });
-      if (!search) cache.savePlan(cacheKey, result);
+      const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: planDate, studyId: activeStudyId, search: searchParam });
+      if (!isSearch) cache.savePlan(cacheKey, result);
       setPlanResult(result);
-      if (!search && result.currentDate) setPlanDate(result.currentDate);
+      if (!isSearch && result.currentDate) setPlanDate(result.currentDate);
     } catch (e) {
       if (!planResult) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać planu.');
     } finally {
@@ -396,7 +398,7 @@ function App() {
     }
   }, [session, planViewMode, planDate, activeStudyId, planResult]);
 
-  const loadGradesData = useCallback(async () => {
+  const loadGradesData = useCallback(async (resetSemId = false) => {
     if (!session || !activeStudyId) {
       setSemesters([]);
       setSelSemId('');
@@ -408,7 +410,8 @@ function App() {
     const cachedSem = cache.loadSemestersForce(activeStudyId) ?? [];
     if (cachedSem.length) setSemesters(cachedSem);
 
-    const semId = selSemId || cachedSem?.[0]?.listaSemestrowId;
+    const activeSemId = resetSemId ? '' : selSemId;
+    const semId = activeSemId || cachedSem?.[0]?.listaSemestrowId;
     if (semId) {
       const cachedG = cache.loadGradesForce(semId);
       if (cachedG) setGrades(cachedG);
@@ -425,7 +428,7 @@ function App() {
       }
 
       const safeSems = sems ?? [];
-      const curSemId = selSemId || safeSems[0].listaSemestrowId;
+      const curSemId = activeSemId || safeSems[0].listaSemestrowId;
       if (!curSemId) {
         setGrades([]);
         setSelSemId('');
@@ -553,7 +556,7 @@ function App() {
     setSelectedPlanEvent(null);
 
     if (screen === 'plan')   void loadPlanData();
-    if (screen === 'grades') void loadGradesData();
+    if (screen === 'grades') void loadGradesData(true);
     if (screen === 'info')   void loadInfoData();
   }, [session, activeStudyId, screen, loadPlanData, loadGradesData, loadInfoData]);
 
