@@ -117,6 +117,44 @@
     background: #323232;
     color: #fafafa;
   }
+
+  .android-appbar {
+    background: var(--mz-surface);
+    color: var(--mz-text);
+  }
+
+  .grade-group-head {
+    color: var(--mz-text);
+  }
+
+  .grade-group-name {
+    color: var(--mz-text);
+  }
+
+  .grade-row {
+    color: var(--mz-text);
+  }
+
+  .news-card {
+    color: var(--mz-text);
+  }
+
+  .news-title {
+    color: var(--mz-text);
+  }
+
+  .news-detail-title {
+    color: var(--mz-text);
+  }
+
+  .news-detail-body,
+  .news-detail-body * {
+    color: var(--mz-text-soft);
+  }
+
+  .news-detail-body a {
+    color: var(--mz-primary);
+  }
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────── */
@@ -197,6 +235,7 @@ textarea {
   align-items: center;
   padding: 0 4px;
   background: var(--mz-surface);
+  color: var(--mz-text);
   box-shadow: var(--shadow-1);
 }
 
@@ -940,6 +979,16 @@ button.outline {
   min-height: 0;
 }
 
+@media (max-width: 480px) {
+  .plan-content {
+    padding: 0;
+  }
+
+  .plan-content-surface {
+    border-radius: 12px;
+  }
+}
+
 .plan-container {
   flex: 1;
   overflow: auto;
@@ -950,6 +999,12 @@ button.outline {
   background: var(--mz-card);
   transition: opacity 150ms ease;
   contain: layout;
+}
+
+@media (max-width: 480px) {
+  .plan-container {
+    padding: 4px;
+  }
 }
 
 .plan-container.fading {
@@ -1476,6 +1531,17 @@ button.outline {
   padding: 10px;
 }
 
+@media (max-width: 480px) {
+  .month-shell {
+    padding: 4px;
+    border-radius: 12px;
+  }
+
+  .plan-container:has(.month-shell) {
+    padding: 2px;
+  }
+}
+
 .month-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1839,6 +1905,7 @@ button.outline {
   width: 100%;
   border: none;
   background: transparent;
+  color: var(--mz-text);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2425,6 +2492,7 @@ button.outline {
   font-weight: 700;
   line-height: 1.3;
   margin-bottom: 3px;
+  color: var(--mz-text);
 }
 
 .news-date {
@@ -2455,6 +2523,7 @@ button.outline {
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
+  color: var(--mz-text);
 }
 
 .news-detail-date {
