@@ -186,6 +186,110 @@ app.get('/api/proxy/image', async (req, res) => {
   }
 });
 
+// ── Academic calendar (session periods) ─────────────────────────────────────
+const CALENDAR_URLS = (() => {
+  const year = new Date().getFullYear();
+  return [
+    'https://www.zut.edu.pl/zut-studenci/organizacja-roku-akademickiego.html',
+    `https://www.zut.edu.pl/zut-studenci/organizacja-roku-akademickiego-${year}${year + 1}.html`,
+    `https://www.zut.edu.pl/zut-studenci/organizacja-roku-akademickiego-${year - 1}${year}.html`,
+    `https://www.zut.edu.pl/zut-studenci/organizacja-roku-akademickiego-${year + 1}${year + 2}.html`,
+  ];
+})();
+
+const CALENDAR_PERIODS = [
+  { key: 'sesja_zimowa',               pattern: /sesja\s+zimowa/i },
+  { key: 'sesja_letnia',               pattern: /sesja\s+letnia/i },
+  { key: 'sesja_poprawkowa',           pattern: /sesja\s+poprawkowa/i },
+  { key: 'przerwa_dydaktyczna_zimowa', pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych\s+w\s+semestrze\s+zimowym/i },
+  { key: 'przerwa_dydaktyczna_letnia', pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych\s+w\s+semestrze\s+letnim/i },
+  { key: 'przerwa_dydaktyczna',        pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych/i },
+  { key: 'wakacje_zimowe',             pattern: /(wakacje|ferie)\s+zimowe/i },
+  { key: 'wakacje_letnie',             pattern: /wakacje\s+letnie/i },
+];
+
+function stripHtmlTags(html) {
+  return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ');
+}
+
+function parseCalendarHtml(html) {
+  const text = stripHtmlTags(html);
+  const dateRe = /(\d{2})\.(\d{2})\.(\d{4})/g;
+  const results = [];
+  const seen = new Set();
+
+  // Check if specific break found (to avoid adding generic one if specific exists)
+  let hasSpecificBreak = false;
+
+  for (const period of CALENDAR_PERIODS) {
+    const matches = [];
+    let idx = 0;
+    let m;
+    // Reset lastIndex if using global
+    const re = new RegExp(period.pattern.source, 'gi');
+    while ((m = re.exec(text)) !== null) {
+      // Find next two dates after this match
+      const after = text.slice(m.index + m[0].length, m.index + m[0].length + 120);
+      const dates = [...after.matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)];
+      if (dates.length >= 2) {
+        const start = `${dates[0][3]}-${dates[0][2]}-${dates[0][1]}`;
+        const end   = `${dates[1][3]}-${dates[1][2]}-${dates[1][1]}`;
+        if (start <= end) {
+          const dedup = `${period.key}|${start}|${end}`;
+          if (!seen.has(dedup)) {
+            seen.add(dedup);
+            results.push({ key: period.key, start, end });
+            if (period.key.startsWith('przerwa_dydaktyczna_') && period.key !== 'przerwa_dydaktyczna') {
+              hasSpecificBreak = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Remove generic break if specific ones found
+  const filtered = hasSpecificBreak
+    ? results.filter(r => r.key !== 'przerwa_dydaktyczna')
+    : results;
+
+  return filtered.sort((a, b) => a.start.localeCompare(b.start));
+}
+
+let calendarCache = null;
+let calendarCacheTs = 0;
+const CALENDAR_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
+
+app.get('/api/proxy/calendar', async (_req, res) => {
+  try {
+    const now = Date.now();
+    if (calendarCache && (now - calendarCacheTs) < CALENDAR_CACHE_TTL) {
+      return res.json({ periods: calendarCache });
+    }
+
+    for (const url of CALENDAR_URLS) {
+      try {
+        const response = await fetchWithTimeout(url, {
+          headers: { 'User-Agent': 'mZUT-PWA-Proxy/1.0' },
+        });
+        if (!response.ok) continue;
+        const html = await response.text();
+        if (!html) continue;
+        const periods = parseCalendarHtml(html);
+        if (periods.length > 0) {
+          calendarCache = periods;
+          calendarCacheTs = now;
+          return res.json({ periods });
+        }
+      } catch { /* try next URL */ }
+    }
+
+    return res.json({ periods: calendarCache ?? [] });
+  } catch (error) {
+    return res.status(502).json({ error: `Calendar proxy error: ${error.message}`, periods: [] });
+  }
+});
+
 app.get('/api/proxy/rss', async (_req, res) => {
   try {
     const response = await fetchWithTimeout(RSS_URL, {

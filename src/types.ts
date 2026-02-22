@@ -92,6 +92,12 @@ export interface PlanMonthCell {
   inCurrentMonth: boolean;
 }
 
+export interface SessionPeriod {
+  key: string;  // e.g. 'sesja_zimowa', 'przerwa_dydaktyczna_letnia'
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+}
+
 export interface PlanResult {
   viewMode: ViewMode;
   currentDate: string;
@@ -104,6 +110,7 @@ export interface PlanResult {
   nextDate: string;
   todayDate: string;
   headerLabel: string;
+  sessionPeriods: SessionPeriod[];
   debug: {
     album: string;
     entriesTotal: number;

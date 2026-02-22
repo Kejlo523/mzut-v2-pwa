@@ -640,7 +640,7 @@ button.outline {
 
 /* ── Home Hero ──────────────────────────────────────────────────────────── */
 .home-hero-card {
-  background: linear-gradient(135deg, #1d4ed8 0%, #6366f1 100%);
+  background: var(--mz-primary);
   border-radius: 20px;
   padding: 20px 18px 16px;
   color: #fff;
@@ -1292,6 +1292,74 @@ button.outline {
 .search-btns button {
   flex: 1;
 }
+
+/* ── Period markers (day view) ──────────────────────────────────────── */
+.period-markers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.period-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  letter-spacing: 0.3px;
+}
+
+.period-marker::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.period-marker-session {
+  background: rgba(239, 83, 80, 0.12);
+  color: #ef5350;
+}
+
+.period-marker-session::before {
+  background: #ef5350;
+}
+
+.period-marker-break {
+  background: rgba(33, 150, 243, 0.12);
+  color: var(--mz-primary);
+}
+
+.period-marker-break::before {
+  background: var(--mz-primary);
+}
+
+.period-marker-holiday {
+  background: rgba(76, 166, 114, 0.12);
+  color: var(--mz-success);
+}
+
+.period-marker-holiday::before {
+  background: var(--mz-success);
+}
+
+/* ── Period dots (week view header) ─────────────────────────────────── */
+.week-period-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.week-period-dot-session  { background: #ef5350; }
+.week-period-dot-break    { background: var(--mz-primary); }
+.week-period-dot-holiday  { background: var(--mz-success); }
 
 /* ── Day timeline view ───────────────────────────────────────────────── */
 .day-tl-card {

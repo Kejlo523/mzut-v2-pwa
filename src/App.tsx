@@ -7,6 +7,7 @@ import type {
   ScreenKey,
   Semester,
   SessionData,
+  SessionPeriod,
   Study,
   StudyDetails,
   StudyHistoryItem,
@@ -243,7 +244,6 @@ function App() {
   const INSTALL_TIP_KEY = 'mzutv2_install_tip_v1';
   const [showInstallTip, setShowInstallTip] = useState(false);
   const [installTipFading, setInstallTipFading] = useState(false);
-  const [installTipDismissMsg, setInstallTipDismissMsg] = useState(false);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -861,7 +861,8 @@ function App() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   async function onLoginSubmit() {
-    if (!loginVal || !password) { setGlobalError('Wpisz login i hasło.'); return; }
+    if (!loginVal.trim()) { setGlobalError('Wpisz numer albumu.'); return; }
+    if (!password.trim()) { setGlobalError('Wpisz hasło.'); return; }
     setLoginLoading(true);
     setGlobalError('');
     try {
@@ -881,16 +882,11 @@ function App() {
   }
 
   // ── Install tip helpers ───────────────────────────────────────────────────
-  const dismissInstallTip = (withMsg: boolean) => {
+  const dismissInstallTip = () => {
     localStorage.setItem(INSTALL_TIP_KEY, '1');
-    if (withMsg) {
-      setInstallTipDismissMsg(true);
-      setInstallTipFading(true);
-      setTimeout(() => setShowInstallTip(false), 2800);
-    } else {
-      setInstallTipFading(true);
-      setTimeout(() => setShowInstallTip(false), 300);
-    }
+    setToast('Możesz to zrobić później w zakładce "O aplikacji"');
+    setInstallTipFading(true);
+    setTimeout(() => setShowInstallTip(false), 300);
   };
 
   const handleInstallTipInstall = async () => {
@@ -1033,12 +1029,11 @@ function App() {
 
   function renderHome() {
     const firstName = session?.username?.split(' ')[0] ?? 'Studencie';
-    const studyLabel = studies[0]?.label ?? null;
 
     return (
       <section className="screen home-screen">
         <div className="home-scroll-content">
-          {/* Hero gradient card */}
+          {/* Hero */}
           <div className="home-hero-card">
             <div className="home-hero-greeting-row">
               <div>
@@ -1047,9 +1042,6 @@ function App() {
               </div>
               <div className="home-hero-avatar">{firstName[0]?.toUpperCase() ?? 'S'}</div>
             </div>
-            {studyLabel && (
-              <div className="home-hero-study">{studyLabel}</div>
-            )}
             {!isOnline && (
               <span className="offline-badge"><Ic n="wifi-off" />Tryb offline</span>
             )}
@@ -1063,8 +1055,8 @@ function App() {
               { key: 'grades' as DrawerKey, label: 'Oceny', desc: 'Średnia i punkty ECTS', icon: 'grade' },
               { key: 'info' as DrawerKey, label: 'Dane studenta', desc: 'Kierunek i przebieg', icon: 'user' },
               { key: 'news' as DrawerKey, label: 'Aktualności', desc: 'Komunikaty uczelni', icon: 'news' },
-              { key: 'attendance' as DrawerKey, label: 'Nieobecności', desc: 'Statystyki obecności', icon: 'present' },
               { key: 'links' as DrawerKey, label: 'Linki', desc: 'Przydatne strony ZUT', icon: 'link' },
+              { key: 'settings' as DrawerKey, label: 'Ustawienia', desc: 'Konfiguracja aplikacji', icon: 'settings' },
             ] as const).map(t => (
               <button key={t.key} type="button" className="tile" onClick={() => openScreen(t.key)}>
                 <div className="tile-icon"><Ic n={t.icon} /></div>
@@ -1075,6 +1067,50 @@ function App() {
           </div>
         </div>
       </section>
+    );
+  }
+
+  function getPeriodDisplayName(key: string): string {
+    const map: Record<string, string> = {
+      sesja_zimowa: 'sesja zimowa', sesja_letnia: 'sesja letnia',
+      sesja_poprawkowa: 'sesja poprawkowa', przerwa_dydaktyczna_zimowa: 'przerwa dydaktyczna (zimowa)',
+      przerwa_dydaktyczna_letnia: 'przerwa dydaktyczna (letnia)', przerwa_dydaktyczna: 'przerwa dydaktyczna',
+      wakacje_zimowe: 'wakacje zimowe', wakacje_letnie: 'wakacje letnie',
+    };
+    return map[key] ?? key.replace(/_/g, ' ');
+  }
+
+  function getPeriodMarkerColor(key: string): 'session' | 'break' | 'holiday' {
+    if (key.startsWith('sesja_')) return 'session';
+    if (key.startsWith('przerwa_')) return 'break';
+    return 'holiday';
+  }
+
+  interface PeriodMarker { label: string; kind: 'session' | 'break' | 'holiday'; }
+
+  function getPeriodMarkers(date: string, prevDate: string | null, periods: SessionPeriod[]): PeriodMarker[] {
+    const markers: PeriodMarker[] = [];
+    for (const p of periods) {
+      // End marker: period ended on the day BEFORE current date
+      if (prevDate && p.end >= prevDate && p.end < date) {
+        markers.push({ label: `Koniec: ${getPeriodDisplayName(p.key)}`, kind: getPeriodMarkerColor(p.key) });
+      }
+      // Start marker: period starts on current date
+      if (p.start === date) {
+        markers.push({ label: `Początek: ${getPeriodDisplayName(p.key)}`, kind: getPeriodMarkerColor(p.key) });
+      }
+    }
+    return markers;
+  }
+
+  function renderPeriodMarkers(markers: PeriodMarker[]) {
+    if (!markers.length) return null;
+    return (
+      <div className="period-markers">
+        {markers.map((m, i) => (
+          <div key={i} className={`period-marker period-marker-${m.kind}`}>{m.label}</div>
+        ))}
+      </div>
     );
   }
 
@@ -1139,62 +1175,65 @@ function App() {
 
               {!planLoading && planViewMode === 'day' && (
                 <div className="list-stack">
-                  {cols.map(col => (
-                    <div key={col.date} className="card day-tl-card">
-                      <div className="day-tl-head">
-                        <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
-                        {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
-                      </div>
-
-                      {col.events.length === 0 ? (
-                        <div className="day-empty">Brak zajęć</div>
-                      ) : (
-                        <div className="day-tl-body">
-                          <div className="day-time-col">
-                            {weekLayout.slots.map(m => (
-                              <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
-                                {fmtHour(m)}
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="day-events-col" style={{ height: weekTrackH }}>
-                            {weekLayout.slots.map((m, idx) => (
-                              <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
-                            ))}
-                            {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
-                              <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
-                            )}
-                            {col.events.map(ev => {
-                              const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                              const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
-                              const left = `calc(${ev.leftPct}% + 2px)`;
-                              const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                              const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                              return (
-                                <div
-                                  key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                  className={`day-event ev-${ev.typeClass}`}
-                                  style={{ top, height: h, left, width }}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={open}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      open();
-                                    }
-                                  }}
-                                  title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                >
-                                  <div className="day-event-title">{ev.title}</div>
-                                  <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                  {cols.map((col, ci) => (
+                    <div key={col.date}>
+                      {renderPeriodMarkers(getPeriodMarkers(col.date, cols[ci - 1]?.date ?? null, planResult?.sessionPeriods ?? []))}
+                      <div className="card day-tl-card">
+                        <div className="day-tl-head">
+                          <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
+                          {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
                         </div>
-                      )}
+
+                        {col.events.length === 0 ? (
+                          <div className="day-empty">Brak zajęć</div>
+                        ) : (
+                          <div className="day-tl-body">
+                            <div className="day-time-col">
+                              {weekLayout.slots.map(m => (
+                                <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
+                                  {fmtHour(m)}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="day-events-col" style={{ height: weekTrackH }}>
+                              {weekLayout.slots.map((m, idx) => (
+                                <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                              ))}
+                              {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                                <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                              )}
+                              {col.events.map(ev => {
+                                const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
+                                const left = `calc(${ev.leftPct}% + 2px)`;
+                                const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                return (
+                                  <div
+                                    key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                    className={`day-event ev-${ev.typeClass}`}
+                                    style={{ top, height: h, left, width }}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={open}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        open();
+                                      }
+                                    }}
+                                    title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                  >
+                                    <div className="day-event-title">{ev.title}</div>
+                                    <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {cols.length === 0 && (
@@ -1212,12 +1251,18 @@ function App() {
                     <>
                       <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
                         <div className="week-head-time">Godz.</div>
-                        {weekCols.map(col => (
-                          <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
-                            <strong>{fmtWeekdayShort(col.date)}</strong>
-                            <span>{fmtDayMonth(col.date)}</span>
-                          </div>
-                        ))}
+                        {weekCols.map((col, ci) => {
+                          const wMarkers = getPeriodMarkers(col.date, weekCols[ci - 1]?.date ?? null, planResult?.sessionPeriods ?? []);
+                          return (
+                            <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
+                              <strong>{fmtWeekdayShort(col.date)}</strong>
+                              <span>{fmtDayMonth(col.date)}</span>
+                              {wMarkers.map((m, i) => (
+                                <span key={i} className={`week-period-dot week-period-dot-${m.kind}`} title={m.label} />
+                              ))}
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="week-grid" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
@@ -1982,33 +2027,25 @@ function App() {
         <div className={`install-tip-overlay${installTipFading ? ' fading' : ''}`}>
           <div className="install-tip-card">
             <div className="install-tip-icon">📱</div>
-            {installTipDismissMsg ? (
-              <p className="install-tip-msg install-tip-dismiss-msg">
-                Opcja jest dostępna w zakładce <strong>O aplikacji</strong>.
-              </p>
-            ) : (
-              <>
-                <p className="install-tip-msg">
-                  Wiesz, że możesz zainstalować tę stronę jako skrót i korzystać jak ze zwykłej aplikacji systemowej?
-                </p>
-                <div className="install-tip-actions">
-                  <button
-                    type="button"
-                    className="install-tip-install-btn"
-                    onClick={() => void handleInstallTipInstall()}
-                  >
-                    Zainstaluj teraz
-                  </button>
-                  <button
-                    type="button"
-                    className="install-tip-dismiss-btn"
-                    onClick={() => dismissInstallTip(true)}
-                  >
-                    Odrzuć
-                  </button>
-                </div>
-              </>
-            )}
+            <p className="install-tip-msg">
+              Wiesz, że możesz zainstalować tę stronę jako skrót i korzystać jak ze zwykłej aplikacji systemowej?
+            </p>
+            <div className="install-tip-actions">
+              <button
+                type="button"
+                className="install-tip-install-btn"
+                onClick={() => void handleInstallTipInstall()}
+              >
+                Zainstaluj teraz
+              </button>
+              <button
+                type="button"
+                className="install-tip-dismiss-btn"
+                onClick={() => dismissInstallTip()}
+              >
+                Odrzuć
+              </button>
+            </div>
           </div>
         </div>
       )}
