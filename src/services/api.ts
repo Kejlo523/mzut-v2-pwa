@@ -225,7 +225,7 @@ export async function fetchGrades(session: SessionData, semesterId: string): Pro
     const date = firstNonEmpty(row.data);
 
     return {
-      subjectName: form ? `${subject} (${form})`.trim() : subject,
+      subjectName: subject,
       grade: firstNonEmpty(row.ocena),
       weight: parseEcts(row),
       type: form,

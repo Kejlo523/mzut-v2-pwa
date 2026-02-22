@@ -65,14 +65,47 @@ function fmtHour(min: number): string {
   return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 }
 
+function isWeekendDate(dateYmd: string): boolean {
+  const d = new Date(`${dateYmd}T00:00:00`);
+  if (!Number.isFinite(d.getTime())) return false;
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function normalizeMatch(value: string): string {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isFinalGradeType(type: string): boolean {
+  const t = normalizeMatch(type);
+  return (
+    t.includes('ocena koncowa') ||
+    t.includes('koncowa') ||
+    t.includes('final') ||
+    t.includes('abschluss')
+  );
+}
+
 function screenTitle(s: ScreenKey): string {
   const m: Record<ScreenKey, string> = {
-    login: 'mzutv2', home: 'mzutv2', plan: 'Plan zajęć', grades: 'Oceny',
-    info: 'Dane studenta', news: 'Aktualności', 'news-detail': 'Aktualność',
-    attendance: 'Obecności', links: 'Przydatne strony', settings: 'Ustawienia', about: 'O aplikacji',
+    login: 'mzutv2',
+    home: 'mzutv2',
+    plan: 'Plan zajęć',
+    grades: 'Oceny',
+    info: 'Dane studenta',
+    news: 'Aktualności',
+    'news-detail': 'Aktualność',
+    attendance: 'Obecności',
+    links: 'Przydatne strony',
+    settings: 'Ustawienia',
+    about: 'O aplikacji',
   };
   return m[s];
 }
+
 
 function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
   const v = Number.parseFloat(g.replace(',', '.'));
@@ -209,12 +242,14 @@ function App() {
   const [grades, setGrades]             = useState<Grade[]>([]);
   const [gradesLoading, setGradesLoad]  = useState(false);
   const [totalEctsAll, setTotalEctsAll] = useState(0);
+  const [expandedGradeSubjects, setExpandedGradeSubjects] = useState<Record<string, boolean>>({});
   const selSemPrev = useRef('');
 
   // Info
   const [details, setDetails]           = useState<StudyDetails | null>(null);
   const [history, setHistory]           = useState<StudyHistoryItem[]>([]);
   const [infoLoading, setInfoLoading]   = useState(false);
+  const [studentPhotoError, setStudentPhotoError] = useState(false);
 
   // News
   const [news, setNews]                 = useState<NewsItem[]>([]);
@@ -240,6 +275,10 @@ function App() {
     const t = window.setTimeout(() => setToast(''), 2200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    setStudentPhotoError(false);
+  }, [session?.imageUrl]);
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
@@ -279,7 +318,7 @@ function App() {
   }, [screen]);
 
   // ── Exit toast ────────────────────────────────────────────────────────────
-  useExitAttemptToast(() => showToast('Nacinij ponownie aby wyj'));
+  useExitAttemptToast(() => showToast('Naciśnij ponownie, aby wyjść'));
 
   const canBack = nav.canGoBack && screen !== 'home';
 
@@ -543,13 +582,55 @@ function App() {
   // ── Computed values ───────────────────────────────────────────────────────
 
   const groupedGrades = useMemo(() => {
-    const m = new Map<string, Grade[]>();
+    const bySubject = new Map<string, Grade[]>();
     for (const g of grades) {
-      const k = g.subjectName || 'Przedmiot';
-      m.set(k, [...(m.get(k) ?? []), g]);
+      const subject = (g.subjectName || 'Przedmiot').trim();
+      bySubject.set(subject, [...(bySubject.get(subject) ?? []), g]);
     }
-    return [...m.entries()].map(([s, items]) => ({ s, items })).sort((a, b) => a.s.localeCompare(b.s, 'pl'));
+
+    return [...bySubject.entries()]
+      .map(([subject, rawItems]) => {
+        const items = [...rawItems].sort((a, b) => {
+          const aOrder = isFinalGradeType(a.type) ? 0 : 1;
+          const bOrder = isFinalGradeType(b.type) ? 0 : 1;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return (a.type || '').localeCompare(b.type || '', 'pl');
+        });
+
+        const finalItem = items.find(item => isFinalGradeType(item.type));
+        const finalGrade = finalItem?.grade?.trim() ? finalItem.grade : '–';
+
+        const ects = items.reduce((max, item) => (item.weight > max ? item.weight : max), 0);
+        return {
+          subject,
+          items,
+          finalGrade,
+          ects,
+        };
+      })
+      .sort((a, b) => a.subject.localeCompare(b.subject, 'pl'));
   }, [grades]);
+
+  useEffect(() => {
+    setExpandedGradeSubjects(prev => {
+      const visibleSubjects = new Set(groupedGrades.map(group => group.subject));
+      const next: Record<string, boolean> = {};
+      let changed = false;
+
+      for (const [subject, isOpen] of Object.entries(prev)) {
+        if (isOpen && visibleSubjects.has(subject)) {
+          next[subject] = true;
+        } else {
+          changed = true;
+        }
+      }
+
+      if (!changed && Object.keys(next).length === Object.keys(prev).length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [groupedGrades]);
 
   const gradesSummary = useMemo(() => {
     let total = 0;
@@ -596,6 +677,15 @@ function App() {
     if (!slots.length) slots.push(startMin);
     return { startMin, endMin, hourHeight: hh, slots };
   }, [planResult?.dayColumns, settings.compactPlan]);
+
+  const weekVisibleColumns = useMemo(() => {
+    const cols = planResult?.dayColumns ?? [];
+    const weekendCols = cols.filter(col => isWeekendDate(col.date));
+    const hideWeekend = weekendCols.length === 2 && weekendCols.every(col => col.events.length === 0);
+    if (!hideWeekend) return cols;
+    const workweekCols = cols.filter(col => !isWeekendDate(col.date));
+    return workweekCols.length > 0 ? workweekCols : cols;
+  }, [planResult?.dayColumns]);
 
   const weekTrackH   = weekLayout.slots.length * weekLayout.hourHeight;
   const min2px       = weekLayout.hourHeight / 60;
@@ -735,19 +825,11 @@ function App() {
 
   function renderPlan() {
     const cols = planResult?.dayColumns ?? [];
+    const weekCols = weekVisibleColumns;
     const today = todayYmd();
 
     return (
       <section className="screen">
-        {studies.length > 0 && (
-          <label className="field-label">
-            Kierunek
-            <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-              {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-            </select>
-          </label>
-        )}
-
         <div className="plan-date-header">
           <button type="button" className="plan-nav-btn" onClick={() => setPlanDate(planResult?.prevDate ?? planDate)} aria-label="Poprzedni">
             <Ic n="chevL"/>
@@ -868,11 +950,11 @@ function App() {
 
         {!planLoading && planViewMode === 'week' && (
           <div className="card week-card">
-            {cols.length > 0 ? (
+            {weekCols.length > 0 ? (
               <>
-                <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${cols.length}, 1fr)` }}>
+                <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
                   <div className="week-head-time">Godz.</div>
-                  {cols.map(col => (
+                  {weekCols.map(col => (
                     <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
                       <strong>{fmtWeekdayShort(col.date)}</strong>
                       <span>{fmtDayMonth(col.date)}</span>
@@ -880,7 +962,7 @@ function App() {
                   ))}
                 </div>
 
-                <div className="week-grid" style={{ gridTemplateColumns: `44px repeat(${cols.length}, 1fr)` }}>
+                <div className="week-grid" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
                   <div className="week-time-col">
                     {weekLayout.slots.map(m => (
                       <div key={`w-time-${m}`} className="week-time-cell" style={{ height: weekLayout.hourHeight }}>
@@ -889,7 +971,7 @@ function App() {
                     ))}
                   </div>
 
-                  {cols.map(col => (
+                  {weekCols.map(col => (
                     <div key={`w-col-${col.date}`} className="week-day-col" style={{ height: weekTrackH }}>
                       {weekLayout.slots.map((m, idx) => (
                         <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
@@ -1014,27 +1096,43 @@ function App() {
 
         <div className="list-stack">
           {settings.gradesGrouping ? (
-            groupedGrades.map(({ s, items }) => {
-              const nums = items.map(g => parseGradeNum(g.grade)).filter((v): v is number => v !== null);
-              const avg = nums.length ? fmtDec(nums.reduce((sum, v) => sum + v, 0) / nums.length, 2) : '-';
+            groupedGrades.map(({ subject, items, finalGrade, ects }) => {
+              const isOpen = !!expandedGradeSubjects[subject];
               return (
-                <div key={s} className="grade-group">
-                  <div className="grade-group-head">
-                    <div className="grade-group-name">{s}</div>
-                    <div className="grade-group-pill">{avg}</div>
-                  </div>
-                  <div className="grade-group-items">
-                    {items.map((g, i) => (
-                      <div key={`${s}-${i}`} className="grade-row">
-                        <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
-                        <div className="grade-info">
-                          <div className="grade-date-teacher">{g.date || '–'}</div>
-                          {g.teacher && <div className="grade-date-teacher">{g.teacher}</div>}
-                        </div>
-                        <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
+                <div key={subject} className="grade-group">
+                  <button
+                    type="button"
+                    className="grade-group-head"
+                    onClick={() => setExpandedGradeSubjects(prev => ({ ...prev, [subject]: !prev[subject] }))}
+                    aria-expanded={isOpen}
+                  >
+                    <div className="grade-group-icon"><Ic n="grade"/></div>
+                    <div className="grade-group-name-wrap">
+                      <div className="grade-group-name">{subject}</div>
+                      <div className="grade-group-sub">
+                        Ocena końcowa{ects > 0 ? ` · ${fmtDec(ects, 1)} ECTS` : ''}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                    <div className={`grade-group-pill ${gradeTone(finalGrade)}`}>{finalGrade || '–'}</div>
+                    <div className={`grade-group-chevron ${isOpen ? 'open' : ''}`}><Ic n="chevR"/></div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="grade-group-items">
+                      {items.map((g, i) => (
+                        <div key={`${subject}-${i}`} className="grade-row">
+                          <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
+                          <div className="grade-info">
+                            <div className="grade-type-chip">{isFinalGradeType(g.type) ? 'Ocena końcowa' : (g.type || 'Składowa')}</div>
+                            <div className="grade-date-teacher">
+                              {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
+                            </div>
+                          </div>
+                          <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -1062,6 +1160,25 @@ function App() {
   function renderInfo() {
     return (
       <section className="screen">
+        {session && (
+          <div className="info-profile-card">
+            {session.imageUrl && !studentPhotoError ? (
+              <img
+                src={session.imageUrl}
+                alt="Zdjęcie studenta"
+                className="info-profile-photo"
+                onError={() => setStudentPhotoError(true)}
+              />
+            ) : (
+              <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
+            )}
+            <div className="info-profile-meta">
+              <div className="info-profile-name">{session.username || 'Student'}</div>
+              <div className="info-profile-id">ID użytkownika: {session.userId || '-'}</div>
+            </div>
+          </div>
+        )}
+
         {studies.length > 0 && (
           <label className="field-label">
             Kierunek
@@ -1283,28 +1400,47 @@ function App() {
     return (
       <section className="screen">
         <div className="about-hero card">
-          <div className="about-logo">mZUT</div>
-          <div className="about-app-name">mzutv2 PWA</div>
-          <div className="about-version">Wersja 2.0 • Progressive Web App</div>
+          <img src="/icons/mzutv2-logo.png" alt="Logo mZUT v2" className="about-logo-img" />
+          <div className="about-app-name">mzutv2</div>
+          <div className="about-version">Wersja PWA • układ zgodny z aplikacją Android</div>
         </div>
 
-        <div className="info-card">
-          {[
-            { l: 'Platforma', v: 'Progressive Web App' },
-            { l: 'Framework', v: 'React 19 + TypeScript' },
-            { l: 'Offline',   v: 'Service Worker + localStorage' },
-            { l: 'API',       v: 'mZUT / plan.zut.edu.pl' },
-          ].map(r => (
-            <div key={r.l} className="info-row">
-              <div className="info-row-label">{r.l}</div>
-              <div className="info-row-value">{r.v}</div>
-            </div>
-          ))}
+        <div className="about-card card">
+          <div className="about-section-title">Ekrany aplikacji</div>
+          <div className="about-page-row">
+            <div className="about-page-name">Plan zajęć</div>
+            <div className="about-page-desc">Widok dnia, tygodnia i miesiąca oraz szczegóły zajęć po kliknięciu.</div>
+          </div>
+          <div className="about-page-row">
+            <div className="about-page-name">Oceny</div>
+            <div className="about-page-desc">Ocena końcowa przedmiotu z rozwijanymi składowymi: wykład, laboratorium i inne.</div>
+          </div>
+          <div className="about-page-row">
+            <div className="about-page-name">Dane studenta</div>
+            <div className="about-page-desc">Zdjęcie, dane kierunku i przebieg studiów.</div>
+          </div>
+          <div className="about-page-row">
+            <div className="about-page-name">Aktualności</div>
+            <div className="about-page-desc">Pełna treść wpisów RSS z przejściem do źródła.</div>
+          </div>
+          <div className="about-page-row">
+            <div className="about-page-name">Przydatne strony</div>
+            <div className="about-page-desc">Szybkie linki do zasobów uczelni i wydziału.</div>
+          </div>
+          <div className="about-page-row">
+            <div className="about-page-name">Ustawienia</div>
+            <div className="about-page-desc">Konfiguracja działania aplikacji i widoków.</div>
+          </div>
         </div>
 
-        <div className="card" style={{fontSize:13,color:'var(--mz-muted)',lineHeight:1.6}}>
-          <p>Nieoficjalny klient mobilny dla studentów Zachodniopomorskiego Uniwersytetu Technologicznego w Szczecinie.</p>
-          <p style={{marginTop:8}}>Aplikacja działa w pełni offline — wszystkie dane są cachowane lokalnie w przeglądarce.</p>
+        <div className="about-card card">
+          <div className="about-section-title">Jak to działa</div>
+          <ol className="about-steps">
+            <li>Logujesz się kontem ZUT.</li>
+            <li>Aplikacja pobiera dane z usług uczelni i zapisuje je lokalnie.</li>
+            <li>Zmiana kierunku odświeża dane we wszystkich zakładkach.</li>
+            <li>Odświeżenie danych wykonasz ikoną odświeżania w nagłówku.</li>
+          </ol>
         </div>
       </section>
     );
@@ -1475,6 +1611,3 @@ function App() {
 }
 
 export default App;
-
-
-
