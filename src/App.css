@@ -306,7 +306,7 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   position: relative;
 }
 
-/* ── Plan Sticky Header (minimal, compact) ────────────────────────────── */
+/* ── Plan Sticky Header (minimal, compact, rounded) ──────────────────── */
 .plan-sticky-header {
   position: sticky;
   top: 0;
@@ -315,11 +315,12 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--mz-surface);
-  border-bottom: 1px solid var(--mz-border-soft);
-  height: 48px;
+  background: transparent;
+  height: 56px;
   flex-shrink: 0;
   gap: 8px;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .plan-nav-btn-compact {
@@ -355,6 +356,11 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  background: var(--mz-card-soft);
+  border: 1px solid var(--mz-border-soft);
+  border-radius: 24px;
+  padding: 8px 16px;
+  margin: 0 4px;
 }
 
 /* ── Plan Content Area (calendar - full height) ──────────────────────── */
