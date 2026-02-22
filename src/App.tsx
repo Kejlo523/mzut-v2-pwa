@@ -169,6 +169,8 @@ function Ic({ n }: { n: string }) {
   if (n === 'news')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path {...SV} d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>;
   if (n === 'present')  return <svg viewBox="0 0 24 24" aria-hidden><polyline {...SV} points="9 11 12 14 22 4"/><path {...SV} d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>;
   if (n === 'link')     return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path {...SV} d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>;
+  if (n === 'lock')  return <svg viewBox="0 0 24 24" aria-hidden><rect {...SV} x="3" y="11" width="18" height="11" rx="2" ry="2"/><path {...SV} d="M7 11V7a5 5 0 0110 0v4"/></svg>;
+  if (n === 'eye')   return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle {...SV} cx="12" cy="12" r="3"/></svg>;
   if (n === 'settings') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="3"/><path {...SV} d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
   if (n === 'info')     return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10"/><line {...SV} x1="12" y1="8" x2="12" y2="12"/><line {...SV} x1="12" y1="16" x2="12.01" y2="16"/></svg>;
   if (n === 'logout')   return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline {...SV} points="16 17 21 12 16 7"/><line {...SV} x1="21" y1="12" x2="9" y2="12"/></svg>;
@@ -790,6 +792,7 @@ function App() {
   // ── Login ─────────────────────────────────────────────────────────────────
   const [loginVal, setLoginVal]         = useState('');
   const [password, setPassword]         = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
   async function onLoginSubmit() {
@@ -895,21 +898,68 @@ function App() {
   function renderLogin() {
     return (
       <section className="screen login-screen">
-        <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="login-logo" />
-        <div className="login-title">mzutv2</div>
-        <div className="login-subtitle">Zaloguj się kontem ZUT</div>
-        <div className="login-form">
-          <label className="field-label">
-            Login
-            <input value={loginVal} onChange={e => setLoginVal(e.target.value)} placeholder="s12345 lub email" autoComplete="username" onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()} />
-          </label>
-          <label className="field-label">
-            Hasło
-            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="•••••••" type="password" autoComplete="current-password" onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()} />
-          </label>
-          <button type="button" onClick={() => void onLoginSubmit()} disabled={loginLoading}>
-            {loginLoading ? 'Logowanie…' : 'Zaloguj się'}
-          </button>
+        <div className="login-header">
+          <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="login-logo" />
+          <h1 className="login-title">mzutv2</h1>
+        </div>
+
+        <div className="login-card">
+          <div className="login-card-title">Zaloguj się kontem ZUT</div>
+
+          <div className="login-form">
+            <div className="login-field">
+              <label htmlFor="login-input" className="login-field-label">
+                <Ic n="user" />
+              </label>
+              <input
+                id="login-input"
+                type="text"
+                value={loginVal}
+                onChange={e => setLoginVal(e.target.value)}
+                placeholder="s12345 lub email"
+                autoComplete="username"
+                onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
+                className="login-field-input"
+              />
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="password-input" className="login-field-label">
+                <Ic n="lock" />
+              </label>
+              <input
+                id="password-input"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Hasło"
+                autoComplete="current-password"
+                onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
+                className="login-field-input"
+              />
+              <button
+                type="button"
+                className="login-field-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+              >
+                <Ic n="eye" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void onLoginSubmit()}
+              disabled={loginLoading}
+              className="login-button"
+            >
+              {loginLoading ? 'Logowanie…' : 'Zaloguj się'}
+            </button>
+
+            <p className="login-info-text">
+              Zaloguj się swoimi danymi z systemu ZUT. Aplikacja nie przechowuje haseł - logowanie odbywa się bezpośrednio na serwerach uczelni.
+            </p>
+          </div>
         </div>
       </section>
     );
