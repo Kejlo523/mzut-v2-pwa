@@ -25,6 +25,24 @@ export function loadSession(): SessionData | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SessionData;
     if (!parsed.userId || !parsed.authKey) return null;
+
+    // Migrate: extract tokenJpg from old imageUrl if not stored separately
+    if (!parsed.tokenJpg && parsed.imageUrl) {
+      try {
+        const imgUrl = parsed.imageUrl.startsWith('http')
+          ? new URL(parsed.imageUrl)
+          : new URL(parsed.imageUrl, 'http://localhost');
+        const tj = imgUrl.searchParams.get('tokenJpg') || '';
+        if (tj) parsed.tokenJpg = tj;
+      } catch { /* ignore */ }
+    }
+
+    // Always reconstruct imageUrl to use proxy
+    if (parsed.userId && parsed.tokenJpg) {
+      parsed.imageUrl = `/api/proxy/image?userId=${encodeURIComponent(parsed.userId)}&tokenJpg=${encodeURIComponent(parsed.tokenJpg)}`;
+    }
+
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
     return parsed;
   } catch {
     return null;

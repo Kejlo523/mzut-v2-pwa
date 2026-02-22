@@ -264,7 +264,6 @@ function App() {
   const [history, setHistory]           = useState<StudyHistoryItem[]>([]);
   const [infoLoading, setInfoLoading]   = useState(false);
   const [studentPhotoError, setStudentPhotoError] = useState(false);
-  const [studentPhotoLoaded, setStudentPhotoLoaded] = useState(false);
 
   // News
   const [news, setNews]                 = useState<NewsItem[]>([]);
@@ -315,22 +314,33 @@ function App() {
     };
   }, [session]);
 
-  // ── Student photo loading with timeout and cache ───────────────────────
-  useEffect(() => {
-    setStudentPhotoError(false);
-    setStudentPhotoLoaded(false);
-  }, [session?.imageUrl]);
+  // ── Student photo loading via fetch (avoids CORS / cache issues) ────────
+  const [studentPhotoBlobUrl, setStudentPhotoBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session?.imageUrl) return;
-    const timeout = setTimeout(() => {
-      if (!studentPhotoLoaded) {
-        // Photo didn't load in 10 seconds, show fallback
-        setStudentPhotoError(true);
+    setStudentPhotoError(false);
+        setStudentPhotoBlobUrl(null);
+
+    const url = session?.imageUrl;
+    if (!url) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(url);
+        if (cancelled) return;
+        if (!resp.ok) { setStudentPhotoError(true); return; }
+        const blob = await resp.blob();
+        if (cancelled) return;
+        if (blob.size === 0) { setStudentPhotoError(true); return; }
+        const blobUrl = URL.createObjectURL(blob);
+        setStudentPhotoBlobUrl(blobUrl);
+      } catch {
+        if (!cancelled) setStudentPhotoError(true);
       }
-    }, 10000);
-    return () => clearTimeout(timeout);
-  }, [session?.imageUrl, studentPhotoLoaded]);
+    })();
+    return () => { cancelled = true; };
+  }, [session?.imageUrl]);
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
@@ -1344,16 +1354,11 @@ function App() {
       <section className="screen">
         {session && (
           <div className="info-profile-card">
-            {session.imageUrl && !studentPhotoError ? (
+            {studentPhotoBlobUrl && !studentPhotoError ? (
               <img
-                src={session.imageUrl}
+                src={studentPhotoBlobUrl}
                 alt="Zdjęcie studenta"
                 className="info-profile-photo"
-                crossOrigin="anonymous"
-                loading="lazy"
-                decoding="async"
-                onError={() => setStudentPhotoError(true)}
-                onLoad={() => setStudentPhotoLoaded(true)}
               />
             ) : (
               <div className="info-profile-fallback">{initials(session.username || 'S')}</div>

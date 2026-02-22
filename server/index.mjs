@@ -150,6 +150,41 @@ app.get('/api/proxy/plan-suggest', async (req, res) => {
   }
 });
 
+app.get('/api/proxy/image', async (req, res) => {
+  try {
+    const userId = String(req.query.userId ?? '').trim();
+    const tokenJpg = String(req.query.tokenJpg ?? '').trim();
+    if (!userId || !tokenJpg) {
+      return res.status(400).json({ error: 'Missing userId or tokenJpg' });
+    }
+
+    const url = `https://www.zut.edu.pl/app-json-proxy/image/?userId=${encodeURIComponent(userId)}&tokenJpg=${encodeURIComponent(tokenJpg)}`;
+    const response = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'mZUTv2-PWA-Proxy/1.0' },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).end();
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    if (buffer.length === 0) {
+      return res.status(404).end();
+    }
+
+    // ZUT returns JPEG with wrong Content-Type (text/html), detect from magic bytes
+    let contentType = 'image/jpeg';
+    if (buffer[0] === 0x89 && buffer[1] === 0x50) contentType = 'image/png';
+    else if (buffer[0] === 0x47 && buffer[1] === 0x49) contentType = 'image/gif';
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(502).json({ error: `Image proxy error: ${error.message}` });
+  }
+});
+
 app.get('/api/proxy/rss', async (_req, res) => {
   try {
     const response = await fetchWithTimeout(RSS_URL, {

@@ -5,6 +5,7 @@ export interface SessionData {
   username: string;
   authKey: string;
   imageUrl: string;
+  tokenJpg?: string;
   activeStudyId: string | null;
 }
 

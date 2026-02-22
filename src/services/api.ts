@@ -177,7 +177,8 @@ export async function login(loginValue: string, password: string): Promise<Sessi
     userId,
     username,
     authKey,
-    imageUrl: `https://www.zut.edu.pl/app-json-proxy/image/userId=${encodeURIComponent(userId)}&tokenJpg=${encodeURIComponent(tokenJpgFromApi)}`,
+    imageUrl: `${API_BASE}/proxy/image?userId=${encodeURIComponent(userId)}&tokenJpg=${encodeURIComponent(tokenJpgFromApi)}`,
+    tokenJpg: tokenJpgFromApi,
     activeStudyId: null,
   };
 }

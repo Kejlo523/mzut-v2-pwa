@@ -74,7 +74,7 @@ export default defineConfig({
               cacheName: 'api-cache',
               networkTimeoutSeconds: 8,
               expiration: { maxAgeSeconds: 3600, maxEntries: 40 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
           // Images – cache first (long TTL)
@@ -84,7 +84,7 @@ export default defineConfig({
             options: {
               cacheName: 'images',
               expiration: { maxAgeSeconds: 7 * 86400, maxEntries: 80 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
           // External resources (ZUT images, RSS thumbnails)
@@ -94,7 +94,7 @@ export default defineConfig({
             options: {
               cacheName: 'zut-assets',
               expiration: { maxAgeSeconds: 3600, maxEntries: 30 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
         ],
