@@ -955,7 +955,7 @@ function App() {
     const today = todayYmd();
 
     return (
-      <section className="screen">
+      <section className="screen plan-screen">
         <div className="plan-header-section">
           <div className="plan-date-header">
             <button type="button" className="plan-nav-btn" onClick={() => {
@@ -982,24 +982,14 @@ function App() {
               <Ic n="chevR"/>
             </button>
           </div>
+        </div>
 
-          <div className="plan-top-row">
-            <div className="segmented" style={{ flex: 1 }}>
-              {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-                <button key={m} type="button" className={planViewMode === m ? 'active' : ''} onClick={() => setPlanViewMode(m)}>
-                  {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
-                </button>
-              ))}
-            </div>
-            <button type="button" className="plan-today-btn" onClick={() => {
-              const isSearch = !!(planSearchQ?.trim());
-              if (isSearch) {
-                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, today);
-              } else {
-                setPlanDate(today);
-              }
-            }}>Dziś</button>
-          </div>
+        <div className="plan-view-modes">
+          {(['day', 'week', 'month'] as ViewMode[]).map(m => (
+            <button key={m} type="button" className={`plan-mode-btn ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
+              {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
+            </button>
+          ))}
         </div>
 
         <div className="plan-wrapper">

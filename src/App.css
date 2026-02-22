@@ -294,22 +294,84 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 /* ══════════════════════════════════════════════════════════════════════
    PLAN SCREEN
 ════════════════════════════════════════════════════════════════════════ */
-/* ── Plan Header Section (controls + view modes) ──────────────────────── */
+/* ── Plan Screen ─────────────────────────────────────────────────────── */
+.plan-screen {
+  padding: 0;
+  gap: 0;
+}
+
+/* ── Plan Header Section (date controls only) ──────────────────────────── */
 .plan-header-section {
   padding: 0 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  flex-shrink: 0;
 }
 
-.plan-date-header { display: flex; align-items: center; justify-content: space-between; padding: 0; }
-.plan-date-label { font-size: 22px; font-weight: 700; flex: 1; text-align: center; }
-.plan-nav-btn { width: 40px; height: 40px; background: transparent; border: none; border-radius: 50%; display: grid; place-items: center; color: var(--mz-text); cursor: pointer; }
-.plan-nav-btn:active { background: var(--mz-border-soft); }
-.plan-nav-btn svg { width: 22px; height: 22px; }
-.plan-today-btn { background: var(--mz-primary-10); color: var(--mz-primary); border: none; border-radius: 20px; padding: 5px 13px; font-size: 12px; font-weight: 700; cursor: pointer; }
-.plan-today-btn:active { background: var(--mz-primary-20); }
-.plan-top-row { display: flex; gap: 8px; align-items: center; }
+.plan-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+}
+.plan-date-label {
+  font-size: 22px;
+  font-weight: 700;
+  flex: 1;
+  text-align: center;
+}
+.plan-nav-btn {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--mz-text);
+  cursor: pointer;
+}
+.plan-nav-btn:active {
+  background: var(--mz-border-soft);
+}
+.plan-nav-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Plan View Mode Buttons (full width) ─────────────────────────────── */
+.plan-view-modes {
+  display: flex;
+  gap: 2px;
+  background: var(--mz-card-soft);
+  border: 1px solid var(--mz-border-soft);
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.plan-mode-btn {
+  flex: 1;
+  height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--mz-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: all 120ms;
+}
+
+.plan-mode-btn.active {
+  background: var(--mz-surface);
+  color: var(--mz-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.plan-mode-btn:active {
+  background: var(--mz-border-soft);
+}
 
 /* ── Plan wrapper (card container) ──────────────────────────────────────── */
 .plan-wrapper {
@@ -322,7 +384,7 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   gap: 0;
 }
 
-/* ── Plan drag/swipe container ──────────────────────────────────────────── */
+/* ── Plan drag/swipe container (the actual card) ──────────────────────── */
 .plan-container {
   flex: 1;
   overflow-y: auto;
@@ -333,6 +395,9 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   background: var(--mz-bg);
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
