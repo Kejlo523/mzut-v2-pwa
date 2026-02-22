@@ -107,6 +107,8 @@ function screenTitle(s: ScreenKey): string {
 function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
   const normalized = g.trim().toLowerCase();
   if (normalized === '-' || normalized === '') return 'neutral';
+  if (normalized === 'zal' || normalized === 'zaliczone') return 'ok';
+  if (normalized === 'niezal' || normalized === 'niezaliczone') return 'bad';
 
   const v = Number.parseFloat(g.replace(',', '.'));
   if (!Number.isFinite(v)) return 'neutral';
