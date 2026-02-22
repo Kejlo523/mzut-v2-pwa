@@ -1108,10 +1108,51 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 /* ══════════════════════════════════════════════════════════════════════
    UTILITY COMPONENTS
 ════════════════════════════════════════════════════════════════════════ */
-.banner { margin: 6px 10px 0; border-radius: 10px; padding: 9px 12px; font-size: 13px; background: var(--mz-primary-10); color: var(--mz-primary); border: 1px solid var(--mz-primary-20); display: flex; align-items: center; gap: 8px; }
-.banner.error { background: var(--mz-danger-10); color: var(--mz-danger); border-color: rgba(248,113,113,.25); }
+.banner {
+  margin: 8px 10px 0;
+  border-radius: 14px;
+  padding: 14px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--mz-primary-10);
+  color: var(--mz-primary);
+  border: 1px solid var(--mz-primary-20);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  animation: banner-in 300ms ease-out;
+}
+
+@keyframes banner-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
+
+.banner.error {
+  background: var(--mz-danger-10);
+  color: var(--mz-danger);
+  border-color: rgba(255, 82, 82, 0.3);
+}
+
 .banner-close,
-.banner-retry { margin-left: auto; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 7px; padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.banner-retry {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: inherit;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 200ms;
+  opacity: 0.9;
+}
+
+.banner-close:active,
+.banner-retry:active {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
 
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #17171b; color: #f4f4f5; padding: 9px 16px; border-radius: 22px; font-size: 13px; font-weight: 500; z-index: 80; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,.45); animation: toast-in 180ms ease-out; pointer-events: none; }
 @media (prefers-color-scheme: light) { .toast { background: #17171b; color: #f4f4f5; } }
