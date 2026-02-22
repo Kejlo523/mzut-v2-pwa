@@ -40,7 +40,7 @@ export default defineConfig({
         scope: appBase,
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
-        orientation: 'portrait-primary',
+        orientation: 'any',
         background_color: '#050505',
         theme_color: '#1e1e1e',
         lang: 'pl',
