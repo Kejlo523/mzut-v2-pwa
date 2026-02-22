@@ -325,10 +325,10 @@ function App() {
     if (!session?.imageUrl) return;
     const timeout = setTimeout(() => {
       if (!studentPhotoLoaded) {
-        // Photo didn't load in 5 seconds, show fallback
+        // Photo didn't load in 10 seconds, show fallback
         setStudentPhotoError(true);
       }
-    }, 5000);
+    }, 10000);
     return () => clearTimeout(timeout);
   }, [session?.imageUrl, studentPhotoLoaded]);
 
@@ -1349,6 +1349,9 @@ function App() {
                 src={session.imageUrl}
                 alt="Zdjęcie studenta"
                 className="info-profile-photo"
+                crossOrigin="anonymous"
+                loading="lazy"
+                decoding="async"
                 onError={() => setStudentPhotoError(true)}
                 onLoad={() => setStudentPhotoLoaded(true)}
               />
