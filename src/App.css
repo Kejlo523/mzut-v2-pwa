@@ -1112,6 +1112,10 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .about-action-desc { font-size: 13px; color: var(--mz-muted); margin-top: 2px; }
 .about-action-arrow { color: var(--mz-border-soft); font-weight: 700; font-size: 18px; }
 
+/* Install PWA card */
+.about-install-card { border: 1.5px solid var(--mz-primary); cursor: pointer; }
+.about-install-card:active { background: var(--mz-primary-10); }
+
 /* Links section */
 .about-links { background: var(--mz-card); border-radius: 20px; border: 1px solid var(--mz-border-soft); overflow: hidden; }
 .about-link-item {

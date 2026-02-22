@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const appBase = (() => {
   const raw = (process.env.VITE_APP_BASE || '').trim();
-  if (!raw) return '/';
+  if (!raw) return '/v2/';
   const normalized = raw.startsWith('/') ? raw : `/${raw}`;
   return `${normalized.replace(/\/+$/, '')}/`;
 })();
@@ -35,7 +35,7 @@ export default defineConfig({
         id: `${appBase}?source=pwa`,
         name: 'mzutv2',
         short_name: 'mzutv2',
-        description: 'Nieoficjalny klient ZUT dla studentow - plan zajec, oceny, aktualnosci',
+        description: 'Nieoficjalny klient ZUT dla studentów – plan zajęć, oceny, aktualności',
         start_url: `${appBase}?source=pwa`,
         scope: appBase,
         display: 'standalone',
@@ -65,9 +65,9 @@ export default defineConfig({
         categories: ['education', 'utilities'],
         shortcuts: [
           {
-            name: 'Plan zajec',
+            name: 'Plan zajęć',
             short_name: 'Plan',
-            description: 'Otworz plan zajec',
+            description: 'Otwórz plan zajęć',
             url: `${appBase}?source=pwa`,
             icons: [{ src: withBase('icons/icon-192.png'), sizes: '192x192' }],
           },
