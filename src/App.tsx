@@ -956,43 +956,35 @@ function App() {
 
     return (
       <section className="screen plan-screen">
-        <div className="plan-header-section">
-          <div className="plan-date-header">
-            <button type="button" className="plan-nav-btn" onClick={() => {
-              const newDate = planResult?.prevDate ?? planDate;
-              const isSearch = !!(planSearchQ?.trim());
-              if (isSearch) {
-                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-              } else {
-                setPlanDate(newDate);
-              }
-            }} aria-label="Poprzedni">
-              <Ic n="chevL"/>
-            </button>
-            <div className="plan-date-label">{planResult?.headerLabel || planDate}</div>
-            <button type="button" className="plan-nav-btn" onClick={() => {
-              const newDate = planResult?.nextDate ?? planDate;
-              const isSearch = !!(planSearchQ?.trim());
-              if (isSearch) {
-                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-              } else {
-                setPlanDate(newDate);
-              }
-            }} aria-label="Następny">
-              <Ic n="chevR"/>
-            </button>
-          </div>
+        {/* Sticky Header - minimal date info */}
+        <div className="plan-sticky-header">
+          <button type="button" className="plan-nav-btn-compact" onClick={() => {
+            const newDate = planResult?.prevDate ?? planDate;
+            const isSearch = !!(planSearchQ?.trim());
+            if (isSearch) {
+              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+            } else {
+              setPlanDate(newDate);
+            }
+          }} aria-label="Poprzedni">
+            <Ic n="chevL"/>
+          </button>
+          <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}</div>
+          <button type="button" className="plan-nav-btn-compact" onClick={() => {
+            const newDate = planResult?.nextDate ?? planDate;
+            const isSearch = !!(planSearchQ?.trim());
+            if (isSearch) {
+              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+            } else {
+              setPlanDate(newDate);
+            }
+          }} aria-label="Następny">
+            <Ic n="chevR"/>
+          </button>
         </div>
 
-        <div className="plan-view-modes">
-          {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-            <button key={m} type="button" className={`plan-mode-btn ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
-              {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
-            </button>
-          ))}
-        </div>
-
-        <div className="plan-wrapper">
+        {/* Calendar Content - Full Height */}
+        <div className="plan-content">
         <div
           className="plan-container"
           onTouchStart={handlePlanDragStart}
@@ -1172,6 +1164,15 @@ function App() {
           </div>
         )}
         </div>
+        </div>
+
+        {/* Floating Toolbar - View Mode Selector */}
+        <div className="plan-floating-toolbar">
+          {(['day', 'week', 'month'] as ViewMode[]).map(m => (
+            <button key={m} type="button" className={`plan-mode-btn-floating ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
+              {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
+            </button>
+          ))}
         </div>
       </section>
     );
