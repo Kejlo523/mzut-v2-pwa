@@ -113,11 +113,6 @@ export default defineConfig({
         target: 'http://localhost:8787',
         changeOrigin: true,
       },
-      '/image-proxy/': {
-        target: 'https://www.zut.edu.pl',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/image-proxy\//, '/'),
-      },
     },
   },
 });

@@ -46,10 +46,6 @@ function fixImageUrls(html: string): string {
         fixedSrc = `https://www.zut.edu.pl/${fixedSrc}`;
       }
     }
-    // Use image proxy to avoid CORS issues - rewrite zut.edu.pl URLs through /image-proxy/
-    if (fixedSrc.includes('zut.edu.pl')) {
-      fixedSrc = fixedSrc.replace('https://www.zut.edu.pl/', '/image-proxy/').replace('https://www.zut.edu.pl', '/image-proxy/');
-    }
     return `<img${before}src="${fixedSrc}"${after}>`;
   });
 }
@@ -706,11 +702,7 @@ export async function fetchNews(): Promise<NewsItem[]> {
       }
     }
 
-    // Use image proxy to avoid CORS issues - rewrite zut.edu.pl URLs through /image-proxy/
-    let thumbUrl = thumbRaw;
-    if (thumbUrl.includes('zut.edu.pl')) {
-      thumbUrl = thumbUrl.replace('https://www.zut.edu.pl/', '/image-proxy/').replace('https://www.zut.edu.pl', '/image-proxy/');
-    }
+    const thumbUrl = thumbRaw;
 
     const parsedDate = new Date(pubDateRaw);
     const date = Number.isFinite(parsedDate.getTime())
