@@ -88,9 +88,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith('/api/') ||
-              url.pathname.startsWith(scopedApiPrefix),
+            urlPattern: new RegExp(`^https?://[^/]+(${escapeRegex(scopedApiPrefix)}|/api/)`),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
