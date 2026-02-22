@@ -92,7 +92,7 @@ function isFinalGradeType(type: string): boolean {
 function screenTitle(s: ScreenKey): string {
   const m: Record<ScreenKey, string> = {
     login: 'mzutv2',
-    home: 'mzutv2',
+    home: 'Strona główna',
     plan: 'Plan zajęć',
     grades: 'Oceny',
     info: 'Dane studenta',
@@ -227,7 +227,7 @@ function App() {
   const [drawerOpen, setDrawerOpen]     = useState(false);
 
   // Plan
-  const [planViewMode, setPlanViewMode] = useState<ViewMode>('day');
+  const [planViewMode, setPlanViewMode] = useState<ViewMode>('week');
   const [planDate, setPlanDate]         = useState(todayYmd);
   const [planResult, setPlanResult]     = useState<PlanResult | null>(null);
   const [planLoading, setPlanLoading]   = useState(false);
@@ -244,12 +244,14 @@ function App() {
   const [totalEctsAll, setTotalEctsAll] = useState(0);
   const [expandedGradeSubjects, setExpandedGradeSubjects] = useState<Record<string, boolean>>({});
   const selSemPrev = useRef('');
+  const planRequestIdRef = useRef<string>('');
 
   // Info
   const [details, setDetails]           = useState<StudyDetails | null>(null);
   const [history, setHistory]           = useState<StudyHistoryItem[]>([]);
   const [infoLoading, setInfoLoading]   = useState(false);
   const [studentPhotoError, setStudentPhotoError] = useState(false);
+  const [studentPhotoLoaded, setStudentPhotoLoaded] = useState(false);
 
   // News
   const [news, setNews]                 = useState<NewsItem[]>([]);
@@ -276,9 +278,49 @@ function App() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  // ── Session inactivity timeout (30 minutes) ───────────────────────────────
+  useEffect(() => {
+    if (!session) return;
+    let inactivityTimer: ReturnType<typeof setTimeout>;
+    const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        setSession(null);
+        showToast('Sesja wygasła, zaloguj się ponownie');
+      }, SESSION_TIMEOUT);
+    };
+
+    // Reset timer on user activity
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    // Initial timer
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [session]);
+
+  // ── Student photo loading with timeout and cache ───────────────────────
   useEffect(() => {
     setStudentPhotoError(false);
+    setStudentPhotoLoaded(false);
   }, [session?.imageUrl]);
+
+  useEffect(() => {
+    if (!session?.imageUrl) return;
+    const timeout = setTimeout(() => {
+      if (!studentPhotoLoaded) {
+        // Photo didn't load in 5 seconds, show fallback
+        setStudentPhotoError(true);
+      }
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [session?.imageUrl, studentPhotoLoaded]);
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
@@ -324,9 +366,9 @@ function App() {
 
   // ── Swipe gestures ────────────────────────────────────────────────────────
   const swipe = useSwipeGestures({
-    canGoBack: canBack,
-    onBack: nav.goBack,
-    canOpenDrawer: !drawerOpen && screen !== 'login' && !canBack,
+    canGoBack: false,
+    onBack: () => {},
+    canOpenDrawer: !drawerOpen && screen !== 'login',
     onOpenDrawer: () => setDrawerOpen(true),
   });
 
@@ -372,33 +414,61 @@ function App() {
     void loadStudiesData(session);
   }, [session, loadStudiesData]);
 
-  const loadPlanData = useCallback(async (search?: { category: string; query: string }) => {
+  const loadPlanData = useCallback(async (search?: { category: string; query: string }, forceRefresh = false) => {
     if (!session) return;
     const cacheKey = planCacheKey(planViewMode, planDate, activeStudyId);
     const isSearch = !!(search?.query?.trim());
     const searchParam = isSearch ? search : { category: 'number', query: '' };
 
-    // Show cached immediately
-    if (!isSearch) {
+    // Create unique request ID to cancel old requests
+    const requestId = Math.random().toString(36).substr(2, 9);
+    planRequestIdRef.current = requestId;
+
+    // Show cached immediately without spinner (but not if forcing refresh)
+    let hasCached = false;
+    if (!isSearch && !forceRefresh) {
       const cached = cache.loadPlanForce(cacheKey);
-      if (cached) { setPlanResult(cached); }
+      if (cached) {
+        setPlanResult(cached);
+        hasCached = true;
+      }
     }
 
-    setPlanLoading(true);
+    // Only show spinner if no cache or searching
+    if (!hasCached) {
+      setPlanLoading(true);
+    }
     setGlobalError('');
     try {
       const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: planDate, studyId: activeStudyId, search: searchParam });
+
+      // Check if this request is still current (not cancelled by newer request)
+      if (planRequestIdRef.current !== requestId) {
+        return; // Newer request is in progress, discard this result
+      }
+
       if (!isSearch) cache.savePlan(cacheKey, result);
       setPlanResult(result);
       if (!isSearch && result.currentDate) setPlanDate(result.currentDate);
     } catch (e) {
-      if (!planResult) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać planu.');
+      if (planRequestIdRef.current === requestId) {
+        const errorMsg = e instanceof Error ? e.message : 'Nie można pobrać planu.';
+        // Check if session expired (401 Unauthorized)
+        if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
+          applySession(null);
+          showToast('Sesja wygasła, zaloguj się ponownie');
+        } else if (!planResult) {
+          setGlobalError(errorMsg);
+        }
+      }
     } finally {
-      setPlanLoading(false);
+      if (planRequestIdRef.current === requestId) {
+        setPlanLoading(false);
+      }
     }
   }, [session, planViewMode, planDate, activeStudyId, planResult]);
 
-  const loadGradesData = useCallback(async (resetSemId = false) => {
+  const loadGradesData = useCallback(async (resetSemId = false, forceRefresh = false) => {
     if (!session || !activeStudyId) {
       setSemesters([]);
       setSelSemId('');
@@ -408,11 +478,11 @@ function App() {
     }
 
     const cachedSem = cache.loadSemestersForce(activeStudyId) ?? [];
-    if (cachedSem.length) setSemesters(cachedSem);
+    if (cachedSem.length && !forceRefresh) setSemesters(cachedSem);
 
     const activeSemId = resetSemId ? '' : selSemId;
     const semId = activeSemId || cachedSem?.[0]?.listaSemestrowId;
-    if (semId) {
+    if (semId && !forceRefresh) {
       const cachedG = cache.loadGradesForce(semId);
       if (cachedG) setGrades(cachedG);
     }
@@ -479,17 +549,24 @@ function App() {
         // noop
       }
     } catch (e) {
-      if (!grades.length) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać ocen.');
+      const errorMsg = e instanceof Error ? e.message : 'Nie można pobrać ocen.';
+      // Check if session expired (401 Unauthorized)
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
+        applySession(null);
+        showToast('Sesja wygasła, zaloguj się ponownie');
+      } else if (!grades.length) {
+        setGlobalError(errorMsg);
+      }
     } finally {
       setGradesLoad(false);
     }
   }, [session, activeStudyId, selSemId, grades.length]);
 
-  const loadInfoData = useCallback(async () => {
+  const loadInfoData = useCallback(async (forceRefresh = false) => {
     if (!session || !activeStudyId) return;
     const forceCached = cache.loadInfoForce(activeStudyId);
-    if (forceCached) { setDetails(forceCached.details); setHistory(forceCached.history); }
-    if (cache.loadInfo(activeStudyId)) return; // fresh cache, skip fetch
+    if (forceCached && !forceRefresh) { setDetails(forceCached.details); setHistory(forceCached.history); }
+    if (cache.loadInfo(activeStudyId) && !forceRefresh) return; // fresh cache, skip fetch
     setInfoLoading(true);
     setGlobalError('');
     try {
@@ -504,10 +581,10 @@ function App() {
     }
   }, [session, activeStudyId]);
 
-  const loadNewsData = useCallback(async () => {
+  const loadNewsData = useCallback(async (forceRefresh = false) => {
     const forced = cache.loadNewsForce() ?? [];
-    if (forced.length) setNews(forced);
-    if (cache.loadNews()) return;
+    if (forced.length && !forceRefresh) setNews(forced);
+    if (cache.loadNews() && !forceRefresh) return;
     setNewsLoading(true);
     setGlobalError('');
     try {
@@ -526,10 +603,11 @@ function App() {
   useEffect(() => {
     if (!session || screen === prevScreen.current) return;
     prevScreen.current = screen;
-    if (screen === 'plan')   void loadPlanData();
-    if (screen === 'grades') void loadGradesData();
-    if (screen === 'info')   void loadInfoData();
-    if (screen === 'news')   void loadNewsData();
+    if (screen === 'plan')       void loadPlanData();
+    if (screen === 'grades')     void loadGradesData();
+    if (screen === 'info')       void loadInfoData();
+    if (screen === 'news')       void loadNewsData();
+    if (screen === 'attendance') void loadPlanData(); // Load plan to show all subjects
   }, [screen, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const prevStudyId = useRef<string | null>(null);
@@ -741,7 +819,7 @@ function App() {
   }
 
   // ── AppBar logic ──────────────────────────────────────────────────────────
-  const onNavIcon = canBack ? nav.goBack : () => setDrawerOpen(true);
+  const onNavIcon = () => setDrawerOpen(true);
 
   // ── Drawer items ──────────────────────────────────────────────────────────
   type DrawerKey = Exclude<ScreenKey, 'login' | 'news-detail'>;
@@ -762,7 +840,7 @@ function App() {
   function renderLogin() {
     return (
       <section className="screen login-screen">
-        <div className="login-logo">mZUT</div>
+        <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="login-logo" />
         <div className="login-title">mzutv2</div>
         <div className="login-subtitle">Zaloguj się kontem ZUT</div>
         <div className="login-form">
@@ -1171,6 +1249,7 @@ function App() {
                 alt="Zdjęcie studenta"
                 className="info-profile-photo"
                 onError={() => setStudentPhotoError(true)}
+                onLoad={() => setStudentPhotoLoaded(true)}
               />
             ) : (
               <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
@@ -1264,7 +1343,6 @@ function App() {
     const fullHtml = item.contentHtml || item.descriptionHtml;
     return (
       <section className="screen">
-        {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
         <div className="card">
           <div className="news-detail-title">{item.title}</div>
           <div className="news-detail-date">{item.date}</div>
@@ -1274,6 +1352,7 @@ function App() {
             <div className="news-detail-body">{item.descriptionText || item.snippet}</div>
           )}
         </div>
+        {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
         {item.link && (
           <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
             Otwórz w przeglądarce ↗
@@ -1391,10 +1470,6 @@ function App() {
             <Toggle checked={settings.gradesGrouping} onChange={v => setSettings(p => ({ ...p, gradesGrouping: v }))} />
           </div>
         </div>
-
-        <button type="button" className="danger-ghost" style={{marginTop:8,width:'100%',textAlign:'left',borderRadius:'var(--r-inner)',border:'1.5px solid rgba(220,38,38,0.3)',background:'var(--mz-danger-10)'}} onClick={() => { applySession(null); setDrawerOpen(false); }}>
-          Wyloguj się
-        </button>
       </section>
     );
   }
@@ -1513,13 +1588,13 @@ function App() {
 
     if (screen === 'plan') {
       actions.push({ key: 'search', icon: 'search', label: 'Szukaj w planie', onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadPlanData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadPlanData(undefined, true), active: false });
     } else if (screen === 'grades') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadGradesData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadGradesData(false, true), active: false });
     } else if (screen === 'info') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadInfoData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadInfoData(true), active: false });
     } else if (screen === 'news') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadNewsData(), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadNewsData(true), active: false });
     }
 
     return (
@@ -1545,8 +1620,8 @@ function App() {
       {/* AppBar */}
       {screen !== 'login' && (
         <header className="android-appbar">
-          <button type="button" className="icon-btn" onClick={onNavIcon} aria-label={canBack ? 'Wróć' : 'Otwórz menu'}>
-            <Ic n={canBack ? 'back' : 'menu'}/>
+          <button type="button" className="icon-btn" onClick={screen === 'news-detail' ? nav.goBack : onNavIcon} aria-label={screen === 'news-detail' ? 'Wróć' : 'Otwórz menu'}>
+            <Ic n={screen === 'news-detail' ? 'back' : 'menu'}/>
           </button>
           <h1>{screenTitle(screen)}</h1>
           {renderAppBarActions()}
@@ -1584,7 +1659,7 @@ function App() {
           <button type="button" className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Zamknij menu"/>
           <aside className="drawer-panel" role="navigation" aria-label="Nawigacja główna">
             <div className="drawer-header">
-              <div className="drawer-avatar">{initials(session?.username || 'S')}</div>
+              <img src="/icons/mzutv2-logo.png" alt="mZUT v2" className="drawer-avatar" />
               <div className="drawer-name">{session?.username || 'Student'}</div>
               <div className="drawer-sub">mzutv2 PWA</div>
             </div>
@@ -1601,7 +1676,7 @@ function App() {
             </div>
 
             <div className="drawer-footer">
-              <button type="button" className="drawer-logout" onClick={() => { applySession(null); setDrawerOpen(false); }}>
+              <button type="button" className="drawer-logout" onClick={() => { if (window.confirm('Czy na pewno chcesz się wylogować?')) { applySession(null); setDrawerOpen(false); } }}>
                 <Ic n="logout"/>
                 Wyloguj się
               </button>
