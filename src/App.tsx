@@ -1194,33 +1194,37 @@ function App() {
   function renderGrades() {
     return (
       <section className="screen">
-        <div className="metrics-row">
-          <div className="metric-card"><div className="metric-label">Średnia</div><div className="metric-value">{gradesSummary.avg}</div></div>
-          <div className="metric-card"><div className="metric-label">ECTS semestr</div><div className="metric-value">{gradesSummary.ects}</div></div>
-          <div className="metric-card"><div className="metric-label">ECTS łącznie</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+        <div className="grades-hero">
+          <div className="metrics-row">
+            <div className="metric-card"><div className="metric-label">Średnia</div><div className="metric-value">{gradesSummary.avg}</div></div>
+            <div className="metric-card"><div className="metric-label">ECTS semestr</div><div className="metric-value">{gradesSummary.ects}</div></div>
+            <div className="metric-card"><div className="metric-label">ECTS łącznie</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+          </div>
         </div>
 
-        <div className="grades-filters">
-          {studies.length > 0 && (
-            <label className="field-label">
-              Kierunek
-              <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-                {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-              </select>
-            </label>
-          )}
-          {semesters.length > 0 && (
-            <label className="field-label">
-              Semestr
-              <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
-                {semesters.map(s => (
-                  <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
-                    Sem. {s.nrSemestru} ({s.pora}) {s.rokAkademicki}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+        <div className="grades-filters-container">
+          <div className="grades-filters">
+            {studies.length > 0 && (
+              <label className="field-label">
+                Kierunek
+                <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+                  {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
+                </select>
+              </label>
+            )}
+            {semesters.length > 0 && (
+              <label className="field-label">
+                Semestr
+                <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
+                  {semesters.map(s => (
+                    <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
+                      Sem. {s.nrSemestru} ({s.pora}) {s.rokAkademicki}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="grades-toggle-row">
@@ -1234,12 +1238,13 @@ function App() {
           </button>
         </div>
 
-        {gradesLoading && <Spinner text="Pobieranie ocen…"/>}
-        {!gradesLoading && grades.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">🎓</div><p>Brak ocen dla wybranego semestru</p></div>
-        )}
+        <div className="grades-surface">
+          {gradesLoading && <Spinner text="Pobieranie ocen…"/>}
+          {!gradesLoading && grades.length === 0 && (
+            <div className="empty-state"><div className="empty-state-icon">🎓</div><p>Brak ocen dla wybranego semestru</p></div>
+          )}
 
-        <div className="list-stack">
+          <div className="list-stack">
           {settings.gradesGrouping ? (
             groupedGrades.map(({ subject, items, finalGrade, ects }) => {
               const isOpen = !!expandedGradeSubjects[subject];
@@ -1297,6 +1302,7 @@ function App() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </section>
     );
