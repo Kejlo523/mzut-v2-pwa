@@ -916,16 +916,17 @@ function App() {
 
   function renderHome() {
     return (
-      <section className="screen">
-        <div className="home-hero-container">
-          <div className="home-hero-label">mZUT v2</div>
-          <div className="home-hero-greeting">Cześć{session?.username ? `, ${session.username.split(' ')[0]}` : ''} 👋</div>
-          <div className="home-hero-sub">Wybierz moduł, aby przejść dalej</div>
-          {!isOnline && <span className="offline-badge" style={{marginTop: 8}}><Ic n="wifi-off"/>Tryb offline</span>}
-        </div>
+      <section className="screen home-screen">
+        <div className="home-scroll-content">
+          <div className="home-hero-container">
+            <div className="home-hero-label">mZUT v2</div>
+            <div className="home-hero-greeting">Cześć{session?.username ? `, ${session.username.split(' ')[0]}` : ''} 👋</div>
+            <div className="home-hero-sub">Wybierz moduł, aby przejść dalej</div>
+            {!isOnline && <span className="offline-badge" style={{marginTop: 8}}><Ic n="wifi-off"/>Tryb offline</span>}
+          </div>
 
-        <div className="home-section-title">Skróty</div>
-        <div className="tile-grid">
+          <div className="home-section-title">Skróty</div>
+          <div className="tile-grid">
           {([
             { key: 'plan'  as DrawerKey, label: 'Plan zajęć',    desc: 'Dzień, tydzień, miesiąc', icon: 'calendar' },
             { key: 'grades'as DrawerKey, label: 'Oceny',          desc: 'Średnia i punkty ECTS',   icon: 'grade'    },
@@ -940,18 +941,9 @@ function App() {
           ))}
         </div>
 
-        <div className="section-title">Inne</div>
-        <div className="list-menu">
-          {([
-            { key: 'links'      as DrawerKey, label: 'Przydatne strony', icon: 'link'     },
-            { key: 'settings'   as DrawerKey, label: 'Ustawienia',       icon: 'settings' },
-          ] as const).map(i => (
-            <button key={i.key} type="button" className="list-menu-item" onClick={() => openScreen(i.key)}>
-              <div className="list-menu-item-icon"><Ic n={i.icon}/></div>
-              <span>{i.label}</span>
-              <div className="list-menu-item-chevron"><Ic n="chevR"/></div>
-            </button>
-          ))}
+        <div className="home-footer-card">
+          <p>mZUT v2 został stworzony jako nieoficjalna, lekka alternatywa do szybkiego podglądu planu, ocen i informacji o studiach na ZUT.</p>
+        </div>
         </div>
       </section>
     );
@@ -964,48 +956,50 @@ function App() {
 
     return (
       <section className="screen">
-        <div className="plan-date-header">
-          <button type="button" className="plan-nav-btn" onClick={() => {
-            const newDate = planResult?.prevDate ?? planDate;
-            const isSearch = !!(planSearchQ?.trim());
-            if (isSearch) {
-              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-            } else {
-              setPlanDate(newDate);
-            }
-          }} aria-label="Poprzedni">
-            <Ic n="chevL"/>
-          </button>
-          <div className="plan-date-label">{planResult?.headerLabel || planDate}</div>
-          <button type="button" className="plan-nav-btn" onClick={() => {
-            const newDate = planResult?.nextDate ?? planDate;
-            const isSearch = !!(planSearchQ?.trim());
-            if (isSearch) {
-              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-            } else {
-              setPlanDate(newDate);
-            }
-          }} aria-label="Następny">
-            <Ic n="chevR"/>
-          </button>
-        </div>
-
-        <div className="plan-top-row">
-          <div className="segmented" style={{ flex: 1 }}>
-            {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-              <button key={m} type="button" className={planViewMode === m ? 'active' : ''} onClick={() => setPlanViewMode(m)}>
-                {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
-              </button>
-            ))}
+        <div className="plan-header-section">
+          <div className="plan-date-header">
+            <button type="button" className="plan-nav-btn" onClick={() => {
+              const newDate = planResult?.prevDate ?? planDate;
+              const isSearch = !!(planSearchQ?.trim());
+              if (isSearch) {
+                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+              } else {
+                setPlanDate(newDate);
+              }
+            }} aria-label="Poprzedni">
+              <Ic n="chevL"/>
+            </button>
+            <div className="plan-date-label">{planResult?.headerLabel || planDate}</div>
+            <button type="button" className="plan-nav-btn" onClick={() => {
+              const newDate = planResult?.nextDate ?? planDate;
+              const isSearch = !!(planSearchQ?.trim());
+              if (isSearch) {
+                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+              } else {
+                setPlanDate(newDate);
+              }
+            }} aria-label="Następny">
+              <Ic n="chevR"/>
+            </button>
           </div>
-          <button type="button" className="plan-today-btn" onClick={() => {
-            const isSearch = !!(planSearchQ?.trim());
-            if (isSearch) {
-              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, today);
-            } else {
-              setPlanDate(today);
-            }
-          }}>Dziś</button>
+
+          <div className="plan-top-row">
+            <div className="segmented" style={{ flex: 1 }}>
+              {(['day', 'week', 'month'] as ViewMode[]).map(m => (
+                <button key={m} type="button" className={planViewMode === m ? 'active' : ''} onClick={() => setPlanViewMode(m)}>
+                  {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="plan-today-btn" onClick={() => {
+              const isSearch = !!(planSearchQ?.trim());
+              if (isSearch) {
+                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, today);
+              } else {
+                setPlanDate(today);
+              }
+            }}>Dziś</button>
+          </div>
         </div>
 
         <div className="plan-wrapper">
