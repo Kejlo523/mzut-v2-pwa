@@ -1372,12 +1372,22 @@ button.outline {
   border-bottom: 1px solid var(--mz-border-soft);
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .day-tl-head-date {
   font-size: 15px;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.day-tl-head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .day-tl-today-badge {
@@ -1387,6 +1397,30 @@ button.outline {
   padding: 1px 8px;
   font-size: 10px;
   font-weight: 700;
+}
+
+/* Period chip shown in day header when the day falls within an active period */
+.day-period-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.day-period-chip-session {
+  background: rgba(239, 83, 80, 0.15);
+  color: #ef5350;
+}
+
+.day-period-chip-break {
+  background: rgba(33, 150, 243, 0.15);
+  color: var(--mz-primary);
+}
+
+.day-period-chip-holiday {
+  background: rgba(76, 166, 114, 0.15);
+  color: var(--mz-success);
 }
 
 .day-tl-body {
