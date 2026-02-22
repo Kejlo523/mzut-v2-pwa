@@ -3,6 +3,7 @@ import type {
   NewsItem,
   PlanResult,
   SessionData,
+  SessionPeriod,
   Semester,
   Study,
   StudyDetails,
@@ -519,6 +520,17 @@ function layoutDayEvents<T extends PlanLayoutEvent>(events: T[]): T[] {
   return positioned;
 }
 
+export async function fetchSessionPeriods(): Promise<SessionPeriod[]> {
+  try {
+    const response = await fetch(`${API_BASE}/proxy/calendar`);
+    if (!response.ok) return [];
+    const body = (await response.json()) as { periods?: SessionPeriod[] };
+    return Array.isArray(body.periods) ? body.periods : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPlan(
   session: SessionData,
   payload: { viewMode: ViewMode; currentDate: string; studyId: string | null; search: { category: string; query: string } },
@@ -550,6 +562,7 @@ export async function fetchPlan(
         nextDate: formatYmd(next),
         todayDate: formatYmd(startOfDay(new Date())),
         headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
+        sessionPeriods: [],
         debug: {
           album: '',
           entriesTotal: 0,
@@ -574,7 +587,10 @@ export async function fetchPlan(
     };
   }
 
-  const rawEvents = await proxyPlanStudent(urlParams);
+  const [rawEvents, sessionPeriods] = await Promise.all([
+    proxyPlanStudent(urlParams),
+    fetchSessionPeriods(),
+  ]);
   const events = rawEvents.map(parsePlanEventRow).filter((event): event is Record<string, string> => Boolean(event));
 
   const grouped = new Map<string, Record<string, string>[]>();
@@ -660,6 +676,7 @@ export async function fetchPlan(
     nextDate: formatYmd(next),
     todayDate: formatYmd(startOfDay(new Date())),
     headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
+    sessionPeriods,
     debug: {
       album,
       entriesTotal: events.length,
