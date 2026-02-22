@@ -21,6 +21,7 @@ const unsafeAgent = new Agent({
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
+app.set('trust proxy', 1);
 app.use(rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }));
 app.use(express.json({ limit: '1mb' }));
 
