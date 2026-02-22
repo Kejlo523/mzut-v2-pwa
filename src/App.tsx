@@ -245,9 +245,9 @@ function App() {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Plan swipe (touch only, velocity-based)
+  // Plan swipe (touch only, strict horizontal detection)
   const [planFading, setPlanFading] = useState(false);
-  const planTouchRef = useRef<{ x: number; t: number } | null>(null);
+  const planTouchRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
   // Now line — current time indicator
   const [nowMinute, setNowMinute] = useState(() => {
@@ -857,22 +857,33 @@ function App() {
     { key: 'about',      label: 'O aplikacji',        icon: 'about'    },
   ];
 
-  // ── Plan touch swipe handlers (velocity-based) ─────────────────────────────
+  // ── Plan touch swipe handlers (strict horizontal) ───────────────────────────
   const onPlanTouchStart = (e: React.TouchEvent) => {
-    planTouchRef.current = { x: e.touches[0].clientX, t: Date.now() };
+    planTouchRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      t: Date.now(),
+    };
   };
 
   const onPlanTouchEnd = (e: React.TouchEvent) => {
     const start = planTouchRef.current;
-    if (!start || !planResult) return;
+    if (!start || !planResult || planLoading) return;
     planTouchRef.current = null;
 
-    const dx = e.changedTouches[0].clientX - start.x;
-    const dt = Date.now() - start.t;
-    const velocity = Math.abs(dx) / dt; // px/ms
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const dt = Math.max(1, Date.now() - start.t);
+    const velocity = absDx / dt; // px/ms
 
-    const triggered = Math.abs(dx) > 50 || (Math.abs(dx) > 20 && velocity > 0.3);
-    if (!triggered) return;
+    // Reduce accidental week changes while user scrolls vertically.
+    const horizontalDominant = absDx > absDy * 1.6;
+    const longSwipe = absDx >= 96 && horizontalDominant;
+    const quickSwipe = absDx >= 68 && velocity >= 0.6 && horizontalDominant && absDy <= 42;
+    if (!longSwipe && !quickSwipe) return;
 
     const targetDate = dx > 0 ? planResult.prevDate : planResult.nextDate;
     if (!targetDate) return;
@@ -1000,39 +1011,55 @@ function App() {
     const cols = planResult?.dayColumns ?? [];
     const weekCols = weekVisibleColumns;
     const today = todayYmd();
+    const activeFilter = planSearchQ.trim();
+    const viewLabel = planViewMode === 'day' ? 'Widok dnia' : planViewMode === 'week' ? 'Widok tygodnia' : 'Widok miesiaca';
 
     return (
       <section className="screen plan-screen">
-        {/* Sticky Header - minimal date info */}
-        <div className="plan-sticky-header">
-          <button type="button" className="plan-nav-btn-compact" onClick={() => {
-            const newDate = planResult?.prevDate ?? planDate;
-            const isSearch = !!(planSearchQ?.trim());
-            if (isSearch) {
-              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-            } else {
-              setPlanDate(newDate);
-            }
-          }} aria-label="Poprzedni">
-            <Ic n="chevL"/>
-          </button>
-          <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}</div>
-          <button type="button" className="plan-nav-btn-compact" onClick={() => {
-            const newDate = planResult?.nextDate ?? planDate;
-            const isSearch = !!(planSearchQ?.trim());
-            if (isSearch) {
-              void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-            } else {
-              setPlanDate(newDate);
-            }
-          }} aria-label="Następny">
-            <Ic n="chevR"/>
-          </button>
-        </div>
+        <aside className="plan-control-pane">
+          {/* Sticky Header */}
+          <div className="plan-sticky-header">
+            <button type="button" className="plan-nav-btn-compact" onClick={() => {
+              const newDate = planResult?.prevDate ?? planDate;
+              const isSearch = !!(planSearchQ?.trim());
+              if (isSearch) {
+                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+              } else {
+                setPlanDate(newDate);
+              }
+            }} aria-label="Poprzedni">
+              <Ic n="chevL"/>
+            </button>
+            <div className="plan-header-center">
+              <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}</div>
+              <div className="plan-header-sub">{viewLabel}{activeFilter ? ` | Filtr: ${activeFilter}` : ''}</div>
+            </div>
+            <button type="button" className="plan-nav-btn-compact" onClick={() => {
+              const newDate = planResult?.nextDate ?? planDate;
+              const isSearch = !!(planSearchQ?.trim());
+              if (isSearch) {
+                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
+              } else {
+                setPlanDate(newDate);
+              }
+            }} aria-label="Następny">
+              <Ic n="chevR"/>
+            </button>
+          </div>
 
-        {/* Calendar Content - Full Height */}
+          <div className="plan-floating-toolbar">
+            {(['day', 'week', 'month'] as ViewMode[]).map(m => (
+              <button key={m} type="button" className={`plan-mode-btn-floating ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
+                {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        {/* Calendar Content */}
         <div className="plan-content">
-        <div
+          <div className="plan-content-surface">
+            <div
           className={`plan-container${planFading ? ' fading' : ''}`}
           onTouchStart={onPlanTouchStart}
           onTouchEnd={onPlanTouchEnd}
@@ -1205,16 +1232,8 @@ function App() {
             </div>
           </div>
         )}
-        </div>
-        </div>
-
-        {/* Floating Toolbar - View Mode Selector */}
-        <div className="plan-floating-toolbar">
-          {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-            <button key={m} type="button" className={`plan-mode-btn-floating ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
-              {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
-            </button>
-          ))}
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -1222,7 +1241,7 @@ function App() {
 
   function renderGrades() {
     return (
-      <section className="screen">
+      <section className="screen grades-screen">
         <div className="grades-hero">
           <div className="metrics-row">
             <div className="metric-card"><div className="metric-label">Średnia</div><div className="metric-value">{gradesSummary.avg}</div></div>
@@ -1327,77 +1346,85 @@ function App() {
   }
 
   function renderInfo() {
+    const hasSideColumn = !!session || studies.length > 0;
+
     return (
-      <section className="screen">
-        {session && (
-          <div className="info-profile-card">
-            {studentPhotoBlobUrl && !studentPhotoError ? (
-              <img
-                src={studentPhotoBlobUrl}
-                alt="Zdjęcie studenta"
-                className="info-profile-photo"
-              />
-            ) : (
-              <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
+      <section className={`screen info-screen${hasSideColumn ? '' : ' info-screen-full'}`}>
+        {hasSideColumn && (
+          <aside className="info-side">
+            {session && (
+              <div className="info-profile-card">
+                {studentPhotoBlobUrl && !studentPhotoError ? (
+                  <img
+                    src={studentPhotoBlobUrl}
+                    alt="Zdjęcie studenta"
+                    className="info-profile-photo"
+                  />
+                ) : (
+                  <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
+                )}
+                <div className="info-profile-meta">
+                  <div className="info-profile-name">{session.username || 'Student'}</div>
+                  <div className="info-profile-id">ID użytkownika: {session.userId || '-'}</div>
+                </div>
+              </div>
             )}
-            <div className="info-profile-meta">
-              <div className="info-profile-name">{session.username || 'Student'}</div>
-              <div className="info-profile-id">ID użytkownika: {session.userId || '-'}</div>
-            </div>
-          </div>
+
+            {studies.length > 0 && (
+              <label className="field-label info-study-select">
+                Kierunek
+                <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+                  {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
+                </select>
+              </label>
+            )}
+          </aside>
         )}
 
-        {studies.length > 0 && (
-          <label className="field-label">
-            Kierunek
-            <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-              {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-            </select>
-          </label>
-        )}
-        {infoLoading && <Spinner text="Ładowanie danych…"/>}
-        {details && (
-          <div className="info-card">
-            {([
-              { l: 'Album',         v: details.album },
-              { l: 'Wydział',       v: details.wydzial },
-              { l: 'Kierunek',      v: details.kierunek },
-              { l: 'Forma',         v: details.forma },
-              { l: 'Poziom',        v: details.poziom },
-              { l: 'Specjalność',   v: details.specjalnosc },
-              { l: 'Specjalizacja', v: details.specjalizacja },
-              { l: 'Status',        v: details.status },
-              { l: 'Rok akadem.',   v: details.rokAkademicki },
-              { l: 'Semestr',       v: details.semestrLabel },
-            ].filter(r => r.v)).map(r => (
-              <div key={r.l} className="info-row">
-                <div className="info-row-label">{r.l}</div>
-                <div className="info-row-value">{r.v}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {history.length > 0 && (
-          <div className="info-card" style={{marginTop:0}}>
-            <div style={{padding:'10px 14px',fontWeight:700,fontSize:14,borderBottom:'1px solid var(--mz-border-soft)'}}>Przebieg studiów</div>
-            {history.map((h, i) => (
-              <div key={i} className="history-row">
-                <span className="history-label">{h.label}</span>
-                <span className="history-status">{h.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {!infoLoading && !details && (
-          <div className="empty-state"><div className="empty-state-icon">👤</div><p>Brak danych studenta</p></div>
-        )}
+        <div className="info-main">
+          {infoLoading && <Spinner text="Ładowanie danych…"/>}
+          {details && (
+            <div className="info-card">
+              {([
+                { l: 'Album',         v: details.album },
+                { l: 'Wydział',       v: details.wydzial },
+                { l: 'Kierunek',      v: details.kierunek },
+                { l: 'Forma',         v: details.forma },
+                { l: 'Poziom',        v: details.poziom },
+                { l: 'Specjalność',   v: details.specjalnosc },
+                { l: 'Specjalizacja', v: details.specjalizacja },
+                { l: 'Status',        v: details.status },
+                { l: 'Rok akadem.',   v: details.rokAkademicki },
+                { l: 'Semestr',       v: details.semestrLabel },
+              ].filter(r => r.v)).map(r => (
+                <div key={r.l} className="info-row">
+                  <div className="info-row-label">{r.l}</div>
+                  <div className="info-row-value">{r.v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {history.length > 0 && (
+            <div className="info-card info-history-card">
+              <div className="info-card-head">Przebieg studiów</div>
+              {history.map((h, i) => (
+                <div key={i} className="history-row">
+                  <span className="history-label">{h.label}</span>
+                  <span className="history-status">{h.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {!infoLoading && !details && (
+            <div className="empty-state"><div className="empty-state-icon">👤</div><p>Brak danych studenta</p></div>
+          )}
+        </div>
       </section>
     );
   }
-
   function renderNews() {
     return (
-      <section className="screen">
+      <section className="screen news-screen">
         {newsLoading && <Spinner text="Pobieranie aktualności…"/>}
         {!newsLoading && news.length === 0 && (
           <div className="empty-state"><div className="empty-state-icon">📰</div><p>Brak aktualności</p></div>
@@ -1425,11 +1452,11 @@ function App() {
   function renderNewsDetail() {
     const p = (nav.current.params ?? {}) as NewsDetailParams;
     const item = p.item;
-    if (!item) return <section className="screen"><div className="empty-state"><p>Brak treści</p></div></section>;
+    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>Brak treści</p></div></section>;
     const fullHtml = item.contentHtml || item.descriptionHtml;
 
     return (
-      <section className="screen">
+      <section className="screen news-detail-screen">
         <div className="card">
           <div className="news-detail-title">{item.title}</div>
           <div className="news-detail-date">{item.date}</div>
@@ -1453,7 +1480,7 @@ function App() {
     const globals  = links.filter(l => l.scope === 'GLOBAL');
     const faculties = links.filter(l => l.scope === 'FACULTY');
     return (
-      <section className="screen">
+      <section className="screen links-screen">
         {faculties.length > 0 && <div className="link-category">Twój wydział</div>}
         {faculties.map(l => (
           <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
@@ -1474,7 +1501,7 @@ function App() {
 
   function renderSettings() {
     return (
-      <section className="screen">
+      <section className="screen settings-screen">
         <div className="settings-card">
           <div className="settings-row">
             <div>
@@ -1525,7 +1552,7 @@ function App() {
 
   function renderAbout() {
     return (
-      <section className="screen">
+      <section className="screen about-screen">
         <div className="about-hero card">
           <img src="/icons/mzutv2-logo.png" alt="Logo mZUT v2" className="about-logo-img" />
           <div className="about-app-name">mZUT v2</div>

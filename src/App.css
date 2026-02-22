@@ -447,36 +447,41 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 /* ── Plan Screen Container ─────────────────────────────────────────────── */
 .plan-screen {
   padding: 0;
-  gap: 0;
+  gap: 8px;
   flex-direction: column;
   position: relative;
 }
 
-/* ── Plan Sticky Header (minimal, compact, rounded) ──────────────────── */
-.plan-sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
+.plan-control-pane {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  height: 56px;
-  flex-shrink: 0;
+  flex-direction: column;
   gap: 8px;
 }
 
+/* ── Plan Sticky Header (minimal, compact, rounded) ──────────────────── */
+.plan-sticky-header {
+  position: static;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 6px;
+  flex-shrink: 0;
+  background: var(--mz-bg);
+}
+
 .plan-nav-btn-compact {
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: none;
+  width: 40px;
+  height: 40px;
+  background: var(--mz-card);
+  border: 1px solid var(--mz-border-soft);
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: var(--mz-text);
   cursor: pointer;
-  transition: background 120ms;
+  transition: background 120ms, border-color 120ms;
   flex-shrink: 0;
 }
 
@@ -484,26 +489,46 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   background: var(--mz-card-soft);
 }
 
+.plan-nav-btn-compact:hover {
+  border-color: var(--mz-border);
+}
+
 .plan-nav-btn-compact svg {
   width: 20px;
   height: 20px;
 }
 
+.plan-header-center {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
 .plan-date-label-compact {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--mz-text);
-  flex: 1;
   text-align: center;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--mz-card-soft);
-  border: 1px solid var(--mz-border-soft);
-  border-radius: 24px;
-  padding: 8px 16px;
-  margin: 0 4px;
+  width: 100%;
+  padding: 0;
+}
+
+.plan-header-sub {
+  font-size: 11px;
+  color: var(--mz-muted);
+  text-align: center;
+  min-width: 0;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Plan Content Area (calendar - full height) ──────────────────────── */
@@ -513,71 +538,75 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
-  will-change: transform;
   touch-action: pan-y;
-  padding-bottom: 80px; /* Space for floating toolbar */
+  padding: 0 2px 0;
   display: flex;
   flex-direction: column;
 }
 
 /* ── Plan Container (inside content) ──────────────────────────────────── */
+.plan-content-surface {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--mz-card);
+  border: 1px solid var(--mz-border-soft);
+  border-radius: 18px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  min-height: 0;
+}
+
 .plan-container {
   flex: 1;
-  overflow: visible;
+  overflow: auto;
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0;
-  background: transparent;
+  padding: 8px;
+  background: var(--mz-card);
   transition: opacity 150ms ease;
   contain: layout;
 }
 .plan-container.fading {
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 /* ── Plan Floating Toolbar (modern floating style) ────────────────────── */
 .plan-floating-toolbar {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: auto;
-  min-width: 240px;
-  max-width: 360px;
-  z-index: 40;
-  display: flex;
-  gap: 8px;
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(10px);
-  background: rgba(44, 44, 44, 0.9);
+  position: static;
+  width: 100%;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: var(--shadow-1);
+  border: 1px solid var(--mz-border-soft);
+  background: var(--mz-surface);
 }
 
 .plan-mode-btn-floating {
-  flex: 1;
-  height: 44px;
+  height: 40px;
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--mz-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: capitalize;
   cursor: pointer;
-  transition: all 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 120ms, color 120ms;
 }
 
 .plan-mode-btn-floating.active {
-  background: var(--mz-primary);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
-  transition: box-shadow 300ms ease;
+  background: var(--mz-primary-10);
+  color: var(--mz-primary);
 }
 
 .plan-mode-btn-floating:active {
-  transform: scale(0.95);
+  background: var(--mz-card-soft);
 }
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
@@ -907,6 +936,12 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 /* ══════════════════════════════════════════════════════════════════════
    INFO SCREEN
 ════════════════════════════════════════════════════════════════════════ */
+.info-screen { display: flex; flex-direction: column; gap: 10px; }
+.info-screen.info-screen-full { max-width: 860px; margin: 0 auto; width: 100%; }
+.info-side { display: flex; flex-direction: column; gap: 8px; }
+.info-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.info-study-select { margin: 0; }
+
 .info-profile-card { background: var(--mz-card); border-radius: var(--r-card); box-shadow: var(--shadow-1); border: 1px solid var(--mz-border-soft); padding: 12px; display: flex; gap: 12px; align-items: center; }
 .info-profile-photo,
 .info-profile-fallback { width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0; }
@@ -919,9 +954,10 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .info-row { display: flex; padding: 10px 14px; border-bottom: 1px solid var(--mz-border-soft); gap: 10px; align-items: flex-start; }
 .info-row:last-child { border-bottom: none; }
 .info-label,
-.info-row-label { font-size: 11px; font-weight: 700; color: var(--mz-muted); text-transform: uppercase; letter-spacing: .05em; flex: 0 0 100px; padding-top: 1px; }
+.info-row-label { font-size: 11px; font-weight: 700; color: var(--mz-muted); text-transform: uppercase; letter-spacing: .05em; flex: 0 0 108px; padding-top: 1px; }
 .info-value,
 .info-row-value { font-size: 14px; font-weight: 500; flex: 1; }
+.info-card-head { padding: 10px 14px; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--mz-border-soft); }
 .history-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--mz-border-soft); gap: 8px; }
 .history-row:last-child { border-bottom: none; }
 .history-label { font-size: 13px; }
@@ -1231,3 +1267,222 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 
 .danger-btn { background: var(--mz-danger-10); color: var(--mz-danger); border: 1.5px solid rgba(248,113,113,.3); border-radius: var(--r-inner); padding: 11px 16px; font-size: 14px; font-weight: 600; width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; cursor: pointer; }
 .danger-btn:active { filter: brightness(.93); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TABLET LANDSCAPE
+════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 900px) and (orientation: landscape) {
+  :root {
+    --drawer-w: min(360px, 34vw);
+  }
+
+  .app-shell {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  main {
+    padding: 10px 16px 16px;
+  }
+
+  .android-appbar {
+    padding-inline: 10px;
+  }
+
+  .screen {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .login-screen {
+    min-height: calc(100dvh - var(--appbar-h));
+    max-width: 520px;
+    width: 100%;
+    padding: 20px 12px;
+    margin: 0 auto;
+  }
+
+  .login-card {
+    max-width: 500px;
+    margin-inline: auto;
+  }
+
+  .home-screen {
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .home-scroll-content {
+    max-width: 940px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 10px 24px;
+  }
+
+  .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .plan-screen {
+    max-width: 1240px;
+    width: 100%;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .plan-control-pane {
+    position: sticky;
+    top: 8px;
+    align-self: start;
+  }
+
+  .plan-sticky-header {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--mz-border-soft);
+    border-radius: 14px;
+    background: var(--mz-card);
+  }
+
+  .plan-content {
+    padding: 0;
+    min-height: calc(100dvh - 190px);
+  }
+
+  .plan-content-surface {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    min-height: calc(100dvh - 190px);
+  }
+
+  .plan-container {
+    max-width: none;
+    margin: 0;
+  }
+
+  .plan-floating-toolbar {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .event-sheet {
+    max-width: 760px;
+  }
+
+  .grades-screen {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-areas:
+      "hero hero"
+      "filters list";
+    gap: 10px;
+    align-items: start;
+  }
+
+  .grades-screen > .grades-hero {
+    grid-area: hero;
+  }
+
+  .grades-screen > .grades-filters-container {
+    grid-area: filters;
+    position: sticky;
+    top: 8px;
+  }
+
+  .grades-screen > .grades-surface {
+    grid-area: list;
+    min-height: calc(100dvh - 210px);
+  }
+
+  .grades-screen .grades-surface .list-stack {
+    padding: 0;
+  }
+
+  .grades-screen .grades-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .info-screen {
+    display: grid;
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .info-side {
+    position: sticky;
+    top: 8px;
+  }
+
+  .info-main {
+    min-height: calc(100dvh - 210px);
+  }
+
+  .info-screen.info-screen-full {
+    max-width: 980px;
+  }
+
+  .news-screen .list-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+  }
+
+  .news-screen .news-card {
+    height: 100%;
+  }
+
+  .news-detail-screen > .card,
+  .news-detail-screen > .news-source-btn {
+    max-width: 1024px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
+  .links-screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+
+  .links-screen .link-category {
+    grid-column: 1 / -1;
+  }
+
+  .settings-screen {
+    max-width: 980px;
+  }
+
+  .settings-screen .settings-card {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .about-screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+
+  .about-screen > .about-hero {
+    grid-column: 1 / -1;
+  }
+}
