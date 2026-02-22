@@ -35,6 +35,13 @@
   --ev-cancelled: #8c8c8c; --ev-cancelled-l: #ffffff;
   --ev-pass:      #4ca672; --ev-pass-l:      #ffffff;
   --ev-class:     #6e85c2; --ev-class-l:     #ffffff;
+  --ev-project:      #5bbb9e;
+  --ev-seminar:      #5bbb70;
+  --ev-diploma:      #b5a24c;
+  --ev-lectorate:    #5ba0bb;
+  --ev-conservatory: #bb5bbb;
+  --ev-consultation: #8c8c8c;
+  --ev-field:        #8cbb5b;
 
   --appbar-h:      56px;
   --drawer-w:      min(260px, 80vw);
@@ -522,18 +529,25 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   flex-direction: column;
   padding: 0;
   background: transparent;
+  transition: opacity 150ms ease;
+  contain: layout;
+}
+.plan-container.fading {
+  opacity: 0.3;
 }
 
 /* ── Plan Floating Toolbar (modern floating style) ────────────────────── */
 .plan-floating-toolbar {
   position: fixed;
   bottom: 20px;
-  left: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 240px;
+  max-width: 360px;
   z-index: 40;
   display: flex;
   gap: 8px;
-  background: var(--mz-card-soft);
   border-radius: 16px;
   padding: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -559,6 +573,7 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   background: var(--mz-primary);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+  transition: box-shadow 300ms ease;
 }
 
 .plan-mode-btn-floating:active {
@@ -718,18 +733,19 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .day-event {
   position: absolute;
   left: 6px; right: 6px;
-  border-radius: 10px;
-  padding: 5px 8px;
+  border-radius: 6px;
+  padding: 3px 4px;
   overflow: hidden;
   cursor: pointer;
-  border-left: 4px solid transparent;
+  border-left: none;
   transition: filter 120ms;
-  color: #e2e8f0;
+  color: #ffffff;
+  font-size: 11px;
+  min-height: 22px;
 }
 .day-event:active { filter: brightness(.92); }
-.day-event-time { font-size: 10px; font-weight: 600; opacity: .75; line-height: 1.2; }
-.day-event-title { font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 1px; }
-.day-event-meta { font-size: 10px; opacity: .65; line-height: 1.3; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-event-title { font-size: 12px; font-weight: 700; line-height: 1.25; }
+.day-event-meta { font-size: 10px; opacity: .8; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .day-empty { padding: 16px 12px; color: var(--mz-muted); font-size: 13px; text-align: center; }
 
@@ -739,12 +755,13 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .week-grid { display: grid; }  /* columns set inline */
 .week-time-col { border-right: 1px solid var(--mz-border-soft); }
 .week-time-cell { display: flex; align-items: flex-start; justify-content: flex-end; padding-right: 5px; padding-top: 2px; font-size: 9px; color: var(--mz-muted); font-weight: 600; border-top: 1px solid var(--mz-border-soft); }
-.week-head-row { background: var(--mz-card-soft); border-bottom: 1px solid var(--mz-border-soft); }
+.week-head-row { background: var(--mz-card-soft); border-bottom: 1px solid var(--mz-border-soft); position: sticky; top: 0; z-index: 5; }
 .week-head-time { display: flex; align-items: center; justify-content: flex-end; padding-right: 5px; border-right: 1px solid var(--mz-border-soft); font-size: 9px; color: var(--mz-muted); }
 .week-head-day { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 2px; border-right: 1px solid var(--mz-border-soft); font-size: 11px; }
 .week-head-day:last-child { border-right: none; }
 .week-head-day strong { font-size: 10px; font-weight: 700; text-transform: capitalize; }
 .week-head-day span { font-size: 9px; color: var(--mz-muted); }
+.week-head-day.today { background: var(--mz-primary-10); border-radius: 8px; }
 .week-head-day.today strong { color: var(--mz-primary); }
 .week-days-wrap { display: grid; }  /* columns set inline */
 .week-day-col { position: relative; border-right: 1px solid var(--mz-border-soft); overflow: hidden; contain: layout style; }
@@ -755,12 +772,13 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   border-radius: 6px;
   padding: 2px 3px;
   overflow: hidden;
-  border-left: 3px solid transparent;
+  border-left: none;
   cursor: pointer;
-  color: #e2e8f0;
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   backface-visibility: hidden;
+  min-height: 22px;
 }
 .week-event:active { filter: brightness(.88); }
 .week-event-time { font-size: 8px; font-weight: 700; line-height: 1.1; opacity: .8; }
@@ -773,19 +791,49 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
 .month-cell { aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; cursor: pointer; position: relative; gap: 2px; }
 .month-cell:active { background: var(--mz-card-soft); }
 .month-cell.out { color: var(--mz-muted); opacity: .45; }
+.month-cell.has { background: var(--mz-primary-10); border: 1px solid var(--mz-primary-20); }
 .month-cell.has .month-cell-num { background: var(--mz-primary-10); border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; }
 .month-cell.has .month-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--mz-primary); }
-.month-cell.today .month-cell-num { background: var(--mz-primary); color: #fff; border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; font-weight: 700; }
+.month-cell.today .month-cell-num { background: var(--mz-primary); color: #fff; border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 700; }
 .month-cell-num { width: 24px; height: 24px; display: grid; place-items: center; }
 
 /* ── Event type colours ──────────────────────────────────────────────── */
-.ev-lecture, .ev-class  { background: var(--ev-lecture); border-color: var(--ev-lecture-l) !important; }
-.ev-lab                  { background: var(--ev-lab);     border-color: var(--ev-lab-l)     !important; }
-.ev-auditory             { background: var(--ev-auditory);border-color: var(--ev-auditory-l)!important; }
-.ev-exam                 { background: var(--ev-exam);    border-color: var(--ev-exam-l)    !important; }
-.ev-remote               { background: var(--ev-remote);  border-color: var(--ev-remote-l)  !important; }
-.ev-cancelled            { background: var(--ev-cancelled);border-color:var(--ev-cancelled-l)!important; opacity:.7; }
-.ev-pass                 { background: var(--ev-pass);    border-color: var(--ev-pass-l)    !important; }
+.ev-lecture, .ev-class   { background: var(--ev-lecture); }
+.ev-lab                  { background: var(--ev-lab); }
+.ev-auditory             { background: var(--ev-auditory); }
+.ev-exam                 { background: var(--ev-exam); }
+.ev-remote               { background: var(--ev-remote); }
+.ev-cancelled            { background: var(--ev-cancelled); opacity:.7; }
+.ev-pass                 { background: var(--ev-pass); }
+.ev-project              { background: var(--ev-project); }
+.ev-seminar              { background: var(--ev-seminar); }
+.ev-diploma              { background: var(--ev-diploma); }
+.ev-lectorate            { background: var(--ev-lectorate); }
+.ev-conservatory         { background: var(--ev-conservatory); }
+.ev-consultation         { background: var(--ev-consultation); }
+.ev-field                { background: var(--ev-field); }
+
+/* ── Now line (current time indicator) ─────────────────────────────── */
+.now-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--mz-danger);
+  z-index: 10;
+  pointer-events: none;
+}
+.now-line::before {
+  content: '';
+  position: absolute;
+  left: -4px; top: -3px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--mz-danger);
+}
+
+/* ── Performance containment ───────────────────────────────────────── */
+.day-events-col, .week-day-col { contain: layout style; will-change: auto; }
+.month-grid { contain: layout style; }
 
 /* ══════════════════════════════════════════════════════════════════════
    EVENT DETAIL BOTTOM SHEET
