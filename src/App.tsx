@@ -1367,7 +1367,7 @@ function App() {
           {news.map(item => (
             <button key={item.id} type="button" className="news-card" onClick={() => nav.push('news-detail', { item } as unknown as NewsDetailParams)}>
               {item.thumbUrl ? (
-                <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" crossOrigin="anonymous" />
+                <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" onError={e => { (e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement('div'), { className: 'news-thumb-placeholder', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H4a2 2 0 00-2 2v16a2 2 0 002 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path fill="currentColor" d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>' })); }} />
               ) : (
                 <div className="news-thumb-placeholder"><Ic n="news"/></div>
               )}
@@ -1387,29 +1387,7 @@ function App() {
     const p = (nav.current.params ?? {}) as NewsDetailParams;
     const item = p.item;
     if (!item) return <section className="screen"><div className="empty-state"><p>Brak treści</p></div></section>;
-    let fullHtml = item.contentHtml || item.descriptionHtml;
-
-    // Process HTML to improve image handling and remove unwanted elements
-    if (fullHtml) {
-      fullHtml = fullHtml
-        // Ensure images have proper attributes for mobile display
-        .replace(/<img([^>]*?)>/gi, (_match, attrs) => {
-          // Add loading="lazy" if not present
-          if (!attrs.includes('loading=')) attrs += ' loading="lazy"';
-          // Add decoding="async" if not present
-          if (!attrs.includes('decoding=')) attrs += ' decoding="async"';
-          // Add crossorigin="anonymous" for better CORS handling
-          if (!attrs.includes('crossorigin=')) attrs += ' crossorigin="anonymous"';
-          return `<img${attrs}>`;
-        })
-        // Remove iframes and scripts for security
-        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        // Remove style attributes that might break layout
-        .replace(/<([a-z]+)([^>]*?)style="[^"]*"([^>]*?)>/gi, '<$1$2$3>')
-        // Clean up multiple line breaks
-        .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '<br/>');
-    }
+    const fullHtml = item.contentHtml || item.descriptionHtml;
 
     return (
       <section className="screen">
