@@ -424,6 +424,13 @@ function eventTypeClass(event: Record<string, string>): string {
   if (hay.includes('egzamin') || form.includes('exam')) return 'exam';
   if (hay.includes('zdalne') || form.includes('remote')) return 'remote';
   if (hay.includes('zaliczenie') || short.startsWith('zal')) return 'pass';
+  if (hay.includes('projekt') || short === 'p') return 'project';
+  if (hay.includes('seminarium') || short === 's') return 'seminar';
+  if (hay.includes('dyplomowe')) return 'diploma';
+  if (hay.includes('lektorat') || short === 'le') return 'lectorate';
+  if (hay.includes('konwersatorium') || short === 'k') return 'conservatory';
+  if (hay.includes('konsultacje')) return 'consultation';
+  if (hay.includes('terenowe')) return 'field';
   return 'class';
 }
 
@@ -436,6 +443,13 @@ function eventTypeLabel(typeClass: string, event: Record<string, string>): strin
     remote: 'Zdalne',
     cancelled: 'Odwołane',
     pass: 'Zaliczenie',
+    project: 'Projekt',
+    seminar: 'Seminarium',
+    diploma: 'Dyplomowe',
+    lectorate: 'Lektorat',
+    conservatory: 'Konwersatorium',
+    consultation: 'Konsultacje',
+    field: 'Zajęcia terenowe',
     class: 'Zajęcia',
   };
   return labels[typeClass] || event.lessonForm || 'Zajęcia';

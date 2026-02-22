@@ -180,6 +180,8 @@ function Ic({ n }: { n: string }) {
   if (n === 'logout')   return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline {...SV} points="16 17 21 12 16 7"/><line {...SV} x1="21" y1="12" x2="9" y2="12"/></svg>;
   if (n === 'wifi-off') return <svg viewBox="0 0 24 24" aria-hidden><line {...SV} x1="1" y1="1" x2="23" y2="23"/><path {...SV} d="M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>;
   if (n === 'about')    return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10"/><path {...SV} d="M12 16v-4M12 8h.01"/></svg>;
+  if (n === 'clock')    return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10"/><polyline {...SV} points="12 6 12 12 16 14"/></svg>;
+  if (n === 'location') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle {...SV} cx="12" cy="10" r="3"/></svg>;
   // fallback
   return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>;
 }
@@ -243,11 +245,15 @@ function App() {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Plan drag/swipe
-  const [planDragOffset, setPlanDragOffset] = useState(0);
-  const [planIsAnimating, setPlanIsAnimating] = useState(false);
-  const planDragStartRef = useRef({ x: 0, y: 0 });
-  const planDragActiveRef = useRef(false);
+  // Plan swipe (touch only, velocity-based)
+  const [planFading, setPlanFading] = useState(false);
+  const planTouchRef = useRef<{ x: number; t: number } | null>(null);
+
+  // Now line — current time indicator
+  const [nowMinute, setNowMinute] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
 
   // Grades
   const [semesters, setSemesters]       = useState<Semester[]>([]);
@@ -286,6 +292,16 @@ function App() {
     const t = window.setTimeout(() => setToast(''), 2200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  // ── Now line timer (update every minute) ───────────────────────────────
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date();
+      setNowMinute(n.getHours() * 60 + n.getMinutes());
+    };
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Session inactivity timeout (30 minutes) ───────────────────────────────
   useEffect(() => {
@@ -841,70 +857,36 @@ function App() {
     { key: 'about',      label: 'O aplikacji',        icon: 'about'    },
   ];
 
-  // ── Plan drag/swipe handlers ───────────────────────────────────────────────
-  const handlePlanDragStart = (e: React.TouchEvent | React.MouseEvent) => {
-    if (planIsAnimating || !planResult) return;
-    planDragActiveRef.current = true;
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    planDragStartRef.current = { x: clientX, y: clientY };
+  // ── Plan touch swipe handlers (velocity-based) ─────────────────────────────
+  const onPlanTouchStart = (e: React.TouchEvent) => {
+    planTouchRef.current = { x: e.touches[0].clientX, t: Date.now() };
   };
 
-  const handlePlanDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!planDragActiveRef.current || !planResult) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    const deltaX = clientX - planDragStartRef.current.x;
-    const deltaY = clientY - planDragStartRef.current.y;
+  const onPlanTouchEnd = (e: React.TouchEvent) => {
+    const start = planTouchRef.current;
+    if (!start || !planResult) return;
+    planTouchRef.current = null;
 
-    // Only allow horizontal drag if it's more horizontal than vertical
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      e.preventDefault?.();
-      setPlanDragOffset(Math.max(-100, Math.min(100, deltaX)));
-    }
-  };
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dt = Date.now() - start.t;
+    const velocity = Math.abs(dx) / dt; // px/ms
 
-  const handlePlanDragEnd = async () => {
-    if (!planDragActiveRef.current || !planResult) return;
-    planDragActiveRef.current = false;
+    const triggered = Math.abs(dx) > 50 || (Math.abs(dx) > 20 && velocity > 0.3);
+    if (!triggered) return;
 
-    const threshold = 30; // pixels to trigger navigation
-    if (Math.abs(planDragOffset) < threshold) {
-      // Snap back to original position
-      setPlanIsAnimating(true);
-      setPlanDragOffset(0);
-      setTimeout(() => setPlanIsAnimating(false), 300);
-      return;
-    }
+    const targetDate = dx > 0 ? planResult.prevDate : planResult.nextDate;
+    if (!targetDate) return;
 
-    // Determine direction and get next/previous date
-    const isNext = planDragOffset < -threshold;
-    const targetDate = isNext ? planResult.nextDate : planResult.prevDate;
-
-    if (!targetDate) {
-      // Can't go further, snap back
-      setPlanIsAnimating(true);
-      setPlanDragOffset(0);
-      setTimeout(() => setPlanIsAnimating(false), 300);
-      return;
-    }
-
-    // Animate to the edge
-    setPlanIsAnimating(true);
-    setPlanDragOffset(isNext ? -window.innerWidth : window.innerWidth);
-
-    // After animation, change date and reset
+    setPlanFading(true);
     setTimeout(() => {
-      // If we're in search mode, preserve the search when changing dates
       const isSearch = !!(planSearchQ?.trim());
       if (isSearch) {
         void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, targetDate);
       } else {
         setPlanDate(targetDate);
       }
-      setPlanDragOffset(0);
-      setPlanIsAnimating(false);
-    }, 300);
+      setPlanFading(false);
+    }, 150);
   };
 
   // ─────────────────────────────────────────────────────── render screens ──
@@ -1051,19 +1033,9 @@ function App() {
         {/* Calendar Content - Full Height */}
         <div className="plan-content">
         <div
-          className="plan-container"
-          onTouchStart={handlePlanDragStart}
-          onTouchMove={handlePlanDragMove}
-          onTouchEnd={handlePlanDragEnd}
-          onMouseDown={handlePlanDragStart}
-          onMouseMove={handlePlanDragMove}
-          onMouseUp={handlePlanDragEnd}
-          onMouseLeave={handlePlanDragEnd}
-          style={{
-            transform: `translateX(${planDragOffset}px)`,
-            transition: planIsAnimating ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            cursor: planDragActiveRef.current ? 'grabbing' : 'grab',
-          }}
+          className={`plan-container${planFading ? ' fading' : ''}`}
+          onTouchStart={onPlanTouchStart}
+          onTouchEnd={onPlanTouchEnd}
         >
           {planLoading && <Spinner text="Pobieranie planu…"/>}
 
@@ -1092,6 +1064,9 @@ function App() {
                       {weekLayout.slots.map((m, idx) => (
                         <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
                       ))}
+                      {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                        <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                      )}
                       {col.events.map(ev => {
                         const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
                         const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
@@ -1114,9 +1089,8 @@ function App() {
                             }}
                             title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
                           >
-                            <div className="day-event-time">{ev.startStr} - {ev.endStr}</div>
                             <div className="day-event-title">{ev.title}</div>
-                            <div className="day-event-meta">{ev.room} {ev.group ? `· ${ev.group}` : ''}</div>
+                            <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
                           </div>
                         );
                       })}
@@ -1162,6 +1136,9 @@ function App() {
                       {weekLayout.slots.map((m, idx) => (
                         <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
                       ))}
+                      {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                        <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                      )}
                       {col.events.map(ev => {
                         const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
                         const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
@@ -1621,18 +1598,18 @@ function App() {
           <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'Zajęcia'}</div>
           <div className="event-sheet-title">{event.title}</div>
           <div className="event-sheet-row">
-            <Ic n="calendar" />
+            <Ic n="clock" />
             <span>{fmtDateLabel(date)} · {event.startStr} - {event.endStr}</span>
           </div>
           {!!event.room && (
             <div className="event-sheet-row">
-              <Ic n="info" />
+              <Ic n="location" />
               <span>Sala: {event.room}</span>
             </div>
           )}
           {!!event.group && (
             <div className="event-sheet-row">
-              <Ic n="info" />
+              <Ic n="group" />
               <span>Grupa: {event.group}</span>
             </div>
           )}
