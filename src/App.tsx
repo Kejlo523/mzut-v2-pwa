@@ -241,9 +241,19 @@ function App() {
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
     || (window.navigator as any).standalone === true;
+  // iOS Safari detection — beforeinstallprompt never fires on iOS
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isIosSafari = isIos
+    && /safari/i.test(navigator.userAgent)
+    && !/crios|fxios|chrome|chromium/i.test(navigator.userAgent);
+  // On iOS Safari user installs manually via Share sheet — we can offer instructions
+  const canOfferInstall = !isStandalone && (canInstallPwa || isIosSafari);
+
   const INSTALL_TIP_KEY = 'mzutv2_install_tip_v1';
   const [showInstallTip, setShowInstallTip] = useState(false);
   const [installTipFading, setInstallTipFading] = useState(false);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -257,6 +267,10 @@ function App() {
   }, []);
 
   const handleInstallPwa = async () => {
+    if (isIosSafari) {
+      setShowIosInstructions(true);
+      return;
+    }
     const prompt = deferredPromptRef.current as any;
     if (!prompt?.prompt) return;
     prompt.prompt();
@@ -871,7 +885,7 @@ function App() {
       setPassword('');
       showToast('Zalogowano poprawnie');
       // Show install tip once after first login (not in standalone PWA)
-      if (!isStandalone && !localStorage.getItem(INSTALL_TIP_KEY)) {
+      if (canOfferInstall && !localStorage.getItem(INSTALL_TIP_KEY)) {
         setTimeout(() => setShowInstallTip(true), 800);
       }
     } catch (e) {
@@ -893,7 +907,12 @@ function App() {
     localStorage.setItem(INSTALL_TIP_KEY, '1');
     setInstallTipFading(true);
     setTimeout(() => setShowInstallTip(false), 300);
-    await handleInstallPwa();
+    if (isIosSafari) {
+      // Small delay so tip fades first, then instructions appear
+      setTimeout(() => setShowIosInstructions(true), 320);
+    } else {
+      await handleInstallPwa();
+    }
   };
 
   // ── AppBar logic ──────────────────────────────────────────────────────────
@@ -1696,12 +1715,16 @@ function App() {
           <div className="about-note">Wersja progresywnej aplikacji webowej</div>
         </div>
 
-        {canInstallPwa && (
+        {canOfferInstall && (
           <button type="button" className="about-action-card about-install-card" onClick={() => void handleInstallPwa()}>
-            <div className="about-action-icon" style={{ background: 'var(--mz-accent)', color: '#fff' }}>📲</div>
+            <div className="about-action-icon" style={{ background: '#1976d2', color: '#fff' }}>📲</div>
             <div className="about-action-content">
               <div className="about-action-title">Zainstaluj aplikację</div>
-              <div className="about-action-desc">Dodaj mZUT v2 do ekranu głównego</div>
+              <div className="about-action-desc">
+                {isIosSafari
+                  ? 'Dodaj do ekranu głównego przez menu Udostępnij'
+                  : 'Dodaj mZUT v2 do ekranu głównego'}
+              </div>
             </div>
             <div className="about-action-arrow">→</div>
           </button>
@@ -2056,7 +2079,7 @@ function App() {
                 className="install-tip-install-btn"
                 onClick={() => void handleInstallTipInstall()}
               >
-                Zainstaluj teraz
+                {isIosSafari ? 'Jak zainstalować?' : 'Zainstaluj teraz'}
               </button>
               <button
                 type="button"
@@ -2066,6 +2089,32 @@ function App() {
                 Odrzuć
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Safari install instructions */}
+      {showIosInstructions && (
+        <div className="ios-inst-overlay" onClick={() => setShowIosInstructions(false)}>
+          <div className="ios-inst-card" onClick={e => e.stopPropagation()}>
+            <div className="ios-inst-title">Instalacja na iOS</div>
+            <ol className="ios-inst-steps">
+              <li>
+                <span className="ios-inst-icon">⬆️</span>
+                <span>Naciśnij ikonę <strong>Udostępnij</strong> (kwadrat ze strzałką) w dolnym pasku Safari</span>
+              </li>
+              <li>
+                <span className="ios-inst-icon">➕</span>
+                <span>Wybierz <strong>„Dodaj do ekranu początkowego"</strong></span>
+              </li>
+              <li>
+                <span className="ios-inst-icon">✅</span>
+                <span>Naciśnij <strong>„Dodaj"</strong> w prawym górnym rogu</span>
+              </li>
+            </ol>
+            <button type="button" className="ios-inst-close" onClick={() => setShowIosInstructions(false)}>
+              Rozumiem
+            </button>
           </div>
         </div>
       )}
