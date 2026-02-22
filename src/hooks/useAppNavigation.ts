@@ -55,6 +55,18 @@ export function useAppNavigation<TScreen extends string>(initialScreen: TScreen)
     }
   }, []);
 
+  const navigateTo = useCallback((key: TScreen, baseScreen: TScreen, params?: unknown) => {
+    const baseId = ++idRef.current;
+    const targetId = ++idRef.current;
+    setStack([
+      { key: baseScreen, id: baseId },
+      { key, params, id: targetId },
+    ]);
+    window.history.replaceState({ mzutv2: true, ts: Date.now() }, '', window.location.href);
+    window.history.pushState({ mzutv2: true, ts: Date.now() }, '', window.location.href);
+    window.history.pushState({ mzutv2: true, ts: Date.now() }, '', window.location.href);
+  }, []);
+
   const current = stack[stack.length - 1];
 
   return useMemo(() => ({
@@ -63,8 +75,9 @@ export function useAppNavigation<TScreen extends string>(initialScreen: TScreen)
     canGoBack: stack.length > 1,
     push,
     reset,
+    navigateTo,
     goBack,
-  }), [stack, current, push, reset, goBack]);
+  }), [stack, current, push, reset, navigateTo, goBack]);
 }
 
 export function useExitAttemptToast(handler: () => void) {

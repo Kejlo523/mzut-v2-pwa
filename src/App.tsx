@@ -843,7 +843,7 @@ function App() {
     if (s === 'home') {
       nav.reset('home', undefined);
     } else {
-      nav.reset(s, undefined);
+      nav.navigateTo(s, 'home', undefined);
     }
     setDrawerOpen(false);
   }, [nav, screen]);

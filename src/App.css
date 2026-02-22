@@ -985,7 +985,10 @@ button.outline {
   }
 
   .plan-content-surface {
-    border-radius: 12px;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
   }
 }
 
@@ -1004,6 +1007,7 @@ button.outline {
 @media (max-width: 480px) {
   .plan-container {
     padding: 2px;
+    background: transparent;
   }
 }
 
