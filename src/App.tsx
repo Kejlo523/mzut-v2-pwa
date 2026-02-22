@@ -113,7 +113,6 @@ function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
   const v = Number.parseFloat(g.replace(',', '.'));
   if (!Number.isFinite(v)) return 'neutral';
   if (v > 2) return 'ok';
-  if (v === 2) return 'warn';
   return 'bad';
 }
 
