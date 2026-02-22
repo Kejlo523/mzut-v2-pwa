@@ -632,70 +632,82 @@ button.outline {
 .home-scroll-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-/* ── Home Hero (Android style) ──────────────────────────────────────────── */
-.home-hero-container {
-  background: var(--mz-primary-10);
+/* ── Home Hero ──────────────────────────────────────────────────────────── */
+.home-hero-card {
+  background: linear-gradient(135deg, #1d4ed8 0%, #6366f1 100%);
   border-radius: 20px;
-  padding: 20px;
-  text-align: center;
-  border: 1px solid var(--mz-border-soft);
+  padding: 20px 18px 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.home-hero-label {
-  display: inline-block;
-  background: var(--mz-primary-10);
-  color: var(--mz-text);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 10px;
+.home-hero-greeting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-hero-hello {
+  font-size: 13px;
+  opacity: 0.85;
+  font-weight: 500;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.home-hero-name {
+  font-size: 24px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 12px;
+  line-height: 1.1;
 }
 
-.home-hero-greeting {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 4px;
-  color: var(--mz-text);
-}
-
-.home-hero-sub {
-  font-size: 12px;
-  opacity: 0.75;
-  color: var(--mz-muted);
-}
-
-.home-section-title {
+.home-hero-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  color: var(--mz-text);
-  margin-bottom: 0;
-  margin-top: 0;
+  flex-shrink: 0;
 }
 
-.home-footer-card {
-  background: var(--mz-card-soft);
-  border-radius: 16px;
-  border: 1px solid var(--mz-border-soft);
-  padding: 16px;
-  text-align: center;
-  color: var(--mz-muted);
+.home-hero-study {
   font-size: 11px;
-  line-height: 1.6;
-  margin-top: auto;
+  opacity: 0.75;
+  line-height: 1.3;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.home-footer-card p {
-  margin: 0;
+.home-hero-card .offline-badge {
+  margin-top: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  align-self: flex-start;
+}
+
+.home-tiles-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--mz-muted);
+  padding: 0 2px;
 }
 
 .section-title {
@@ -3181,19 +3193,34 @@ button.outline {
    UTILITY COMPONENTS
 ════════════════════════════════════════════════════════════════════════ */
 .banner {
-  margin: 8px 10px 0;
-  border-radius: 14px;
-  padding: 14px 14px;
-  font-size: 14px;
+  margin: 6px 10px 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 13px;
   font-weight: 500;
   background: var(--mz-primary-10);
   color: var(--mz-primary);
   border: 1px solid var(--mz-primary-20);
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  animation: banner-in 300ms ease-out;
+  gap: 8px;
+  animation: banner-in 200ms ease-out;
+}
+
+.banner-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.banner-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(96, 165, 250, 0.3);
+  border-top-color: var(--mz-primary);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes banner-in {
@@ -3236,6 +3263,98 @@ button.outline {
   background: rgba(0, 0, 0, 0.1);
 }
 
+/* ── PWA Install Tip ─────────────────────────────────────────────────────── */
+.install-tip-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 90;
+  padding: 0 12px 20px;
+  animation: sheet-up 260ms cubic-bezier(.2, 0, 0, 1);
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.install-tip-overlay.fading {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+
+.install-tip-card {
+  background: var(--mz-surface);
+  border: 1px solid var(--mz-border-soft);
+  border-radius: 20px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.install-tip-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.install-tip-msg {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mz-text);
+  margin: 0;
+  max-width: 280px;
+}
+
+.install-tip-dismiss-msg {
+  color: var(--mz-muted);
+  font-size: 13px;
+}
+
+.install-tip-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.install-tip-install-btn {
+  flex: 1;
+  background: var(--mz-primary);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms;
+}
+
+.install-tip-install-btn:active {
+  filter: brightness(0.9);
+}
+
+.install-tip-dismiss-btn {
+  flex: 0 0 auto;
+  background: var(--mz-card-soft);
+  color: var(--mz-muted);
+  border: 1px solid var(--mz-border-soft);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.install-tip-dismiss-btn:active {
+  background: var(--mz-border-soft);
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
 .toast {
   position: fixed;
   left: 50%;

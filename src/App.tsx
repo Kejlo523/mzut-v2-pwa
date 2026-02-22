@@ -238,6 +238,12 @@ function App() {
   // PWA install prompt
   const deferredPromptRef = useRef<Event | null>(null);
   const [canInstallPwa, setCanInstallPwa] = useState(false);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || (window.navigator as any).standalone === true;
+  const INSTALL_TIP_KEY = 'mzutv2_install_tip_v1';
+  const [showInstallTip, setShowInstallTip] = useState(false);
+  const [installTipFading, setInstallTipFading] = useState(false);
+  const [installTipDismissMsg, setInstallTipDismissMsg] = useState(false);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -863,12 +869,36 @@ function App() {
       applySession(s);
       setPassword('');
       showToast('Zalogowano poprawnie');
+      // Show install tip once after first login (not in standalone PWA)
+      if (!isStandalone && !localStorage.getItem(INSTALL_TIP_KEY)) {
+        setTimeout(() => setShowInstallTip(true), 800);
+      }
     } catch (e) {
       setGlobalError(e instanceof Error ? e.message : 'Logowanie nieudane.');
     } finally {
       setLoginLoading(false);
     }
   }
+
+  // ── Install tip helpers ───────────────────────────────────────────────────
+  const dismissInstallTip = (withMsg: boolean) => {
+    localStorage.setItem(INSTALL_TIP_KEY, '1');
+    if (withMsg) {
+      setInstallTipDismissMsg(true);
+      setInstallTipFading(true);
+      setTimeout(() => setShowInstallTip(false), 2800);
+    } else {
+      setInstallTipFading(true);
+      setTimeout(() => setShowInstallTip(false), 300);
+    }
+  };
+
+  const handleInstallTipInstall = async () => {
+    localStorage.setItem(INSTALL_TIP_KEY, '1');
+    setInstallTipFading(true);
+    setTimeout(() => setShowInstallTip(false), 300);
+    await handleInstallPwa();
+  };
 
   // ── AppBar logic ──────────────────────────────────────────────────────────
   const onNavIcon = () => setDrawerOpen(true);
@@ -1002,23 +1032,39 @@ function App() {
   }
 
   function renderHome() {
+    const firstName = session?.username?.split(' ')[0] ?? 'Studencie';
+    const studyLabel = studies[0]?.label ?? null;
+
     return (
       <section className="screen home-screen">
         <div className="home-scroll-content">
-          <div className="home-hero-container">
-            <div className="home-hero-label">mZUT v2</div>
-            <div className="home-hero-greeting">Cześć{session?.username ? `, ${session.username.split(' ')[0]}` : ''} 👋</div>
-            <div className="home-hero-sub">Wybierz moduł, aby przejść dalej</div>
-            {!isOnline && <span className="offline-badge" style={{ marginTop: 8 }}><Ic n="wifi-off" />Tryb offline</span>}
+          {/* Hero gradient card */}
+          <div className="home-hero-card">
+            <div className="home-hero-greeting-row">
+              <div>
+                <div className="home-hero-hello">Cześć,</div>
+                <div className="home-hero-name">{firstName}</div>
+              </div>
+              <div className="home-hero-avatar">{firstName[0]?.toUpperCase() ?? 'S'}</div>
+            </div>
+            {studyLabel && (
+              <div className="home-hero-study">{studyLabel}</div>
+            )}
+            {!isOnline && (
+              <span className="offline-badge"><Ic n="wifi-off" />Tryb offline</span>
+            )}
           </div>
 
-          <div className="home-section-title">Skróty</div>
+          {/* Quick access tiles */}
+          <div className="home-tiles-label">Szybki dostęp</div>
           <div className="tile-grid">
             {([
-              { key: 'plan' as DrawerKey, label: 'Plan zajęć', desc: 'Dzień, tydzień, miesiąc', icon: 'calendar' },
+              { key: 'plan' as DrawerKey, label: 'Plan zajęć', desc: 'Dzień / Tydzień / Miesiąc', icon: 'calendar' },
               { key: 'grades' as DrawerKey, label: 'Oceny', desc: 'Średnia i punkty ECTS', icon: 'grade' },
               { key: 'info' as DrawerKey, label: 'Dane studenta', desc: 'Kierunek i przebieg', icon: 'user' },
               { key: 'news' as DrawerKey, label: 'Aktualności', desc: 'Komunikaty uczelni', icon: 'news' },
+              { key: 'attendance' as DrawerKey, label: 'Nieobecności', desc: 'Statystyki obecności', icon: 'present' },
+              { key: 'links' as DrawerKey, label: 'Linki', desc: 'Przydatne strony ZUT', icon: 'link' },
             ] as const).map(t => (
               <button key={t.key} type="button" className="tile" onClick={() => openScreen(t.key)}>
                 <div className="tile-icon"><Ic n={t.icon} /></div>
@@ -1026,10 +1072,6 @@ function App() {
                 <span className="tile-desc">{t.desc}</span>
               </button>
             ))}
-          </div>
-
-          <div className="home-footer-card">
-            <p>mZUT v2 został stworzony jako nieoficjalna, lekka alternatywa do szybkiego podglądu planu, ocen i informacji o studiach na ZUT.</p>
           </div>
         </div>
       </section>
@@ -1915,13 +1957,13 @@ function App() {
       {/* Global loading / error banners */}
       {globalLoading && (
         <div className="banner">
-          <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+          <div className="banner-spinner" />
           Ładowanie danych…
         </div>
       )}
       {globalError && (
         <div className="banner error">
-          <Ic n="info" />
+          <span className="banner-icon">⚠</span>
           <span style={{ flex: 1 }}>{globalError}</span>
           <button type="button" className="banner-retry" onClick={() => setGlobalError('')}>OK</button>
         </div>
@@ -1934,6 +1976,42 @@ function App() {
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}
+
+      {/* PWA Install Tip */}
+      {showInstallTip && (
+        <div className={`install-tip-overlay${installTipFading ? ' fading' : ''}`}>
+          <div className="install-tip-card">
+            <div className="install-tip-icon">📱</div>
+            {installTipDismissMsg ? (
+              <p className="install-tip-msg install-tip-dismiss-msg">
+                Opcja jest dostępna w zakładce <strong>O aplikacji</strong>.
+              </p>
+            ) : (
+              <>
+                <p className="install-tip-msg">
+                  Wiesz, że możesz zainstalować tę stronę jako skrót i korzystać jak ze zwykłej aplikacji systemowej?
+                </p>
+                <div className="install-tip-actions">
+                  <button
+                    type="button"
+                    className="install-tip-install-btn"
+                    onClick={() => void handleInstallTipInstall()}
+                  >
+                    Zainstaluj teraz
+                  </button>
+                  <button
+                    type="button"
+                    className="install-tip-dismiss-btn"
+                    onClick={() => dismissInstallTip(true)}
+                  >
+                    Odrzuć
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {renderPlanEventSheet()}
       {renderPlanSearchSheet()}
