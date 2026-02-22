@@ -315,12 +315,9 @@ button.outline { background: transparent; color: var(--mz-text); border: 1.5px s
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: transparent;
   height: 56px;
   flex-shrink: 0;
   gap: 8px;
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .plan-nav-btn-compact {
