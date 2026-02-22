@@ -436,7 +436,7 @@ function App() {
   const swipe = useSwipeGestures({
     canGoBack: false,
     onBack: () => { },
-    canOpenDrawer: !drawerOpen && screen !== 'login',
+    canOpenDrawer: !drawerOpen && screen !== 'login' && screen !== 'plan',
     onOpenDrawer: () => setDrawerOpen(true),
   });
 
@@ -1072,15 +1072,15 @@ function App() {
 
   function getPeriodDisplayName(key: string): string {
     const map: Record<string, string> = {
-      sesja_zimowa: 'sesja zimowa', sesja_letnia: 'sesja letnia',
-      sesja_poprawkowa: 'sesja poprawkowa', przerwa_dydaktyczna_zimowa: 'przerwa dydaktyczna (zimowa)',
-      przerwa_dydaktyczna_letnia: 'przerwa dydaktyczna (letnia)', przerwa_dydaktyczna: 'przerwa dydaktyczna',
-      wakacje_zimowe: 'wakacje zimowe', wakacje_letnie: 'wakacje letnie',
+      sesja_zimowa: 'Sesja zimowa', sesja_letnia: 'Sesja letnia',
+      sesja_poprawkowa: 'Sesja poprawkowa', przerwa_dydaktyczna_zimowa: 'Przerwa dydaktyczna',
+      przerwa_dydaktyczna_letnia: 'Przerwa dydaktyczna', przerwa_dydaktyczna: 'Przerwa dydaktyczna',
+      wakacje_zimowe: 'Wakacje zimowe', wakacje_letnie: 'Wakacje letnie',
     };
     return map[key] ?? key.replace(/_/g, ' ');
   }
 
-  function getPeriodMarkerColor(key: string): 'session' | 'break' | 'holiday' {
+  function getPeriodKind(key: string): 'session' | 'break' | 'holiday' {
     if (key.startsWith('sesja_')) return 'session';
     if (key.startsWith('przerwa_')) return 'break';
     return 'holiday';
@@ -1088,22 +1088,32 @@ function App() {
 
   interface PeriodMarker { label: string; kind: 'session' | 'break' | 'holiday'; }
 
-  function getPeriodMarkers(date: string, prevDate: string | null, periods: SessionPeriod[]): PeriodMarker[] {
+  // Returns markers for day boundaries (end of previous period, start of new period)
+  function getPeriodTransitionMarkers(date: string, prevDate: string | null, periods: SessionPeriod[]): PeriodMarker[] {
     const markers: PeriodMarker[] = [];
     for (const p of periods) {
-      // End marker: period ended on the day BEFORE current date
       if (prevDate && p.end >= prevDate && p.end < date) {
-        markers.push({ label: `Koniec: ${getPeriodDisplayName(p.key)}`, kind: getPeriodMarkerColor(p.key) });
+        markers.push({ label: `Koniec: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
       }
-      // Start marker: period starts on current date
       if (p.start === date) {
-        markers.push({ label: `Początek: ${getPeriodDisplayName(p.key)}`, kind: getPeriodMarkerColor(p.key) });
+        markers.push({ label: `Początek: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
       }
     }
     return markers;
   }
 
-  function renderPeriodMarkers(markers: PeriodMarker[]) {
+  // Returns periods that are ACTIVE on a given date (date falls within start..end)
+  function getActivePeriods(date: string, periods: SessionPeriod[]): PeriodMarker[] {
+    const markers: PeriodMarker[] = [];
+    for (const p of periods) {
+      if (date >= p.start && date <= p.end) {
+        markers.push({ label: getPeriodDisplayName(p.key), kind: getPeriodKind(p.key) });
+      }
+    }
+    return markers;
+  }
+
+  function renderPeriodBanner(markers: PeriodMarker[]) {
     if (!markers.length) return null;
     return (
       <div className="period-markers">
@@ -1175,13 +1185,22 @@ function App() {
 
               {!planLoading && planViewMode === 'day' && (
                 <div className="list-stack">
-                  {cols.map((col, ci) => (
+                  {cols.map((col, ci) => {
+                    const periods = planResult?.sessionPeriods ?? [];
+                    const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
+                    const activeMarkers = getActivePeriods(col.date, periods);
+                    return (
                     <div key={col.date}>
-                      {renderPeriodMarkers(getPeriodMarkers(col.date, cols[ci - 1]?.date ?? null, planResult?.sessionPeriods ?? []))}
+                      {renderPeriodBanner(transMarkers)}
                       <div className="card day-tl-card">
                         <div className="day-tl-head">
                           <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
-                          {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
+                          <div className="day-tl-head-right">
+                            {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
+                            {activeMarkers.map((m, i) => (
+                              <span key={i} className={`day-period-chip day-period-chip-${m.kind}`}>{m.label}</span>
+                            ))}
+                          </div>
                         </div>
 
                         {col.events.length === 0 ? (
@@ -1235,7 +1254,8 @@ function App() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {cols.length === 0 && (
                     <div className="empty-state">
                       <div className="empty-icon">📅</div>
@@ -1251,13 +1271,13 @@ function App() {
                     <>
                       <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
                         <div className="week-head-time">Godz.</div>
-                        {weekCols.map((col, ci) => {
-                          const wMarkers = getPeriodMarkers(col.date, weekCols[ci - 1]?.date ?? null, planResult?.sessionPeriods ?? []);
+                        {weekCols.map((col) => {
+                          const wActive = getActivePeriods(col.date, planResult?.sessionPeriods ?? []);
                           return (
                             <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
                               <strong>{fmtWeekdayShort(col.date)}</strong>
                               <span>{fmtDayMonth(col.date)}</span>
-                              {wMarkers.map((m, i) => (
+                              {wActive.map((m, i) => (
                                 <span key={i} className={`week-period-dot week-period-dot-${m.kind}`} title={m.label} />
                               ))}
                             </div>
