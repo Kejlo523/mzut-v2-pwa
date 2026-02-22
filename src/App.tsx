@@ -105,10 +105,13 @@ function screenTitle(s: ScreenKey): string {
 
 
 function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
+  const normalized = g.trim().toLowerCase();
+  if (normalized === '-' || normalized === '') return 'neutral';
+
   const v = Number.parseFloat(g.replace(',', '.'));
   if (!Number.isFinite(v)) return 'neutral';
-  if (v >= 4.5) return 'ok';
-  if (v >= 3.0) return 'warn';
+  if (v > 2) return 'ok';
+  if (v === 2) return 'warn';
   return 'bad';
 }
 
