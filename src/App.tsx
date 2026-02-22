@@ -1397,19 +1397,39 @@ function App() {
     const p = (nav.current.params ?? {}) as NewsDetailParams;
     const item = p.item;
     if (!item) return <section className="screen"><div className="empty-state"><p>Brak treści</p></div></section>;
-    const fullHtml = item.contentHtml || item.descriptionHtml;
+    let fullHtml = item.contentHtml || item.descriptionHtml;
+
+    // Process HTML to improve image handling and remove unwanted elements
+    if (fullHtml) {
+      fullHtml = fullHtml
+        // Ensure images have proper attributes for mobile display
+        .replace(/<img([^>]*?)>/g, (_match, attrs) => {
+          // Add loading="lazy" if not present, and ensure proper styling
+          if (!attrs.includes('loading=')) attrs += ' loading="lazy"';
+          if (!attrs.includes('decoding=')) attrs += ' decoding="async"';
+          return `<img${attrs}>`;
+        })
+        // Remove iframes and scripts for security
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        // Remove style attributes that might break layout
+        .replace(/<([a-z]+)([^>]*?)style="[^"]*"([^>]*?)>/gi, '<$1$2$3>')
+        // Clean up multiple line breaks
+        .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '<br/>');
+    }
+
     return (
       <section className="screen">
         <div className="card">
           <div className="news-detail-title">{item.title}</div>
           <div className="news-detail-date">{item.date}</div>
+          {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" loading="lazy" decoding="async" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
           {fullHtml ? (
             <div className="news-detail-body" dangerouslySetInnerHTML={{ __html: fullHtml }} />
           ) : (
             <div className="news-detail-body">{item.descriptionText || item.snippet}</div>
           )}
         </div>
-        {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
         {item.link && (
           <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
             Otwórz w przeglądarce ↗
