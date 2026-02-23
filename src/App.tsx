@@ -52,22 +52,25 @@ function addDaysYmd(ymd: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function fmtDateLabel(v: string): string {
+function fmtDateLabel(v: string, lang: string = 'pl'): string {
   const d = new Date(`${v}T00:00:00`);
   if (!Number.isFinite(d.getTime())) return v;
-  return new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit', weekday: 'short' }).format(d);
+  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
+  return new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit', weekday: 'short' }).format(d);
 }
 
-function fmtWeekdayShort(v: string): string {
+function fmtWeekdayShort(v: string, lang: string = 'pl'): string {
   const d = new Date(`${v}T00:00:00`);
   if (!Number.isFinite(d.getTime())) return v;
-  return new Intl.DateTimeFormat('pl-PL', { weekday: 'short' }).format(d);
+  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
+  return new Intl.DateTimeFormat(loc, { weekday: 'short' }).format(d);
 }
 
-function fmtDayMonth(v: string): string {
+function fmtDayMonth(v: string, lang: string = 'pl'): string {
   const d = new Date(`${v}T00:00:00`);
   if (!Number.isFinite(d.getTime())) return v;
-  return new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit' }).format(d);
+  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
+  return new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit' }).format(d);
 }
 
 function fmtHour(min: number): string {
@@ -463,6 +466,8 @@ function App() {
     onBack: () => { },
     canOpenDrawer: !drawerOpen && screen !== 'login',
     onOpenDrawer: () => setDrawerOpen(true),
+    canCloseDrawer: drawerOpen,
+    onCloseDrawer: () => setDrawerOpen(false),
   });
 
   // ── Session management ────────────────────────────────────────────────────
@@ -1039,7 +1044,7 @@ function App() {
         </div>
 
         <div className="login-card">
-          <div className="login-card-title">Zaloguj się kontem ZUT</div>
+          <div className="login-card-title">{t('login.cardTitle')}</div>
 
           <div className="login-form">
             <div className="login-field">
@@ -1284,7 +1289,7 @@ function App() {
                           {renderPeriodBanner(transMarkers)}
                           <div className="card day-tl-card">
                             <div className="day-tl-head">
-                              <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
+                              <div className="day-tl-head-date">{fmtDateLabel(col.date, settings.language)}</div>
                               <div className="day-tl-head-right">
                                 {col.date === today && <span className="day-tl-today-badge">{t('plan.today')}</span>}
                                 {activeMarkers.map((m, i) => (
@@ -1376,8 +1381,8 @@ function App() {
                             return (
                               <React.Fragment key={`h-${col.date}`}>
                                 <div className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
-                                  <strong>{fmtWeekdayShort(col.date)}</strong>
-                                  <span>{fmtDayMonth(col.date)}</span>
+                                  <strong>{fmtWeekdayShort(col.date, settings.language)}</strong>
+                                  <span>{fmtDayMonth(col.date, settings.language)}</span>
                                 </div>
                                 {sep && <div className={`week-head-separator week-head-separator-${sep.kind}`} title={sep.label} />}
                                 {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
@@ -1573,7 +1578,7 @@ function App() {
                 <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
                   {semesters.map(s => (
                     <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
-                      {t('grades.semOption')} {s.nrSemestru} ({s.pora}) {s.rokAkademicki}
+                      {t('grades.semOption')} {s.nrSemestru} ({t(`period.${s.pora.toLowerCase()}`) || s.pora}) {s.rokAkademicki}
                     </option>
                   ))}
                 </select>
@@ -1939,7 +1944,7 @@ function App() {
           <div className="event-sheet-title">{event.title}</div>
           <div className="event-sheet-row">
             <Ic n="clock" />
-            <span>{fmtDateLabel(date)} · {event.startStr} - {event.endStr}</span>
+            <span>{fmtDateLabel(date, settings.language)} · {event.startStr} - {event.endStr}</span>
           </div>
           {!!event.room && (
             <div className="event-sheet-row">
@@ -2035,29 +2040,29 @@ function App() {
 
             {/* Category row */}
             <div className="search-field-group">
-              <label className="search-label">Kategoria</label>
+              <label className="search-label">{t('search.category')}</label>
               <select
                 value={planSearchCat}
                 onChange={e => handleCategoryChange(e.target.value)}
                 className="search-select"
               >
-                <option value="album">Album</option>
-                <option value="teacher">Prowadzący</option>
-                <option value="group">Grupa</option>
-                <option value="room">Sala</option>
-                <option value="subject">Przedmiot</option>
+                <option value="album">{t('search.catAlbum')}</option>
+                <option value="teacher">{t('search.catTeacher')}</option>
+                <option value="group">{t('search.catGroup')}</option>
+                <option value="room">{t('search.catRoom')}</option>
+                <option value="subject">{t('search.catSubject')}</option>
               </select>
             </div>
 
             {/* Query row with spinner */}
             <div className="search-field-group">
-              <label className="search-label">Wyszukaj</label>
+              <label className="search-label">{t('search.queryLabel')}</label>
               <div className="search-input-wrapper">
                 <input
                   type="text"
                   value={planSearchQ}
                   onChange={e => handleQueryChange(e.target.value)}
-                  placeholder="Wpisz aby szukać..."
+                  placeholder={t('search.queryPlaceholder')}
                   className="search-input"
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 />
@@ -2080,7 +2085,7 @@ function App() {
                     </button>
                   ))
                 ) : planSearchCat !== 'album' && !planSearchQ.trim() ? (
-                  <div className="search-placeholder">Wpisz aby szukać</div>
+                  <div className="search-placeholder">{t('search.placeholderSearch')}</div>
                 ) : null}
               </div>
             )}

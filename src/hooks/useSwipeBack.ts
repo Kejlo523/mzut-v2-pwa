@@ -13,6 +13,8 @@ interface UseSwipeOptions {
   onBack: () => void;
   canOpenDrawer: boolean;
   onOpenDrawer: () => void;
+  canCloseDrawer?: boolean;
+  onCloseDrawer?: () => void;
 }
 
 const INTERACTIVE_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']);
@@ -25,7 +27,7 @@ function isInteractiveTarget(el: EventTarget | null): boolean {
   return false;
 }
 
-export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawer }: UseSwipeOptions): SwipeHandlers {
+export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawer, canCloseDrawer, onCloseDrawer }: UseSwipeOptions): SwipeHandlers {
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const isFromEdge = useRef(false);
@@ -65,6 +67,12 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
 
     // Reject if mostly vertical (unless it's a very clear horizontal swipe)
     if (dy > Math.abs(dx) && dy > 40) return;
+
+    // Swipe left anywhere -> close drawer
+    if (dx < -40 && canCloseDrawer && onCloseDrawer) {
+      onCloseDrawer();
+      return;
+    }
 
     // Swipe right from left edge → open drawer 
     // Relaxed requirement: dx > 40 and origX <= 60
