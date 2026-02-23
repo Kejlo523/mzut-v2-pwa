@@ -1494,6 +1494,26 @@ function App() {
               </div>
             </div>
           </div>
+          {/* Inline legend – visible only in portrait on phones */}
+          {!planLoading && (
+            <div className="plan-legend-inline">
+              <div className="plan-legend-inline-title">{t('plan.legend') || 'Legenda'}</div>
+              <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zajęć'}</div>
+              {EVENT_LEGEND.map(ev => (
+                <div key={ev.cls} className="legend-row">
+                  <div className="legend-swatch" style={{ background: ev.color }} />
+                  <span className="legend-label">{ev.label}</span>
+                </div>
+              ))}
+              <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okresów'}</div>
+              {MARKER_LEGEND.map(m => (
+                <div key={m.kind} className="legend-row">
+                  <div className="legend-line-swatch" style={{ background: m.color }} />
+                  <span className="legend-label">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </section>
@@ -2201,7 +2221,7 @@ function App() {
       {/* AppBar */}
       {screen !== 'login' && (
         <header className="android-appbar">
-          <button type="button" className="icon-btn" onClick={screen === 'news-detail' ? nav.goBack : onNavIcon} aria-label={screen === 'news-detail' ? t('general.back') : t('general.openMenu')}>
+          <button type="button" className={`icon-btn appbar-nav-btn${screen === 'news-detail' ? ' is-back' : ''}`} onClick={screen === 'news-detail' ? nav.goBack : onNavIcon} aria-label={screen === 'news-detail' ? t('general.back') : t('general.openMenu')}>
             <Ic n={screen === 'news-detail' ? 'back' : 'menu'} />
           </button>
           <h1>{t(SCREEN_I18N_KEY[screen])}</h1>

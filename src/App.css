@@ -4049,6 +4049,308 @@ button.outline {
   }
 }
 
+/* ── Plan legend inline (portrait phone) ──────────────────────────────────── */
+.plan-legend-inline {
+  display: none;
+}
+
+@media (max-width: 599px) and (orientation: portrait) {
+  .plan-legend-btn {
+    display: none;
+  }
+
+  .plan-legend-inline {
+    display: block;
+    background: var(--mz-card);
+    border-radius: var(--r-card);
+    padding: 4px 0 16px;
+    margin-top: 8px;
+  }
+
+  .plan-legend-inline-title {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 20px 8px;
+    color: var(--mz-text);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DESKTOP / PC  (pointer: fine + min-width 1024px)
+════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1024px) and (pointer: fine) {
+  :root {
+    --desktop-sidebar-w: 260px;
+  }
+
+  /* App shell becomes a grid: sidebar | (appbar + content) */
+  .app-shell {
+    display: grid;
+    grid-template-columns: var(--desktop-sidebar-w) 1fr;
+    grid-template-rows: var(--appbar-h) 1fr;
+    grid-template-areas:
+      "sidebar appbar"
+      "sidebar content";
+    height: 100dvh;
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  /* AppBar in the right column, row 1 */
+  .android-appbar {
+    grid-area: appbar;
+    position: static;
+    grid-template-columns: 1fr auto;
+    border-bottom: 1px solid var(--mz-border-soft);
+    box-shadow: none;
+    padding-inline: 16px;
+  }
+
+  /* Restore 3-column grid when back button is shown (news-detail) */
+  .android-appbar:has(.appbar-nav-btn.is-back) {
+    grid-template-columns: 48px 1fr auto;
+  }
+
+  /* Hide the hamburger/menu button – nav is always visible in sidebar */
+  .appbar-nav-btn:not(.is-back) {
+    display: none;
+  }
+
+  /* Main content in right column, row 2 */
+  main {
+    grid-area: content;
+    overflow-y: auto;
+    height: 100%;
+    padding: 10px 20px 20px;
+  }
+
+  /* Drawer: becomes a persistent sidebar in left column */
+  .app-drawer {
+    grid-area: sidebar;
+    position: static;
+    pointer-events: auto;
+    z-index: auto;
+    height: 100%;
+  }
+
+  .drawer-backdrop {
+    display: none;
+  }
+
+  .drawer-panel {
+    position: static;
+    height: 100%;
+    width: 100%;
+    transform: none !important;
+    transition: none;
+    box-shadow: none;
+    border-right: 1px solid var(--mz-border-soft);
+    overflow-y: auto;
+    border-radius: 0;
+  }
+
+  /* Content layout – same rules as 900px landscape (screens, plan, grades…) */
+  .screen {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .login-screen {
+    min-height: calc(100dvh - var(--appbar-h));
+    max-width: 520px;
+    width: 100%;
+    padding: 20px 12px;
+    margin: 0 auto;
+  }
+
+  .login-card {
+    max-width: 500px;
+    margin-inline: auto;
+  }
+
+  .home-screen {
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .home-scroll-content {
+    max-width: 940px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 10px 24px;
+  }
+
+  .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .plan-screen {
+    max-width: 1240px;
+    width: 100%;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .plan-control-pane {
+    position: sticky;
+    top: 8px;
+    align-self: start;
+  }
+
+  .plan-sticky-header {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--mz-border-soft);
+    border-radius: 14px;
+    background: var(--mz-card);
+  }
+
+  .plan-content {
+    padding: 0;
+    min-height: calc(100dvh - 190px);
+  }
+
+  .plan-content-surface {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    min-height: calc(100dvh - 190px);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .plan-container {
+    max-width: none;
+    margin: 0;
+  }
+
+  .plan-floating-toolbar {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .event-sheet {
+    max-width: 760px;
+  }
+
+  .grades-screen {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-areas:
+      "hero hero"
+      "filters list";
+    gap: 10px;
+    align-items: start;
+  }
+
+  .grades-screen > .grades-hero {
+    grid-area: hero;
+  }
+
+  .grades-screen > .grades-filters-container {
+    grid-area: filters;
+    position: sticky;
+    top: 8px;
+  }
+
+  .grades-screen > .grades-surface {
+    grid-area: list;
+    min-height: calc(100dvh - 210px);
+  }
+
+  .grades-screen .grades-surface .list-stack {
+    padding: 0;
+  }
+
+  .grades-screen .grades-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .info-screen {
+    display: grid;
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .info-side {
+    position: sticky;
+    top: 8px;
+  }
+
+  .info-main {
+    min-height: calc(100dvh - 210px);
+  }
+
+  .info-screen.info-screen-full {
+    max-width: 980px;
+  }
+
+  .news-screen .list-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+  }
+
+  .news-screen .news-card {
+    height: 100%;
+  }
+
+  .news-detail-screen > .card,
+  .news-detail-screen > .news-source-btn {
+    max-width: 1024px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
+  .links-screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+
+  .links-screen .link-category {
+    grid-column: 1 / -1;
+  }
+
+  .settings-screen {
+    max-width: 980px;
+  }
+
+  .settings-screen .settings-card {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .about-screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+
+  .about-screen > .about-hero {
+    grid-column: 1 / -1;
+  }
+}
+
 .app-shell {
   touch-action: pan-y;
   overscroll-behavior-x: none;
