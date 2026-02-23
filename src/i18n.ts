@@ -142,6 +142,93 @@ const pl: Record<string, string> = {
     'event.teacher': 'Prowadzący',
     'event.group': 'Grupa',
     'event.type': 'Typ',
+
+    // Login (extra)
+    'login.loggingIn': 'Logowanie…',
+    'login.loginBtn': 'Zaloguj się',
+    'login.infoText': 'Zaloguj się swoimi danymi z systemu ZUT. Aplikacja nie przechowuje haseł - logowanie odbywa się bezpośrednio na serwerach uczelni.',
+
+    // Home tiles
+    'home.offlineMode': 'Tryb offline',
+    'home.quickAccess': 'Szybki dostęp',
+    'home.tilePlan': 'Plan zajęć',
+    'home.tilePlanDesc': 'Dzień / Tydzień / Miesiąc',
+    'home.tileGrades': 'Oceny',
+    'home.tileGradesDesc': 'Średnia i punkty ECTS',
+    'home.tileInfo': 'Dane studenta',
+    'home.tileInfoDesc': 'Kierunek i przebieg',
+    'home.tileNews': 'Aktualności',
+    'home.tileNewsDesc': 'Komunikaty uczelni',
+    'home.tileLinks': 'Linki',
+    'home.tileLinksDesc': 'Przydatne strony ZUT',
+    'home.tileSettings': 'Ustawienia',
+    'home.tileSettingsDesc': 'Konfiguracja aplikacji',
+
+    // Grades (extra)
+    'grades.avg': 'Średnia',
+    'grades.ectsSem': 'ECTS semestr',
+    'grades.ectsTotal': 'ECTS łącznie',
+    'grades.studyField': 'Kierunek',
+    'grades.semLabel': 'Semestr',
+    'grades.semOption': 'Sem.',
+    'grades.loading': 'Pobieranie ocen…',
+    'grades.noGrades': 'Brak ocen dla wybranego semestru',
+    'grades.finalGrade': 'Ocena końcowa',
+    'grades.component': 'Składowa',
+    'grades.subject': 'Przedmiot',
+
+    // Info
+    'info.studentPhoto': 'Zdjęcie studenta',
+    'info.userId': 'ID użytkownika',
+    'info.studyField': 'Kierunek',
+    'info.loading': 'Ładowanie danych…',
+    'info.album': 'Album',
+    'info.faculty': 'Wydział',
+    'info.field': 'Kierunek',
+    'info.form': 'Forma',
+    'info.level': 'Poziom',
+    'info.speciality': 'Specjalność',
+    'info.specialization': 'Specjalizacja',
+    'info.status': 'Status',
+    'info.academicYear': 'Rok akadem.',
+    'info.semester': 'Semestr',
+    'info.studyHistory': 'Przebieg studiów',
+    'info.noData': 'Brak danych studenta',
+
+    // News
+    'news.loading': 'Pobieranie aktualności…',
+    'news.empty': 'Brak aktualności',
+    'news.noContent': 'Brak treści',
+    'news.openInBrowser': 'Otwórz w przeglądarce ↗',
+
+    // Links
+    'links.faculty': 'Twój wydział',
+    'links.university': 'Zasoby uczelni',
+
+    // About
+    'about.pwaNote': 'Wersja progresywnej aplikacji webowej',
+    'about.installApp': 'Zainstaluj aplikację',
+    'about.installIos': 'Dodaj do ekranu głównego przez menu Udostępnij',
+    'about.installAndroid': 'Dodaj mZUT v2 do ekranu głównego',
+    'about.rateApp': 'Oceń aplikację',
+    'about.rateDesc': 'Twoja opinia pomaga nam rozwijać mZUT!',
+    'about.sourceCode': 'Kod źródłowy',
+    'about.sourceDesc': 'Sprawdź projekt na GitHubie',
+
+    // Period display names
+    'periodName.sesja_zimowa': 'Sesja zimowa',
+    'periodName.sesja_letnia': 'Sesja letnia',
+    'periodName.sesja_poprawkowa': 'Sesja poprawkowa',
+    'periodName.przerwa_dydaktyczna_zimowa': 'Przerwa dydaktyczna',
+    'periodName.przerwa_dydaktyczna_letnia': 'Przerwa dydaktyczna',
+    'periodName.przerwa_dydaktyczna': 'Przerwa dydaktyczna',
+    'periodName.wakacje_zimowe': 'Wakacje zimowe',
+    'periodName.wakacje_letnie': 'Wakacje letnie',
+    'period.end': 'Koniec',
+    'period.start': 'Początek',
+
+    // Global banners
+    'banner.loading': 'Ładowanie danych…',
 };
 
 const en: Record<string, string> = {
@@ -286,6 +373,93 @@ const en: Record<string, string> = {
     'event.teacher': 'Teacher',
     'event.group': 'Group',
     'event.type': 'Type',
+
+    // Login (extra)
+    'login.loggingIn': 'Logging in…',
+    'login.loginBtn': 'Log in',
+    'login.infoText': 'Log in with your ZUT system credentials. The app does not store passwords – authentication is done directly on university servers.',
+
+    // Home tiles
+    'home.offlineMode': 'Offline mode',
+    'home.quickAccess': 'Quick access',
+    'home.tilePlan': 'Schedule',
+    'home.tilePlanDesc': 'Day / Week / Month',
+    'home.tileGrades': 'Grades',
+    'home.tileGradesDesc': 'Average and ECTS credits',
+    'home.tileInfo': 'Student info',
+    'home.tileInfoDesc': 'Field of study and history',
+    'home.tileNews': 'News',
+    'home.tileNewsDesc': 'University announcements',
+    'home.tileLinks': 'Links',
+    'home.tileLinksDesc': 'Useful ZUT websites',
+    'home.tileSettings': 'Settings',
+    'home.tileSettingsDesc': 'App configuration',
+
+    // Grades (extra)
+    'grades.avg': 'Average',
+    'grades.ectsSem': 'ECTS sem.',
+    'grades.ectsTotal': 'Total ECTS',
+    'grades.studyField': 'Field of study',
+    'grades.semLabel': 'Semester',
+    'grades.semOption': 'Sem.',
+    'grades.loading': 'Loading grades…',
+    'grades.noGrades': 'No grades for selected semester',
+    'grades.finalGrade': 'Final grade',
+    'grades.component': 'Component',
+    'grades.subject': 'Subject',
+
+    // Info
+    'info.studentPhoto': 'Student photo',
+    'info.userId': 'User ID',
+    'info.studyField': 'Field of study',
+    'info.loading': 'Loading data…',
+    'info.album': 'Album',
+    'info.faculty': 'Faculty',
+    'info.field': 'Field of study',
+    'info.form': 'Form',
+    'info.level': 'Level',
+    'info.speciality': 'Speciality',
+    'info.specialization': 'Specialization',
+    'info.status': 'Status',
+    'info.academicYear': 'Academic year',
+    'info.semester': 'Semester',
+    'info.studyHistory': 'Study history',
+    'info.noData': 'No student data available',
+
+    // News
+    'news.loading': 'Loading news…',
+    'news.empty': 'No news available',
+    'news.noContent': 'No content',
+    'news.openInBrowser': 'Open in browser ↗',
+
+    // Links
+    'links.faculty': 'Your faculty',
+    'links.university': 'University resources',
+
+    // About
+    'about.pwaNote': 'Progressive web app version',
+    'about.installApp': 'Install app',
+    'about.installIos': 'Add to home screen via Share menu',
+    'about.installAndroid': 'Add mZUT v2 to home screen',
+    'about.rateApp': 'Rate the app',
+    'about.rateDesc': 'Your feedback helps us improve mZUT!',
+    'about.sourceCode': 'Source code',
+    'about.sourceDesc': 'Check the project on GitHub',
+
+    // Period display names
+    'periodName.sesja_zimowa': 'Winter exam session',
+    'periodName.sesja_letnia': 'Summer exam session',
+    'periodName.sesja_poprawkowa': 'Retake session',
+    'periodName.przerwa_dydaktyczna_zimowa': 'Winter break',
+    'periodName.przerwa_dydaktyczna_letnia': 'Summer break',
+    'periodName.przerwa_dydaktyczna': 'Teaching break',
+    'periodName.wakacje_zimowe': 'Winter holidays',
+    'periodName.wakacje_letnie': 'Summer holidays',
+    'period.end': 'End',
+    'period.start': 'Start',
+
+    // Global banners
+    'banner.loading': 'Loading data…',
 };
 
 const dictionaries = { pl, en } as const;
