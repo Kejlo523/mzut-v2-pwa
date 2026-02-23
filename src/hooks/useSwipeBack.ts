@@ -2,10 +2,10 @@ import type React from 'react';
 import { useCallback, useRef } from 'react';
 
 interface SwipeHandlers {
-  onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerMove: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerUp: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerCancel: () => void;
+  onTouchStart: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchMove: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchEnd: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchCancel: () => void;
 }
 
 interface UseSwipeOptions {
@@ -19,13 +19,9 @@ const INTERACTIVE_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 
 
 function isInteractiveTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false;
-  // Only check the direct target and its immediate parent — not the whole tree
-  let node: Element | null = el as Element;
-  for (let i = 0; i < 3 && node; i++) {
-    if (INTERACTIVE_TAGS.has(node.tagName)) return true;
-    if (node.getAttribute('role') === 'button') return true;
-    node = node.parentElement;
-  }
+  const node = el as Element;
+  if (INTERACTIVE_TAGS.has(node.tagName)) return true;
+  if (node.getAttribute('role') === 'button') return true;
   return false;
 }
 
@@ -35,8 +31,8 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
   const isFromEdge = useRef(false);
   const blocked = useRef(false);
 
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
-    if (e.pointerType !== 'touch') return;
+  const onTouchStart = useCallback((e: React.TouchEvent<HTMLElement>) => {
+    if (e.touches.length !== 1) return;
 
     if (isInteractiveTarget(e.target)) {
       blocked.current = true;
@@ -44,23 +40,23 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     }
 
     blocked.current = false;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
     // 44px edge zone for drawer open
-    isFromEdge.current = e.clientX <= 44;
+    isFromEdge.current = e.touches[0].clientX <= 44;
   }, []);
 
-  const onPointerMove = useCallback((_e: React.PointerEvent<HTMLElement>) => {
-    // nothing — we decide on pointerUp
+  const onTouchMove = useCallback((_e: React.TouchEvent<HTMLElement>) => {
+    // nothing — we decide on touchEnd
   }, []);
 
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+  const onTouchEnd = useCallback((e: React.TouchEvent<HTMLElement>) => {
     if (blocked.current) { blocked.current = false; return; }
     if (startX.current === null || startY.current === null) return;
 
     const origX = startX.current;
-    const dx = e.clientX - origX;
-    const dy = Math.abs(e.clientY - startY.current);
+    const dx = e.changedTouches[0].clientX - origX;
+    const dy = Math.abs(e.changedTouches[0].clientY - startY.current);
     startX.current = null;
     startY.current = null;
 
@@ -79,13 +75,13 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     }
   }, [canGoBack, onBack, canOpenDrawer, onOpenDrawer]);
 
-  const onPointerCancel = useCallback(() => {
+  const onTouchCancel = useCallback(() => {
     startX.current = null;
     startY.current = null;
     blocked.current = false;
   }, []);
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
+  return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel };
 }
 
 // Legacy compat
@@ -94,6 +90,6 @@ export function useSwipeBack(enabled: boolean, onBack: () => void) {
     canGoBack: enabled,
     onBack,
     canOpenDrawer: false,
-    onOpenDrawer: () => {},
+    onOpenDrawer: () => { },
   });
 }
