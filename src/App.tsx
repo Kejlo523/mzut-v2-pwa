@@ -294,9 +294,9 @@ function App() {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Plan swipe (touch only, strict horizontal detection)
-  const [planFading, setPlanFading] = useState(false);
-  const planTouchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Plan carousel swipe (direct DOM animation — no React state per frame)
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const planDragRef = useRef<{ startX: number; startY: number; startTime: number; locked: boolean } | null>(null);
 
   // Now line — current time indicator
   const [nowMinute, setNowMinute] = useState(() => {
@@ -931,47 +931,72 @@ function App() {
     { key: 'about', label: 'O aplikacji', icon: 'about' },
   ];
 
-  // ── Plan touch swipe handlers (strict horizontal) ───────────────────────────
+  // ── Plan carousel animation helpers ─────────────────────────────────────────
+  function applyCarouselTransform(x: number, animated: boolean, duration = 240) {
+    const el = carouselRef.current;
+    if (!el) return;
+    el.style.transition = animated ? `transform ${duration}ms cubic-bezier(0.25,0.46,0.45,0.94)` : 'none';
+    el.style.transform = x === 0 ? '' : `translateX(${x}px)`;
+  }
+
+  function commitPlanNavigate(targetDate: string, exitRight: boolean) {
+    const exitX = exitRight ? window.innerWidth : -window.innerWidth;
+    const enterX = -exitX;
+    applyCarouselTransform(exitX, true, 200);
+    setTimeout(() => {
+      if (carouselRef.current) {
+        carouselRef.current.style.transition = 'none';
+        carouselRef.current.style.transform = `translateX(${enterX}px)`;
+      }
+      const isSearch = !!(planSearchQ?.trim());
+      if (isSearch) void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, targetDate);
+      else setPlanDate(targetDate);
+      requestAnimationFrame(() => requestAnimationFrame(() => applyCarouselTransform(0, true, 220)));
+    }, 215);
+  }
+
+  // ── Plan touch swipe handlers ─────────────────────────────────────────────
   const onPlanTouchStart = (e: React.TouchEvent) => {
-    planTouchRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      t: Date.now(),
+    if (e.touches.length !== 1) return;
+    if (carouselRef.current) carouselRef.current.style.transition = 'none';
+    planDragRef.current = {
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      startTime: Date.now(),
+      locked: false,
     };
   };
 
+  const onPlanTouchMove = (e: React.TouchEvent) => {
+    const drag = planDragRef.current;
+    if (!drag || !carouselRef.current) return;
+    const dx = e.touches[0].clientX - drag.startX;
+    const dy = e.touches[0].clientY - drag.startY;
+    if (!drag.locked) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) { planDragRef.current = null; return; }
+      drag.locked = true;
+    }
+    carouselRef.current.style.transform = `translateX(${dx}px)`;
+  };
+
   const onPlanTouchEnd = (e: React.TouchEvent) => {
-    const start = planTouchRef.current;
-    if (!start || !planResult || planLoading) return;
-    planTouchRef.current = null;
-
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    const dt = Math.max(1, Date.now() - start.t);
-    const velocity = absDx / dt; // px/ms
-
-    // Reduce accidental week changes while user scrolls vertically.
-    const horizontalDominant = absDx > absDy * 1.6;
-    const longSwipe = absDx >= 96 && horizontalDominant;
-    const quickSwipe = absDx >= 68 && velocity >= 0.6 && horizontalDominant && absDy <= 42;
-    if (!longSwipe && !quickSwipe) return;
-
+    const drag = planDragRef.current;
+    planDragRef.current = null;
+    if (!drag?.locked) { applyCarouselTransform(0, true); return; }
+    if (!planResult || planLoading) { applyCarouselTransform(0, true); return; }
+    const dx = e.changedTouches[0].clientX - drag.startX;
+    const dt = Math.max(1, Date.now() - drag.startTime);
+    const velocity = Math.abs(dx) / dt;
+    if (Math.abs(dx) < 50 && velocity < 0.35) { applyCarouselTransform(0, true); return; }
     const targetDate = dx > 0 ? planResult.prevDate : planResult.nextDate;
-    if (!targetDate) return;
+    if (!targetDate) { applyCarouselTransform(0, true); return; }
+    commitPlanNavigate(targetDate, dx > 0);
+  };
 
-    setPlanFading(true);
-    setTimeout(() => {
-      const isSearch = !!(planSearchQ?.trim());
-      if (isSearch) {
-        void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, targetDate);
-      } else {
-        setPlanDate(targetDate);
-      }
-      setPlanFading(false);
-    }, 150);
+  const onPlanTouchCancel = () => {
+    planDragRef.current = null;
+    applyCarouselTransform(0, true);
   };
 
   // ─────────────────────────────────────────────────────── render screens ──
@@ -1157,12 +1182,7 @@ function App() {
           <div className="plan-sticky-header">
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
               const newDate = planResult?.prevDate ?? planDate;
-              const isSearch = !!(planSearchQ?.trim());
-              if (isSearch) {
-                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-              } else {
-                setPlanDate(newDate);
-              }
+              commitPlanNavigate(newDate, true);
             }} aria-label="Poprzedni">
               <Ic n="chevL" />
             </button>
@@ -1172,12 +1192,7 @@ function App() {
             </div>
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
               const newDate = planResult?.nextDate ?? planDate;
-              const isSearch = !!(planSearchQ?.trim());
-              if (isSearch) {
-                void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() }, false, newDate);
-              } else {
-                setPlanDate(newDate);
-              }
+              commitPlanNavigate(newDate, false);
             }} aria-label="Następny">
               <Ic n="chevR" />
             </button>
@@ -1189,6 +1204,22 @@ function App() {
                 {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
               </button>
             ))}
+            <button
+              type="button"
+              className={`plan-mode-btn-floating plan-today-btn ${planDate === today && !planSearchQ?.trim() ? 'active' : ''}`}
+              onClick={() => {
+                const t = today;
+                if (planDate !== t || planSearchQ?.trim()) {
+                  commitPlanNavigate(t, planDate > t);
+                  if (planSearchQ?.trim()) {
+                    setPlanSearchQ('');
+                    setPlanSearchCat('album');
+                  }
+                }
+              }}
+            >
+              Dziś
+            </button>
           </div>
         </aside>
 
@@ -1196,9 +1227,12 @@ function App() {
         <div className="plan-content">
           <div className="plan-content-surface">
             <div
-              className={`plan-container${planFading ? ' fading' : ''}`}
+              className="plan-container"
+              ref={carouselRef}
               onTouchStart={onPlanTouchStart}
+              onTouchMove={onPlanTouchMove}
               onTouchEnd={onPlanTouchEnd}
+              onTouchCancel={onPlanTouchCancel}
             >
               {planLoading && <Spinner text="Pobieranie planu…" />}
 
@@ -1292,13 +1326,15 @@ function App() {
                         <div className="week-head-time">Godz.</div>
                         {weekCols.map((col) => {
                           const wActive = getActivePeriods(col.date, planResult?.sessionPeriods ?? []);
+                          const topPeriod = wActive.sort((a, b) => {
+                            const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
+                            return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
+                          })[0] ?? null;
                           return (
-                            <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''}`}>
+                            <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
                               <strong>{fmtWeekdayShort(col.date)}</strong>
                               <span>{fmtDayMonth(col.date)}</span>
-                              {wActive.map((m, i) => (
-                                <span key={i} className={`week-period-dot week-period-dot-${m.kind}`} title={m.label} />
-                              ))}
+                              {topPeriod && <div className={`week-period-line week-period-line-${topPeriod.kind}`} title={topPeriod.label} />}
                             </div>
                           );
                         })}
@@ -1658,23 +1694,6 @@ function App() {
     return (
       <section className="screen settings-screen">
         <div className="settings-card">
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">Język</div>
-              <div className="settings-row-sub">Język interfejsu</div>
-            </div>
-            <select value={settings.language} onChange={e => setSettings(p => ({ ...p, language: e.target.value === 'en' ? 'en' : 'pl' }))}>
-              <option value="pl">Polski</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">Powiadomienia</div>
-              <div className="settings-row-sub">Włącz push notifications</div>
-            </div>
-            <Toggle checked={settings.notificationsEnabled} onChange={v => setSettings(p => ({ ...p, notificationsEnabled: v }))} />
-          </div>
           <div className="settings-row">
             <div>
               <div className="settings-row-label">Odświeżanie</div>

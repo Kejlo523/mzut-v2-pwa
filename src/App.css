@@ -903,33 +903,32 @@ button.outline {
 }
 
 .plan-nav-btn-compact {
-  width: 42px;
-  height: 42px;
-  background: var(--mz-card-soft);
-  border: 1.5px solid var(--mz-border-soft);
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   color: var(--mz-text);
   cursor: pointer;
-  transition: all 180ms cubic-bezier(.22, 1, .36, 1);
+  transition: background 150ms, color 150ms;
   flex-shrink: 0;
 }
 
 .plan-nav-btn-compact:hover {
   background: var(--mz-primary-10);
-  border-color: var(--mz-primary);
   color: var(--mz-primary);
 }
 
 .plan-nav-btn-compact:active {
-  transform: scale(.9);
+  transform: scale(.88);
   background: var(--mz-primary-20);
 }
 
 .plan-nav-btn-compact svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .plan-header-center {
@@ -1012,8 +1011,7 @@ button.outline {
   flex-direction: column;
   padding: 8px;
   background: var(--mz-card);
-  transition: opacity 150ms ease;
-  contain: layout;
+  will-change: transform;
 }
 
 @media (max-width: 480px) {
@@ -1023,17 +1021,13 @@ button.outline {
   }
 }
 
-.plan-container.fading {
-  opacity: 0.4;
-}
-
 /* ── Plan Floating Toolbar (modern floating style) ────────────────────── */
 .plan-floating-toolbar {
   position: static;
   width: 100%;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   gap: 6px;
   border-radius: 14px;
   padding: 6px;
@@ -1062,6 +1056,17 @@ button.outline {
 
 .plan-mode-btn-floating:active {
   background: var(--mz-card-soft);
+}
+
+.plan-today-btn {
+  padding: 0 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.plan-today-btn.active {
+  background: var(--mz-primary);
+  color: #fff;
 }
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
@@ -1348,18 +1353,22 @@ button.outline {
   background: var(--mz-success);
 }
 
-/* ── Period dots (week view header) ─────────────────────────────────── */
-.week-period-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-top: 2px;
-  flex-shrink: 0;
+/* ── Period line (week view header) — full-width colored bar like Android ── */
+.week-head-day {
+  position: relative;
 }
 
-.week-period-dot-session  { background: #ef5350; }
-.week-period-dot-break    { background: var(--mz-primary); }
-.week-period-dot-holiday  { background: var(--mz-success); }
+.week-period-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+}
+
+.week-period-line-session  { background: #ef5350; }
+.week-period-line-break    { background: var(--mz-primary); }
+.week-period-line-holiday  { background: var(--mz-success); }
 
 /* ── Day timeline view ───────────────────────────────────────────────── */
 .day-tl-card {
