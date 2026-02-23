@@ -105,6 +105,7 @@ const pl: Record<string, string> = {
     // Login
     'login.title': 'Zaloguj się',
     'login.username': 'Nazwa użytkownika',
+    'login.usernamePlaceholder': 's12345 lub e-mail',
     'login.password': 'Hasło',
     'login.submit': 'Zaloguj',
     'login.info': 'Zaloguj się swoimi danymi z ePortalu ZUT',
@@ -325,9 +326,9 @@ const en: Record<string, string> = {
     'home.tileSettings': 'Settings',
     'home.tileSettingsDesc': 'Configuration',
 
-    // Login
     'login.title': 'Log in',
     'login.username': 'Username',
+    'login.usernamePlaceholder': 's12345 or email',
     'login.password': 'Password',
     'login.submit': 'Log in',
     'login.info': 'Log in with your ePortal ZUT credentials',

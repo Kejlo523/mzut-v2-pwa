@@ -39,7 +39,7 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     if (e.touches.length !== 1) return;
 
     const x = e.touches[0].clientX;
-    const fromEdge = x <= 80;
+    const fromEdge = x <= window.innerWidth / 2;
 
     // Only block interactions for non-edge swipes
     if (!fromEdge && isInteractiveTarget(e.target)) {
@@ -77,8 +77,8 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     }
 
     // Swipe right from left edge → open drawer 
-    // Relaxed requirement: dx > 40 and origX <= 80
-    if (origX <= 80 && dx > 40 && canOpenDrawer) {
+    // Relaxed requirement: dx > 40 and origX <= window.innerWidth / 2
+    if (origX <= window.innerWidth / 2 && dx > 40 && canOpenDrawer) {
       onOpenDrawer();
       return;
     }
