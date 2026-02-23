@@ -2219,7 +2219,7 @@ function App() {
       )}
 
       {/* Main content */}
-      <main>
+      <main key={screen}>
         {renderScreen()}
       </main>
 
