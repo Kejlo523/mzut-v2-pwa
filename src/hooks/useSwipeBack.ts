@@ -22,6 +22,8 @@ const INTERACTIVE_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 
 function isInteractiveTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false;
   const node = el as Element;
+  if (node.classList.contains('drawer-backdrop')) return false;
+  if (node.closest('.plan-carousel-track')) return false;
   if (INTERACTIVE_TAGS.has(node.tagName)) return true;
   if (node.getAttribute('role') === 'button') return true;
   return false;
@@ -37,7 +39,7 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     if (e.touches.length !== 1) return;
 
     const x = e.touches[0].clientX;
-    const fromEdge = x <= 44;
+    const fromEdge = x <= 80;
 
     // Only block interactions for non-edge swipes
     if (!fromEdge && isInteractiveTarget(e.target)) {
@@ -75,14 +77,14 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     }
 
     // Swipe right from left edge → open drawer 
-    // Relaxed requirement: dx > 40 and origX <= 60
-    if (origX <= 60 && dx > 40 && canOpenDrawer) {
+    // Relaxed requirement: dx > 40 and origX <= 80
+    if (origX <= 80 && dx > 40 && canOpenDrawer) {
       onOpenDrawer();
       return;
     }
 
     // Swipe right (back) from very left edge
-    if (dx > 80 && dy < 70 && origX <= 44 && canGoBack) {
+    if (dx > 80 && dy < 70 && origX <= 80 && canGoBack) {
       onBack();
     }
   }, [canGoBack, onBack, canOpenDrawer, onOpenDrawer]);
