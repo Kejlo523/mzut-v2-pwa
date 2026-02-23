@@ -2212,7 +2212,7 @@ function App() {
   // ─────────────────────────────────────────────── render ──────────────────
   return (
     <div
-      className="app-shell"
+      className={`app-shell${screen === 'login' ? ' is-login' : ''}`}
       onTouchStart={swipe.onTouchStart}
       onTouchMove={swipe.onTouchMove}
       onTouchEnd={swipe.onTouchEnd}
