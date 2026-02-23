@@ -34,16 +34,19 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
   const onTouchStart = useCallback((e: React.TouchEvent<HTMLElement>) => {
     if (e.touches.length !== 1) return;
 
-    if (isInteractiveTarget(e.target)) {
+    const x = e.touches[0].clientX;
+    const fromEdge = x <= 44;
+
+    // Only block interactions for non-edge swipes
+    if (!fromEdge && isInteractiveTarget(e.target)) {
       blocked.current = true;
       return;
     }
 
     blocked.current = false;
-    startX.current = e.touches[0].clientX;
+    startX.current = x;
     startY.current = e.touches[0].clientY;
-    // 44px edge zone for drawer open
-    isFromEdge.current = e.touches[0].clientX <= 44;
+    isFromEdge.current = fromEdge;
   }, []);
 
   const onTouchMove = useCallback((_e: React.TouchEvent<HTMLElement>) => {

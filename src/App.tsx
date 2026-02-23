@@ -2157,7 +2157,7 @@ function App() {
       {globalLoading && (
         <div className="banner">
           <div className="banner-spinner" />
-          Ładowanie danych…
+          {t('banner.loading')}
         </div>
       )}
       {globalError && (
@@ -2169,7 +2169,7 @@ function App() {
       )}
 
       {/* Main content */}
-      <main>
+      <main key={screen}>
         {renderScreen()}
       </main>
 
@@ -2182,7 +2182,7 @@ function App() {
           <div className="install-tip-card">
             <div className="install-tip-icon">📱</div>
             <p className="install-tip-msg">
-              Wiesz, że możesz zainstalować tę stronę jako skrót i korzystać jak ze zwykłej aplikacji systemowej?
+              {t('install.tip')}
             </p>
             <div className="install-tip-actions">
               <button
@@ -2190,14 +2190,14 @@ function App() {
                 className="install-tip-install-btn"
                 onClick={() => void handleInstallTipInstall()}
               >
-                {isIosSafari ? 'Jak zainstalować?' : 'Zainstaluj teraz'}
+                {isIosSafari ? t('install.howIos') : t('install.now')}
               </button>
               <button
                 type="button"
                 className="install-tip-dismiss-btn"
                 onClick={() => dismissInstallTip()}
               >
-                Odrzuć
+                {t('install.dismiss')}
               </button>
             </div>
           </div>
@@ -2208,23 +2208,23 @@ function App() {
       {showIosInstructions && (
         <div className="ios-inst-overlay" onClick={() => setShowIosInstructions(false)}>
           <div className="ios-inst-card" onClick={e => e.stopPropagation()}>
-            <div className="ios-inst-title">Instalacja na iOS</div>
+            <div className="ios-inst-title">{t('install.iosTitle')}</div>
             <ol className="ios-inst-steps">
               <li>
                 <span className="ios-inst-icon">⬆️</span>
-                <span>Naciśnij ikonę <strong>Udostępnij</strong> (kwadrat ze strzałką) w dolnym pasku Safari</span>
+                <span dangerouslySetInnerHTML={{ __html: t('install.iosStep1') }} />
               </li>
               <li>
                 <span className="ios-inst-icon">➕</span>
-                <span>Wybierz <strong>„Dodaj do ekranu początkowego"</strong></span>
+                <span dangerouslySetInnerHTML={{ __html: t('install.iosStep2') }} />
               </li>
               <li>
                 <span className="ios-inst-icon">✅</span>
-                <span>Naciśnij <strong>„Dodaj"</strong> w prawym górnym rogu</span>
+                <span dangerouslySetInnerHTML={{ __html: t('install.iosStep3') }} />
               </li>
             </ol>
             <button type="button" className="ios-inst-close" onClick={() => setShowIosInstructions(false)}>
-              Rozumiem
+              {t('install.iosOk')}
             </button>
           </div>
         </div>
