@@ -1,0 +1,481 @@
+﻿diff --git a/src/App.css b/src/App.css
+index 70c50fc..a3a4510 100644
+--- a/src/App.css
++++ b/src/App.css
+@@ -342,7 +342,7 @@ main {
+ @keyframes scr-in {
+   from {
+     opacity: 0;
+-    transform: translateY(12px) scale(.98);
++    transform: scale(.97);
+   }
+ 
+   to {
+@@ -354,7 +354,7 @@ main {
+ @keyframes scr-back {
+   from {
+     opacity: 0;
+-    transform: translateY(-8px) scale(.98);
++    transform: scale(1.02);
+   }
+ 
+   to {
+@@ -894,7 +894,7 @@ button.outline {
+   position: static;
+   z-index: 1;
+   display: grid;
+-  grid-template-columns: 36px 1fr auto auto 36px;
++  grid-template-columns: 36px 1fr 36px;
+   align-items: center;
+   gap: 6px;
+   padding: 6px 6px 4px;
+@@ -927,8 +927,8 @@ button.outline {
+ }
+ 
+ .plan-nav-btn-compact svg {
+-  width: 22px;
+-  height: 22px;
++  width: 20px;
++  height: 20px;
+ }
+ 
+ .plan-header-center {
+@@ -1064,57 +1064,116 @@ button.outline {
+   background: var(--mz-card-soft);
+ }
+ 
+-.plan-header-today-btn {
+-  height: 30px;
+-  padding: 0 10px;
+-  white-space: nowrap;
+-  flex-shrink: 0;
+-  border: none;
+-  border-radius: 8px;
++/* ÔöÇÔöÇ Plan legend button ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++.plan-legend-btn {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  gap: 6px;
++  width: 100%;
++  padding: 10px 0;
++  margin-top: 4px;
+   background: transparent;
++  border: 1px solid var(--mz-border-soft);
++  border-radius: 12px;
+   color: var(--mz-muted);
+-  font-size: 11px;
+-  font-weight: 700;
++  font-size: 12px;
++  font-weight: 600;
+   cursor: pointer;
+-  transition: background 120ms, color 120ms;
++  transition: background 150ms, color 150ms;
+ }
+ 
+-.plan-header-today-btn.active {
+-  background: var(--mz-primary);
+-  color: #fff;
++.plan-legend-btn:active {
++  background: var(--mz-card-soft);
++  color: var(--mz-text);
+ }
+ 
+-.plan-header-today-btn:active {
+-  background: var(--mz-primary-20);
++.plan-legend-btn svg {
++  width: 16px;
++  height: 16px;
+ }
+ 
+-.plan-header-search-btn {
+-  width: 30px;
+-  height: 30px;
+-  padding: 0;
+-  background: transparent;
+-  border: none;
+-  border-radius: 50%;
+-  display: grid;
+-  place-items: center;
++/* ÔöÇÔöÇ Legend bottom sheet ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++.legend-overlay {
++  position: fixed;
++  inset: 0;
++  z-index: 100;
++  background: rgba(0, 0, 0, .5);
++  display: flex;
++  align-items: flex-end;
++}
++
++.legend-sheet {
++  width: 100%;
++  max-width: 480px;
++  margin: 0 auto;
++  background: var(--mz-surface);
++  border-radius: 20px 20px 0 0;
++  padding: 0 0 32px;
++  animation: sheet-up 250ms cubic-bezier(.2, 0, 0, 1);
++  max-height: 80dvh;
++  overflow-y: auto;
++}
++
++.legend-sheet-handle {
++  width: 36px;
++  height: 4px;
++  background: var(--mz-muted);
++  border-radius: 2px;
++  margin: 10px auto;
++  opacity: .4;
++}
++
++.legend-sheet-title {
++  font-size: 16px;
++  font-weight: 700;
++  padding: 4px 20px 12px;
++  color: var(--mz-text);
++}
++
++.legend-section-title {
++  font-size: 11px;
++  font-weight: 700;
+   color: var(--mz-muted);
+-  cursor: pointer;
+-  transition: background 150ms, color 150ms;
++  text-transform: uppercase;
++  letter-spacing: .06em;
++  padding: 12px 20px 4px;
++}
++
++.legend-row {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 7px 20px;
++}
++
++.legend-swatch {
++  width: 20px;
++  height: 20px;
++  border-radius: 5px;
+   flex-shrink: 0;
+ }
+ 
+-.plan-header-search-btn svg {
+-  width: 18px;
+-  height: 18px;
++.legend-line-swatch {
++  width: 20px;
++  height: 4px;
++  border-radius: 2px;
++  flex-shrink: 0;
+ }
+ 
+-.plan-header-search-btn:active {
+-  background: var(--mz-primary-10);
+-  color: var(--mz-primary);
++.legend-label {
++  font-size: 13px;
++  color: var(--mz-text-soft);
+ }
+ 
+-.plan-header-search-btn.active {
+-  color: var(--mz-primary);
++@keyframes sheet-up {
++  from {
++    transform: translateY(100%);
++  }
++
++  to {
++    transform: none;
++  }
+ }
+ 
+ /* ÔöÇÔöÇ Plan search ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
+diff --git a/src/App.tsx b/src/App.tsx
+index 2f0e20a..babbf76 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -191,6 +191,8 @@ function Ic({ n }: { n: string }) {
+   if (n === 'about') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><path {...SV} d="M12 16v-4M12 8h.01" /></svg>;
+   if (n === 'clock') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><polyline {...SV} points="12 6 12 12 16 14" /></svg>;
+   if (n === 'location') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle {...SV} cx="12" cy="10" r="3" /></svg>;
++  if (n === 'download') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline {...SV} points="7 10 12 15 17 10" /><line {...SV} x1="12" y1="15" x2="12" y2="3" /></svg>;
++  if (n === 'layers') return <svg viewBox="0 0 24 24" aria-hidden><polygon {...SV} points="12 2 2 7 12 12 22 7 12 2" /><polyline {...SV} points="2 17 12 22 22 17" /><polyline {...SV} points="2 12 12 17 22 12" /></svg>;
+   // fallback
+   return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" fill="currentColor" /></svg>;
+ }
+@@ -297,6 +299,7 @@ function App() {
+   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
+   const [planSearchLoading, setPlanSearchLoading] = useState(false);
+   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
++  const [showLegend, setShowLegend] = useState(false);
+   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+ 
+   // Plan carousel swipe (direct DOM animation ÔÇö no React state per frame)
+@@ -1228,7 +1231,7 @@ function App() {
+     return (
+       <section className="screen plan-screen">
+         <aside className="plan-control-pane">
+-          {/* Sticky Header ÔÇö prev | center | Today | search | next */}
++          {/* Sticky Header ÔÇö prev | date | next */}
+           <div className="plan-sticky-header">
+             <button type="button" className="plan-nav-btn-compact" onClick={() => {
+               const newDate = planResult?.prevDate ?? planDate;
+@@ -1239,30 +1242,6 @@ function App() {
+             <div className="plan-header-center">
+               <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}{activeFilter ? ` ┬Ě ${activeFilter}` : ''}</div>
+             </div>
+-            <button
+-              type="button"
+-              className={`plan-header-today-btn ${planDate === today && !planSearchQ?.trim() ? 'active' : ''}`}
+-              onClick={() => {
+-                const td = today;
+-                if (planDate !== td || planSearchQ?.trim()) {
+-                  commitPlanNavigate(td, planDate > td);
+-                  if (planSearchQ?.trim()) {
+-                    setPlanSearchQ('');
+-                    setPlanSearchCat('album');
+-                  }
+-                }
+-              }}
+-            >
+-              {t('plan.today')}
+-            </button>
+-            <button
+-              type="button"
+-              className={`plan-header-search-btn ${planSearchOpen ? 'active' : ''}`}
+-              onClick={() => setPlanSearchOpen(p => !p)}
+-              aria-label={t('plan.search')}
+-            >
+-              <Ic n="search" />
+-            </button>
+             <button type="button" className="plan-nav-btn-compact" onClick={() => {
+               const newDate = planResult?.nextDate ?? planDate;
+               commitPlanNavigate(newDate, false);
+@@ -1503,10 +1482,70 @@ function App() {
+             </div>
+           </div>
+         </div>
++
++        {/* Legend button below calendar */}
++        {!planLoading && (
++          <button type="button" className="plan-legend-btn" onClick={() => setShowLegend(true)}>
++            <Ic n="layers" />
++            {t('plan.legend') || 'Legenda'}
++          </button>
++        )}
+       </section>
+     );
+   }
+ 
++  // Legend data
++  const EVENT_LEGEND: Array<{ cls: string; label: string; color: string }> = [
++    { cls: 'ev-lecture', label: 'Wyk┼éad / ─ćwiczenia', color: 'var(--ev-lecture)' },
++    { cls: 'ev-lab', label: 'Laboratorium', color: 'var(--ev-lab)' },
++    { cls: 'ev-auditory', label: 'Audytoryjne', color: 'var(--ev-auditory)' },
++    { cls: 'ev-exam', label: 'Egzamin', color: 'var(--ev-exam)' },
++    { cls: 'ev-remote', label: 'Zdalne', color: 'var(--ev-remote)' },
++    { cls: 'ev-cancelled', label: 'Odwo┼éane', color: 'var(--ev-cancelled)' },
++    { cls: 'ev-pass', label: 'Zaliczenie', color: 'var(--ev-pass)' },
++    { cls: 'ev-project', label: 'Projekt', color: 'var(--ev-project)' },
++    { cls: 'ev-seminar', label: 'Seminarium', color: 'var(--ev-seminar)' },
++    { cls: 'ev-diploma', label: 'Dyplomowe', color: 'var(--ev-diploma)' },
++    { cls: 'ev-lectorate', label: 'Lektorat', color: 'var(--ev-lectorate)' },
++    { cls: 'ev-conservatory', label: 'Konwersatorium', color: 'var(--ev-conservatory)' },
++    { cls: 'ev-consultation', label: 'Konsultacje', color: 'var(--ev-consultation)' },
++    { cls: 'ev-field', label: 'Terenowe', color: 'var(--ev-field)' },
++  ];
++
++  const MARKER_LEGEND: Array<{ kind: string; label: string; color: string }> = [
++    { kind: 'session', label: 'Sesja egzaminacyjna', color: '#ef5350' },
++    { kind: 'break', label: 'Przerwa dydaktyczna', color: 'var(--mz-primary)' },
++    { kind: 'holiday', label: '┼Üwi─Öto / Dzie┼ä wolny', color: 'var(--mz-success)' },
++  ];
++
++  function renderPlanLegendSheet() {
++    if (!showLegend) return null;
++    return (
++      <div className="legend-overlay" onClick={() => setShowLegend(false)}>
++        <div className="legend-sheet" onClick={e => e.stopPropagation()}>
++          <div className="legend-sheet-handle" />
++          <div className="legend-sheet-title">{t('plan.legend') || 'Legenda'}</div>
++
++          <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zaj─Ö─ç'}</div>
++          {EVENT_LEGEND.map(ev => (
++            <div key={ev.cls} className="legend-row">
++              <div className="legend-swatch" style={{ background: ev.color }} />
++              <span className="legend-label">{ev.label}</span>
++            </div>
++          ))}
++
++          <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okres├│w'}</div>
++          {MARKER_LEGEND.map(m => (
++            <div key={m.kind} className="legend-row">
++              <div className="legend-line-swatch" style={{ background: m.color }} />
++              <span className="legend-label">{m.label}</span>
++            </div>
++          ))}
++        </div>
++      </div>
++    );
++  }
++
+   function renderGrades() {
+     return (
+       <section className="screen grades-screen">
+@@ -1625,14 +1664,14 @@ function App() {
+                 {studentPhotoBlobUrl && !studentPhotoError ? (
+                   <img
+                     src={studentPhotoBlobUrl}
+-                    alt={t('info.photoAlt')}
++                    alt={t('info.studentPhoto')}
+                     className="info-profile-photo"
+                   />
+                 ) : (
+                   <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
+                 )}
+                 <div className="info-profile-meta">
+-                  <div className="info-profile-name">{session.username || t('info.studentNameFallback')}</div>
++                  <div className="info-profile-name">{session.username || 'Student'}</div>
+                   <div className="info-profile-id">{t('info.userId')}: {session.userId || '-'}</div>
+                 </div>
+               </div>
+@@ -1654,16 +1693,16 @@ function App() {
+           {details && (
+             <div className="info-card">
+               {([
+-                { l: t('info.detailAlbum'), v: details.album },
+-                { l: t('info.detailFaculty'), v: details.wydzial },
+-                { l: t('info.detailField'), v: details.kierunek },
+-                { l: t('info.detailForm'), v: details.forma },
+-                { l: t('info.detailLevel'), v: details.poziom },
+-                { l: t('info.detailSpecialty'), v: details.specjalnosc },
+-                { l: t('info.detailSpecialization'), v: details.specjalizacja },
+-                { l: t('info.detailStatus'), v: details.status },
+-                { l: t('info.detailYear'), v: details.rokAkademicki },
+-                { l: t('info.detailSem'), v: details.semestrLabel },
++                { l: t('info.album'), v: details.album },
++                { l: t('info.faculty'), v: details.wydzial },
++                { l: t('info.field'), v: details.kierunek },
++                { l: t('info.form'), v: details.forma },
++                { l: t('info.level'), v: details.poziom },
++                { l: t('info.speciality'), v: details.specjalnosc },
++                { l: t('info.specialization'), v: details.specjalizacja },
++                { l: t('info.status'), v: details.status },
++                { l: t('info.academicYear'), v: details.rokAkademicki },
++                { l: t('info.semester'), v: details.semestrLabel },
+               ].filter(r => r.v)).map(r => (
+                 <div key={r.l} className="info-row">
+                   <div className="info-row-label">{r.l}</div>
+@@ -1684,7 +1723,7 @@ function App() {
+             </div>
+           )}
+           {!infoLoading && !details && (
+-            <div className="empty-state"><div className="empty-state-icon">­čĹĄ</div><p>{t('info.empty')}</p></div>
++            <div className="empty-state"><div className="empty-state-icon">­čĹĄ</div><p>{t('info.noData')}</p></div>
+           )}
+         </div>
+       </section>
+@@ -1720,7 +1759,7 @@ function App() {
+   function renderNewsDetail() {
+     const p = (nav.current.params ?? {}) as NewsDetailParams;
+     const item = p.item;
+-    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>{t('newsDetail.noContent')}</p></div></section>;
++    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>{t('news.noContent')}</p></div></section>;
+     const fullHtml = item.contentHtml || item.descriptionHtml;
+ 
+     return (
+@@ -1737,7 +1776,7 @@ function App() {
+         </div>
+         {item.link && (
+           <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
+-            {t('newsDetail.openBrowser')} ÔćŚ
++            {t('news.openInBrowser')}
+           </a>
+         )}
+       </section>
+@@ -1827,7 +1866,9 @@ function App() {
+             <div className="about-action-content">
+               <div className="about-action-title">{t('about.installApp')}</div>
+               <div className="about-action-desc">
+-                {isIosSafari ? t('about.installIos') : t('about.installAndroid')}
++                {isIosSafari
++                  ? t('about.installIos')
++                  : t('about.installAndroid')}
+               </div>
+             </div>
+             <div className="about-action-arrow">Ôćĺ</div>
+@@ -1881,7 +1922,7 @@ function App() {
+         </div>
+ 
+         <div className="about-description">
+-          <p>{t('about.description')}</p>
++          <p>mZUT v2 zosta┼é stworzony jako nieoficjalna, lekka alternatywa do szybkiego podgl─ůdu planu, ocen i informacji o studiach na ZUT, bez konieczno┼Ťci przeklikiwania si─Ö przez ci─Ö┼╝kie panele www.</p>
+           <p style={{ marginTop: '12px', opacity: 0.8, fontSize: '12px' }}>Made with ÔŁĄ´ŞĆ by Kejlo</p>
+         </div>
+       </section>
+@@ -2092,7 +2133,26 @@ function App() {
+     const actions: Array<{ key: string; icon: string; label: string; onClick: () => void; active: boolean }> = [];
+ 
+     if (screen === 'plan') {
++      actions.push({
++        key: 'today',
++        icon: 'calendar',
++        label: t('plan.today'),
++        onClick: () => {
++          const td = todayYmd();
++          if (planDate !== td || planSearchQ?.trim()) {
++            commitPlanNavigate(td, planDate > td);
++            if (planSearchQ?.trim()) {
++              setPlanSearchQ('');
++              setPlanSearchCat('album');
++            }
++          }
++        },
++        active: planDate === todayYmd() && !planSearchQ?.trim(),
++      });
++      actions.push({ key: 'search', icon: 'search', label: t('plan.search'), onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
+       actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadPlanData(undefined, true), active: false });
++    } else if (screen === 'home' && canOfferInstall) {
++      actions.push({ key: 'install', icon: 'download', label: t('install.now'), onClick: () => void handleInstallPwa(), active: false });
+     } else if (screen === 'grades') {
+       actions.push({ key: 'refresh', icon: 'refresh', label: t('grades.refreshLabel'), onClick: () => void loadGradesData(false, true), active: false });
+     } else if (screen === 'info') {
+@@ -2161,7 +2221,7 @@ function App() {
+       )}
+ 
+       {/* Main content */}
+-      <main key={screen}>
++      <main>
+         {renderScreen()}
+       </main>
+ 
+@@ -2224,6 +2284,7 @@ function App() {
+ 
+       {renderPlanEventSheet()}
+       {renderPlanSearchSheet()}
++      {renderPlanLegendSheet()}
+ 
+       {/* Navigation Drawer */}
+       {screen !== 'login' && (
+@@ -2234,7 +2295,7 @@ function App() {
+               <img src={LOGO_SRC} alt="mZUT v2" className="drawer-header-logo" />
+               <div className="drawer-header-info">
+                 <div className="drawer-header-title">mZUT v2</div>
+-                <div className="drawer-header-user">{session?.username || t('info.studentNameFallback')}</div>
++                <div className="drawer-header-user">{session?.username || 'Student'}</div>
+               </div>
+             </div>
+ 
+@@ -2250,9 +2311,9 @@ function App() {
+             </div>
+ 
+             <div className="drawer-footer">
+-              <button type="button" className="drawer-logout" onClick={() => { if (window.confirm(t('logout.confirm'))) { applySession(null); setDrawerOpen(false); } }}>
++              <button type="button" className="drawer-logout" onClick={() => { if (window.confirm('Czy na pewno chcesz si─Ö wylogowa─ç?')) { applySession(null); setDrawerOpen(false); } }}>
+                 <Ic n="logout" />
+-                {t('logout.button')}
++                Wyloguj si─Ö
+               </button>
+             </div>
+           </aside>

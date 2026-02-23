@@ -191,6 +191,8 @@ function Ic({ n }: { n: string }) {
   if (n === 'about') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><path {...SV} d="M12 16v-4M12 8h.01" /></svg>;
   if (n === 'clock') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><polyline {...SV} points="12 6 12 12 16 14" /></svg>;
   if (n === 'location') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle {...SV} cx="12" cy="10" r="3" /></svg>;
+  if (n === 'download') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline {...SV} points="7 10 12 15 17 10" /><line {...SV} x1="12" y1="15" x2="12" y2="3" /></svg>;
+  if (n === 'layers') return <svg viewBox="0 0 24 24" aria-hidden><polygon {...SV} points="12 2 2 7 12 12 22 7 12 2" /><polyline {...SV} points="2 17 12 22 22 17" /><polyline {...SV} points="2 12 12 17 22 12" /></svg>;
   // fallback
   return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" fill="currentColor" /></svg>;
 }
@@ -297,6 +299,7 @@ function App() {
   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
   const [planSearchLoading, setPlanSearchLoading] = useState(false);
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Plan carousel swipe (direct DOM animation — no React state per frame)
@@ -1239,30 +1242,6 @@ function App() {
             <div className="plan-header-center">
               <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}{activeFilter ? ` · ${activeFilter}` : ''}</div>
             </div>
-            <button
-              type="button"
-              className={`plan-header-today-btn ${planDate === today && !planSearchQ?.trim() ? 'active' : ''}`}
-              onClick={() => {
-                const td = today;
-                if (planDate !== td || planSearchQ?.trim()) {
-                  commitPlanNavigate(td, planDate > td);
-                  if (planSearchQ?.trim()) {
-                    setPlanSearchQ('');
-                    setPlanSearchCat('album');
-                  }
-                }
-              }}
-            >
-              {t('plan.today')}
-            </button>
-            <button
-              type="button"
-              className={`plan-header-search-btn ${planSearchOpen ? 'active' : ''}`}
-              onClick={() => setPlanSearchOpen(p => !p)}
-              aria-label={t('plan.search')}
-            >
-              <Ic n="search" />
-            </button>
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
               const newDate = planResult?.nextDate ?? planDate;
               commitPlanNavigate(newDate, false);
@@ -1503,7 +1482,67 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Legend button below calendar */}
+        {!planLoading && (
+          <button type="button" className="plan-legend-btn" onClick={() => setShowLegend(true)}>
+            <Ic n="layers" />
+            {t('plan.legend') || 'Legenda'}
+          </button>
+        )}
       </section>
+    );
+  }
+
+  // Legend data
+  const EVENT_LEGEND: Array<{ cls: string; label: string; color: string }> = [
+    { cls: 'ev-lecture', label: 'Wykład / Ćwiczenia', color: 'var(--ev-lecture)' },
+    { cls: 'ev-lab', label: 'Laboratorium', color: 'var(--ev-lab)' },
+    { cls: 'ev-auditory', label: 'Audytoryjne', color: 'var(--ev-auditory)' },
+    { cls: 'ev-exam', label: 'Egzamin', color: 'var(--ev-exam)' },
+    { cls: 'ev-remote', label: 'Zdalne', color: 'var(--ev-remote)' },
+    { cls: 'ev-cancelled', label: 'Odwołane', color: 'var(--ev-cancelled)' },
+    { cls: 'ev-pass', label: 'Zaliczenie', color: 'var(--ev-pass)' },
+    { cls: 'ev-project', label: 'Projekt', color: 'var(--ev-project)' },
+    { cls: 'ev-seminar', label: 'Seminarium', color: 'var(--ev-seminar)' },
+    { cls: 'ev-diploma', label: 'Dyplomowe', color: 'var(--ev-diploma)' },
+    { cls: 'ev-lectorate', label: 'Lektorat', color: 'var(--ev-lectorate)' },
+    { cls: 'ev-conservatory', label: 'Konwersatorium', color: 'var(--ev-conservatory)' },
+    { cls: 'ev-consultation', label: 'Konsultacje', color: 'var(--ev-consultation)' },
+    { cls: 'ev-field', label: 'Terenowe', color: 'var(--ev-field)' },
+  ];
+
+  const MARKER_LEGEND: Array<{ kind: string; label: string; color: string }> = [
+    { kind: 'session', label: 'Sesja egzaminacyjna', color: '#ef5350' },
+    { kind: 'break', label: 'Przerwa dydaktyczna', color: 'var(--mz-primary)' },
+    { kind: 'holiday', label: 'Święto / Dzień wolny', color: 'var(--mz-success)' },
+  ];
+
+  function renderPlanLegendSheet() {
+    if (!showLegend) return null;
+    return (
+      <div className="legend-overlay" onClick={() => setShowLegend(false)}>
+        <div className="legend-sheet" onClick={e => e.stopPropagation()}>
+          <div className="legend-sheet-handle" />
+          <div className="legend-sheet-title">{t('plan.legend') || 'Legenda'}</div>
+
+          <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zajęć'}</div>
+          {EVENT_LEGEND.map(ev => (
+            <div key={ev.cls} className="legend-row">
+              <div className="legend-swatch" style={{ background: ev.color }} />
+              <span className="legend-label">{ev.label}</span>
+            </div>
+          ))}
+
+          <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okresów'}</div>
+          {MARKER_LEGEND.map(m => (
+            <div key={m.kind} className="legend-row">
+              <div className="legend-line-swatch" style={{ background: m.color }} />
+              <span className="legend-label">{m.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -2092,7 +2131,26 @@ function App() {
     const actions: Array<{ key: string; icon: string; label: string; onClick: () => void; active: boolean }> = [];
 
     if (screen === 'plan') {
+      actions.push({
+        key: 'today',
+        icon: 'calendar',
+        label: t('plan.today'),
+        onClick: () => {
+          const td = todayYmd();
+          if (planDate !== td || planSearchQ?.trim()) {
+            commitPlanNavigate(td, planDate > td);
+            if (planSearchQ?.trim()) {
+              setPlanSearchQ('');
+              setPlanSearchCat('album');
+            }
+          }
+        },
+        active: planDate === todayYmd() && !planSearchQ?.trim(),
+      });
+      actions.push({ key: 'search', icon: 'search', label: t('plan.search'), onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
       actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadPlanData(undefined, true), active: false });
+    } else if (screen === 'home' && canOfferInstall) {
+      actions.push({ key: 'install', icon: 'download', label: t('install.now'), onClick: () => void handleInstallPwa(), active: false });
     } else if (screen === 'grades') {
       actions.push({ key: 'refresh', icon: 'refresh', label: t('grades.refreshLabel'), onClick: () => void loadGradesData(false, true), active: false });
     } else if (screen === 'info') {
@@ -2161,7 +2219,7 @@ function App() {
       )}
 
       {/* Main content */}
-      <main key={screen}>
+      <main>
         {renderScreen()}
       </main>
 
@@ -2224,6 +2282,7 @@ function App() {
 
       {renderPlanEventSheet()}
       {renderPlanSearchSheet()}
+      {renderPlanLegendSheet()}
 
       {/* Navigation Drawer */}
       {screen !== 'login' && (
