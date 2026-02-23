@@ -41,9 +41,6 @@ const pl: Record<string, string> = {
     'plan.hour': 'Godz.',
     'plan.search': 'Szukaj w planie',
     'plan.refresh': 'Odśwież',
-    'plan.legend': 'Legenda',
-    'plan.eventTypes': 'Typy zajęć',
-    'plan.periodMarkers': 'Markery okresów',
 
     // Plan search sheet
     'search.title': 'Szukaj w planie',
@@ -185,9 +182,6 @@ const en: Record<string, string> = {
     'plan.hour': 'Hour',
     'plan.search': 'Search schedule',
     'plan.refresh': 'Refresh',
-    'plan.legend': 'Legend',
-    'plan.eventTypes': 'Class types',
-    'plan.periodMarkers': 'Period markers',
 
     // Plan search sheet
     'search.title': 'Search schedule',
