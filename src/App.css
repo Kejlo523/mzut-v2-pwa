@@ -3922,6 +3922,9 @@ button.outline {
     width: 100%;
     margin: 0;
     min-height: calc(100dvh - 190px);
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
 
   .plan-container {
@@ -4045,5 +4048,8 @@ button.outline {
     grid-column: 1 / -1;
   }
 }
-.app-shell { touch-action: pan-y; overscroll-behavior-x: none; }
 
+.app-shell {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+}

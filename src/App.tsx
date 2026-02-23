@@ -464,7 +464,7 @@ function App() {
   const swipe = useSwipeGestures({
     canGoBack: false,
     onBack: () => { },
-    canOpenDrawer: !drawerOpen && screen !== 'login',
+    canOpenDrawer: !drawerOpen && screen !== 'login' && screen !== 'plan',
     onOpenDrawer: () => setDrawerOpen(true),
     canCloseDrawer: drawerOpen,
     onCloseDrawer: () => setDrawerOpen(false),
@@ -1262,6 +1262,14 @@ function App() {
               </button>
             ))}
           </div>
+
+          {/* Legend button below calendar in mobile, below filters in landscape */}
+          {!planLoading && (
+            <button type="button" className="plan-legend-btn" onClick={() => setShowLegend(true)}>
+              <Ic n="layers" />
+              {t('plan.legend') || 'Legenda'}
+            </button>
+          )}
         </aside>
 
         {/* Calendar Content */}
@@ -1488,13 +1496,6 @@ function App() {
           </div>
         </div>
 
-        {/* Legend button below calendar */}
-        {!planLoading && (
-          <button type="button" className="plan-legend-btn" onClick={() => setShowLegend(true)}>
-            <Ic n="layers" />
-            {t('plan.legend') || 'Legenda'}
-          </button>
-        )}
       </section>
     );
   }

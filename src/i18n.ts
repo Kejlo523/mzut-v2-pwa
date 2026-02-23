@@ -155,9 +155,9 @@ const pl: Record<string, string> = {
 
     // New additions based on missing keys audit
     'about.description': 'mZUT v2 został stworzony jako nieoficjalna, lekka alternatywa do szybkiego podglądu planu, ocen i informacji o studiach na ZUT, bez konieczności przeklikiwania się przez ciężkie panele www.',
-    'about.installAndroid': 'Dostępne w prawym górnym rogu przeglądarki',
+    'about.installAndroid': 'Zainstaluj skrót i korzystaj jak ze zwykłej aplikacji systemowej',
     'about.installApp': 'Zainstaluj aplikację',
-    'about.installIos': 'Dostępne w menu udostępniania Safari (strzałka w górę) > <b>Do ekranu początkowego</b>',
+    'about.installIos': 'Zainstaluj skrót i korzystaj jak ze zwykłej aplikacji systemowej',
     'about.pwaNote': 'Wersja progresywnej aplikacji webowej',
     'about.rateApp': 'Oceń aplikację',
     'about.rateDesc': 'Podziel się opinią',
@@ -378,9 +378,9 @@ const en: Record<string, string> = {
 
     // New additions based on missing keys audit
     'about.description': 'mZUT v2 was created as an unofficial, lightweight alternative for quick access to the schedule, grades, and study information at ZUT, without the need to click through heavy web panels.',
-    'about.installAndroid': 'Available in the top right corner of the browser',
+    'about.installAndroid': 'Install shortcut and use like a regular system app',
     'about.installApp': 'Install application',
-    'about.installIos': 'Available in Safari share menu (up arrow) > <b>Add to Home Screen</b>',
+    'about.installIos': 'Install shortcut and use like a regular system app',
     'about.pwaNote': 'Progressive Web App version',
     'about.rateApp': 'Rate the app',
     'about.rateDesc': 'Share your opinion',
