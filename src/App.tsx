@@ -1056,7 +1056,7 @@ function App() {
                 type="text"
                 value={loginVal}
                 onChange={e => setLoginVal(e.target.value)}
-                placeholder="s12345 lub email"
+                placeholder={t('login.usernamePlaceholder') || "s12345 lub email"}
                 autoComplete="username"
                 onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
                 className="login-field-input"
@@ -1072,7 +1072,7 @@ function App() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Hasło"
+                placeholder={t('login.password')}
                 autoComplete="current-password"
                 onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
                 className="login-field-input"
@@ -1081,7 +1081,7 @@ function App() {
                 type="button"
                 className="login-field-toggle"
                 onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+                aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
               >
                 <Ic n="eye" />
               </button>
@@ -1096,7 +1096,7 @@ function App() {
               {loginLoading ? t('login.loggingIn') : t('login.loginBtn')}
             </button>
 
-            <p className="login-info-text">
+            <p className="login-info-text" style={{ whiteSpace: 'pre-line' }}>
               {t('login.infoText')}
             </p>
           </div>
@@ -1901,19 +1901,19 @@ function App() {
         <div className="about-links">
           <a href="https://mzut.endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
             <span className="about-link-icon">ℹ️</span>
-            <span className="about-link-text">Strona projektu: mzut.endozero.pl</span>
+            <span className="about-link-text">{t('about.projectSite')}</span>
             <span className="about-link-arrow">→</span>
           </a>
 
           <a href="https://endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
             <span className="about-link-icon">👤</span>
-            <span className="about-link-text">Strona autora: endozero.pl</span>
+            <span className="about-link-text">{t('about.authorSite')}</span>
             <span className="about-link-arrow">→</span>
           </a>
 
           <a href="https://mzut.endozero.pl/privacy_policy.html" target="_blank" rel="noreferrer" className="about-link-item">
             <span className="about-link-icon">🔒</span>
-            <span className="about-link-text">Polityka prywatności</span>
+            <span className="about-link-text">{t('about.privacyPolicy')}</span>
             <span className="about-link-arrow">→</span>
           </a>
 
