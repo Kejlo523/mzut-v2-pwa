@@ -1085,11 +1085,11 @@ function App() {
               disabled={loginLoading}
               className="login-button"
             >
-              {loginLoading ? 'Logowanie…' : 'Zaloguj się'}
+              {loginLoading ? t('login.loggingIn') : t('login.loginBtn')}
             </button>
 
             <p className="login-info-text">
-              Zaloguj się swoimi danymi z systemu ZUT. Aplikacja nie przechowuje haseł - logowanie odbywa się bezpośrednio na serwerach uczelni.
+              {t('login.infoText')}
             </p>
           </div>
         </div>
@@ -1098,7 +1098,7 @@ function App() {
   }
 
   function renderHome() {
-    const firstName = session?.username?.split(' ')[0] ?? 'Studencie';
+    const firstName = session?.username?.split(' ')[0] ?? 'Student';
 
     return (
       <section className="screen home-screen">
@@ -1107,31 +1107,31 @@ function App() {
           <div className="home-hero-card">
             <div className="home-hero-greeting-row">
               <div>
-                <div className="home-hero-hello">Cześć,</div>
+                <div className="home-hero-hello">{t('home.hello')}</div>
                 <div className="home-hero-name">{firstName}</div>
               </div>
               <div className="home-hero-avatar">{firstName[0]?.toUpperCase() ?? 'S'}</div>
             </div>
             {!isOnline && (
-              <span className="offline-badge"><Ic n="wifi-off" />Tryb offline</span>
+              <span className="offline-badge"><Ic n="wifi-off" />{t('home.offlineMode')}</span>
             )}
           </div>
 
           {/* Quick access tiles */}
-          <div className="home-tiles-label">Szybki dostęp</div>
+          <div className="home-tiles-label">{t('home.quickAccess')}</div>
           <div className="tile-grid">
             {([
-              { key: 'plan' as DrawerKey, label: 'Plan zajęć', desc: 'Dzień / Tydzień / Miesiąc', icon: 'calendar' },
-              { key: 'grades' as DrawerKey, label: 'Oceny', desc: 'Średnia i punkty ECTS', icon: 'grade' },
-              { key: 'info' as DrawerKey, label: 'Dane studenta', desc: 'Kierunek i przebieg', icon: 'user' },
-              { key: 'news' as DrawerKey, label: 'Aktualności', desc: 'Komunikaty uczelni', icon: 'news' },
-              { key: 'links' as DrawerKey, label: 'Linki', desc: 'Przydatne strony ZUT', icon: 'link' },
-              { key: 'settings' as DrawerKey, label: 'Ustawienia', desc: 'Konfiguracja aplikacji', icon: 'settings' },
-            ] as const).map(t => (
-              <button key={t.key} type="button" className="tile" onClick={() => openScreen(t.key)}>
-                <div className="tile-icon"><Ic n={t.icon} /></div>
-                <span className="tile-label">{t.label}</span>
-                <span className="tile-desc">{t.desc}</span>
+              { key: 'plan' as DrawerKey, label: t('home.tilePlan'), desc: t('home.tilePlanDesc'), icon: 'calendar' },
+              { key: 'grades' as DrawerKey, label: t('home.tileGrades'), desc: t('home.tileGradesDesc'), icon: 'grade' },
+              { key: 'info' as DrawerKey, label: t('home.tileInfo'), desc: t('home.tileInfoDesc'), icon: 'user' },
+              { key: 'news' as DrawerKey, label: t('home.tileNews'), desc: t('home.tileNewsDesc'), icon: 'news' },
+              { key: 'links' as DrawerKey, label: t('home.tileLinks'), desc: t('home.tileLinksDesc'), icon: 'link' },
+              { key: 'settings' as DrawerKey, label: t('home.tileSettings'), desc: t('home.tileSettingsDesc'), icon: 'settings' },
+            ] as const).map(tile => (
+              <button key={tile.key} type="button" className="tile" onClick={() => openScreen(tile.key)}>
+                <div className="tile-icon"><Ic n={tile.icon} /></div>
+                <span className="tile-label">{tile.label}</span>
+                <span className="tile-desc">{tile.desc}</span>
               </button>
             ))}
           </div>
@@ -1141,13 +1141,7 @@ function App() {
   }
 
   function getPeriodDisplayName(key: string): string {
-    const map: Record<string, string> = {
-      sesja_zimowa: 'Sesja zimowa', sesja_letnia: 'Sesja letnia',
-      sesja_poprawkowa: 'Sesja poprawkowa', przerwa_dydaktyczna_zimowa: 'Przerwa dydaktyczna',
-      przerwa_dydaktyczna_letnia: 'Przerwa dydaktyczna', przerwa_dydaktyczna: 'Przerwa dydaktyczna',
-      wakacje_zimowe: 'Wakacje zimowe', wakacje_letnie: 'Wakacje letnie',
-    };
-    return map[key] ?? key.replace(/_/g, ' ');
+    return t(`periodName.${key}`) !== `periodName.${key}` ? t(`periodName.${key}`) : key.replace(/_/g, ' ');
   }
 
   function getPeriodKind(key: string): 'session' | 'break' | 'holiday' {
@@ -1163,10 +1157,10 @@ function App() {
     const markers: PeriodMarker[] = [];
     for (const p of periods) {
       if (prevDate && p.end >= prevDate && p.end < date) {
-        markers.push({ label: `Koniec: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
+        markers.push({ label: `${t('period.end')}: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
       }
       if (p.start === date) {
-        markers.push({ label: `Początek: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
+        markers.push({ label: `${t('period.start')}: ${getPeriodDisplayName(p.key)}`, kind: getPeriodKind(p.key) });
       }
     }
     return markers;
@@ -1298,9 +1292,9 @@ function App() {
                 onTouchEnd={onPlanTouchEnd}
                 onTouchCancel={onPlanTouchCancel}
               >
-                {planLoading && <Spinner text={t('plan.loading')} />}
+                {planLoading && !planResult && <Spinner text={t('plan.loading')} />}
 
-                {!planLoading && planViewMode === 'day' && (
+                {planViewMode === 'day' && (
                   <div className="list-stack">
                     {cols.map((col, ci) => {
                       const periods = planResult?.sessionPeriods ?? [];
@@ -1382,7 +1376,7 @@ function App() {
                   </div>
                 )}
 
-                {!planLoading && planViewMode === 'week' && (
+                {planViewMode === 'week' && (
                   <div className="card week-card">
                     {weekCols.length > 0 ? (
                       <>
@@ -1476,7 +1470,7 @@ function App() {
                   </div>
                 )}
 
-                {!planLoading && planViewMode === 'month' && (
+                {planViewMode === 'month' && (
                   <div className="month-shell">
                     <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map(k => <span key={k}>{t(k)}</span>)}</div>
                     <div className="month-grid">
@@ -1518,9 +1512,9 @@ function App() {
       <section className="screen grades-screen">
         <div className="grades-hero">
           <div className="metrics-row">
-            <div className="metric-card"><div className="metric-label">Średnia</div><div className="metric-value">{gradesSummary.avg}</div></div>
-            <div className="metric-card"><div className="metric-label">ECTS semestr</div><div className="metric-value">{gradesSummary.ects}</div></div>
-            <div className="metric-card"><div className="metric-label">ECTS łącznie</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+            <div className="metric-card"><div className="metric-label">{t('grades.avg')}</div><div className="metric-value">{gradesSummary.avg}</div></div>
+            <div className="metric-card"><div className="metric-label">{t('grades.ectsSem')}</div><div className="metric-value">{gradesSummary.ects}</div></div>
+            <div className="metric-card"><div className="metric-label">{t('grades.ectsTotal')}</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
           </div>
         </div>
 
@@ -1528,7 +1522,7 @@ function App() {
           <div className="grades-filters">
             {studies.length > 0 && (
               <label className="field-label">
-                Kierunek
+                {t('grades.studyField')}
                 <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
                   {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
                 </select>
@@ -1536,11 +1530,11 @@ function App() {
             )}
             {semesters.length > 0 && (
               <label className="field-label">
-                Semestr
+                {t('grades.semLabel')}
                 <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
                   {semesters.map(s => (
                     <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
-                      Sem. {s.nrSemestru} ({s.pora}) {s.rokAkademicki}
+                      {t('grades.semOption')} {s.nrSemestru} ({s.pora}) {s.rokAkademicki}
                     </option>
                   ))}
                 </select>
@@ -1550,9 +1544,9 @@ function App() {
         </div>
 
         <div className="grades-surface">
-          {gradesLoading && <Spinner text="Pobieranie ocen…" />}
+          {gradesLoading && <Spinner text={t('grades.loading')} />}
           {!gradesLoading && grades.length === 0 && (
-            <div className="empty-state"><div className="empty-state-icon">🎓</div><p>Brak ocen dla wybranego semestru</p></div>
+            <div className="empty-state"><div className="empty-state-icon">🎓</div><p>{t('grades.noGrades')}</p></div>
           )}
 
           <div className="list-stack">
@@ -1571,7 +1565,7 @@ function App() {
                       <div className="grade-group-name-wrap">
                         <div className="grade-group-name">{subject}</div>
                         <div className="grade-group-sub">
-                          Ocena końcowa{ects > 0 ? ` · ${fmtDec(ects, 1)} ECTS` : ''}
+                          {t('grades.finalGrade')}{ects > 0 ? ` · ${fmtDec(ects, 1)} ECTS` : ''}
                         </div>
                       </div>
                       <div className={`grade-group-pill ${gradeTone(finalGrade)}`}>{finalGrade || '–'}</div>
@@ -1584,7 +1578,7 @@ function App() {
                           <div key={`${subject}-${i}`} className="grade-row">
                             <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
                             <div className="grade-info">
-                              <div className="grade-type-chip">{isFinalGradeType(g.type) ? 'Ocena końcowa' : (g.type || 'Składowa')}</div>
+                              <div className="grade-type-chip">{isFinalGradeType(g.type) ? t('grades.finalGrade') : (g.type || t('grades.component'))}</div>
                               <div className="grade-date-teacher">
                                 {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
                               </div>
@@ -1603,7 +1597,7 @@ function App() {
                   <div key={`flat-${i}-${g.subjectName}`} className="grade-row">
                     <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
                     <div className="grade-info">
-                      <div>{g.subjectName || 'Przedmiot'}</div>
+                      <div>{g.subjectName || t('grades.subject')}</div>
                       <div className="grade-date-teacher">
                         {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
                       </div>
@@ -1631,22 +1625,22 @@ function App() {
                 {studentPhotoBlobUrl && !studentPhotoError ? (
                   <img
                     src={studentPhotoBlobUrl}
-                    alt="Zdjęcie studenta"
+                    alt={t('info.photoAlt')}
                     className="info-profile-photo"
                   />
                 ) : (
                   <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
                 )}
                 <div className="info-profile-meta">
-                  <div className="info-profile-name">{session.username || 'Student'}</div>
-                  <div className="info-profile-id">ID użytkownika: {session.userId || '-'}</div>
+                  <div className="info-profile-name">{session.username || t('info.studentNameFallback')}</div>
+                  <div className="info-profile-id">{t('info.userId')}: {session.userId || '-'}</div>
                 </div>
               </div>
             )}
 
             {studies.length > 0 && (
               <label className="field-label info-study-select">
-                Kierunek
+                {t('info.studyField')}
                 <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
                   {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
                 </select>
@@ -1656,20 +1650,20 @@ function App() {
         )}
 
         <div className="info-main">
-          {infoLoading && <Spinner text="Ładowanie danych…" />}
+          {infoLoading && <Spinner text={t('info.loading')} />}
           {details && (
             <div className="info-card">
               {([
-                { l: 'Album', v: details.album },
-                { l: 'Wydział', v: details.wydzial },
-                { l: 'Kierunek', v: details.kierunek },
-                { l: 'Forma', v: details.forma },
-                { l: 'Poziom', v: details.poziom },
-                { l: 'Specjalność', v: details.specjalnosc },
-                { l: 'Specjalizacja', v: details.specjalizacja },
-                { l: 'Status', v: details.status },
-                { l: 'Rok akadem.', v: details.rokAkademicki },
-                { l: 'Semestr', v: details.semestrLabel },
+                { l: t('info.detailAlbum'), v: details.album },
+                { l: t('info.detailFaculty'), v: details.wydzial },
+                { l: t('info.detailField'), v: details.kierunek },
+                { l: t('info.detailForm'), v: details.forma },
+                { l: t('info.detailLevel'), v: details.poziom },
+                { l: t('info.detailSpecialty'), v: details.specjalnosc },
+                { l: t('info.detailSpecialization'), v: details.specjalizacja },
+                { l: t('info.detailStatus'), v: details.status },
+                { l: t('info.detailYear'), v: details.rokAkademicki },
+                { l: t('info.detailSem'), v: details.semestrLabel },
               ].filter(r => r.v)).map(r => (
                 <div key={r.l} className="info-row">
                   <div className="info-row-label">{r.l}</div>
@@ -1680,7 +1674,7 @@ function App() {
           )}
           {history.length > 0 && (
             <div className="info-card info-history-card">
-              <div className="info-card-head">Przebieg studiów</div>
+              <div className="info-card-head">{t('info.studyHistory')}</div>
               {history.map((h, i) => (
                 <div key={i} className="history-row">
                   <span className="history-label">{h.label}</span>
@@ -1690,7 +1684,7 @@ function App() {
             </div>
           )}
           {!infoLoading && !details && (
-            <div className="empty-state"><div className="empty-state-icon">👤</div><p>Brak danych studenta</p></div>
+            <div className="empty-state"><div className="empty-state-icon">👤</div><p>{t('info.empty')}</p></div>
           )}
         </div>
       </section>
@@ -1699,9 +1693,9 @@ function App() {
   function renderNews() {
     return (
       <section className="screen news-screen">
-        {newsLoading && <Spinner text="Pobieranie aktualności…" />}
+        {newsLoading && <Spinner text={t('news.loading')} />}
         {!newsLoading && news.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">📰</div><p>Brak aktualności</p></div>
+          <div className="empty-state"><div className="empty-state-icon">📰</div><p>{t('news.empty')}</p></div>
         )}
         <div className="list-stack">
           {news.map(item => (
@@ -1726,7 +1720,7 @@ function App() {
   function renderNewsDetail() {
     const p = (nav.current.params ?? {}) as NewsDetailParams;
     const item = p.item;
-    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>Brak treści</p></div></section>;
+    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>{t('newsDetail.noContent')}</p></div></section>;
     const fullHtml = item.contentHtml || item.descriptionHtml;
 
     return (
@@ -1743,7 +1737,7 @@ function App() {
         </div>
         {item.link && (
           <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
-            Otwórz w przeglądarce ↗
+            {t('newsDetail.openBrowser')} ↗
           </a>
         )}
       </section>
@@ -1755,14 +1749,14 @@ function App() {
     const faculties = links.filter(l => l.scope === 'FACULTY');
     return (
       <section className="screen links-screen">
-        {faculties.length > 0 && <div className="link-category">Twój wydział</div>}
+        {faculties.length > 0 && <div className="link-category">{t('links.faculty')}</div>}
         {faculties.map(l => (
           <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
             <div className="link-card-title">{l.title}</div>
             <div className="link-card-desc">{l.description}</div>
           </a>
         ))}
-        <div className="link-category">Zasoby uczelni</div>
+        <div className="link-category">{t('links.university')}</div>
         {globals.map(l => (
           <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
             <div className="link-card-title">{l.title}</div>
@@ -1824,18 +1818,16 @@ function App() {
           <img src={LOGO_SRC} alt="Logo mZUT v2" className="about-logo-img" />
           <div className="about-app-name">mZUT v2</div>
           <div className="about-version">v1.2.0 (PWA)</div>
-          <div className="about-note">Wersja progresywnej aplikacji webowej</div>
+          <div className="about-note">{t('about.pwaNote')}</div>
         </div>
 
         {canOfferInstall && (
           <button type="button" className="about-action-card about-install-card" onClick={() => void handleInstallPwa()}>
             <div className="about-action-icon" style={{ background: '#1976d2', color: '#fff' }}>📲</div>
             <div className="about-action-content">
-              <div className="about-action-title">Zainstaluj aplikację</div>
+              <div className="about-action-title">{t('about.installApp')}</div>
               <div className="about-action-desc">
-                {isIosSafari
-                  ? 'Dodaj do ekranu głównego przez menu Udostępnij'
-                  : 'Dodaj mZUT v2 do ekranu głównego'}
+                {isIosSafari ? t('about.installIos') : t('about.installAndroid')}
               </div>
             </div>
             <div className="about-action-arrow">→</div>
@@ -1846,8 +1838,8 @@ function App() {
           <a href="https://play.google.com/store/apps/details?id=pl.kejlo.mzutv2" target="_blank" rel="noreferrer" className="about-action-card">
             <div className="about-action-icon" style={{ background: '#26FFA000' }}>⭐</div>
             <div className="about-action-content">
-              <div className="about-action-title">Oceń aplikację</div>
-              <div className="about-action-desc">Twoja opinia pomaga nam rozwijać mZUT!</div>
+              <div className="about-action-title">{t('about.rateApp')}</div>
+              <div className="about-action-desc">{t('about.rateDesc')}</div>
             </div>
             <div className="about-action-arrow">→</div>
           </a>
@@ -1855,8 +1847,8 @@ function App() {
           <a href="https://github.com/Kejlo523/mzut-v2" target="_blank" rel="noreferrer" className="about-action-card">
             <div className="about-action-icon" style={{ background: 'var(--mz-border-soft)', color: 'var(--mz-text)' }}>📝</div>
             <div className="about-action-content">
-              <div className="about-action-title">Kod źródłowy</div>
-              <div className="about-action-desc">Sprawdź projekt na GitHubie</div>
+              <div className="about-action-title">{t('about.sourceCode')}</div>
+              <div className="about-action-desc">{t('about.sourceDesc')}</div>
             </div>
             <div className="about-action-arrow">→</div>
           </a>
@@ -1889,7 +1881,7 @@ function App() {
         </div>
 
         <div className="about-description">
-          <p>mZUT v2 został stworzony jako nieoficjalna, lekka alternatywa do szybkiego podglądu planu, ocen i informacji o studiach na ZUT, bez konieczności przeklikiwania się przez ciężkie panele www.</p>
+          <p>{t('about.description')}</p>
           <p style={{ marginTop: '12px', opacity: 0.8, fontSize: '12px' }}>Made with ❤️ by Kejlo</p>
         </div>
       </section>
@@ -2236,13 +2228,13 @@ function App() {
       {/* Navigation Drawer */}
       {screen !== 'login' && (
         <div className={`app-drawer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen} aria-modal={drawerOpen}>
-          <button type="button" className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Zamknij menu" />
-          <aside className="drawer-panel" role="navigation" aria-label="Nawigacja główna">
+          <button type="button" className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label={t('general.closeMenu')} />
+          <aside className="drawer-panel" role="navigation" aria-label={t('general.openMenu')}>
             <div className="drawer-header">
               <img src={LOGO_SRC} alt="mZUT v2" className="drawer-header-logo" />
               <div className="drawer-header-info">
                 <div className="drawer-header-title">mZUT v2</div>
-                <div className="drawer-header-user">{session?.username || 'Student'}</div>
+                <div className="drawer-header-user">{session?.username || t('info.studentNameFallback')}</div>
               </div>
             </div>
 
@@ -2258,9 +2250,9 @@ function App() {
             </div>
 
             <div className="drawer-footer">
-              <button type="button" className="drawer-logout" onClick={() => { if (window.confirm('Czy na pewno chcesz się wylogować?')) { applySession(null); setDrawerOpen(false); } }}>
+              <button type="button" className="drawer-logout" onClick={() => { if (window.confirm(t('logout.confirm'))) { applySession(null); setDrawerOpen(false); } }}>
                 <Ic n="logout" />
-                Wyloguj się
+                {t('logout.button')}
               </button>
             </div>
           </aside>
