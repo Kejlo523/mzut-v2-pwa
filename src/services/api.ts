@@ -541,11 +541,19 @@ export async function fetchPlan(
   let urlParams: Record<string, string>;
   let album = '';
 
+  let fetchStart = rangeStart;
+  let fetchEnd = rangeEnd;
+  if (viewMode === 'day') {
+    const dow = current.getDay() || 7;
+    fetchStart = addDays(current, -(dow - 1));
+    fetchEnd = addDays(fetchStart, 6);
+  }
+
   if (firstNonEmpty(payload.search.query)) {
     urlParams = {
       [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
-      start: toOffsetIso(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate(), 0, 0, 0)),
-      end: toOffsetIso(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate(), 23, 59, 59)),
+      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
     };
   } else {
     const resolvedStudyId = payload.studyId || session.activeStudyId;
@@ -582,8 +590,8 @@ export async function fetchPlan(
 
     urlParams = {
       number: album,
-      start: toOffsetIso(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate(), 0, 0, 0)),
-      end: toOffsetIso(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate(), 23, 59, 59)),
+      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
     };
   }
 
