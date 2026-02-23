@@ -755,8 +755,8 @@ button.outline {
   display: grid;
   place-items: center;
   margin-bottom: 9px;
-  background: var(--mz-primary-10);
-  color: var(--mz-primary);
+  background: rgba(160, 160, 160, 0.12);
+  color: var(--mz-muted);
   flex-shrink: 0;
 }
 
@@ -894,10 +894,10 @@ button.outline {
   position: static;
   z-index: 1;
   display: grid;
-  grid-template-columns: 42px 1fr 42px;
+  grid-template-columns: 36px 1fr auto auto 36px;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px 6px;
+  gap: 6px;
+  padding: 6px 6px 4px;
   flex-shrink: 0;
   background: var(--mz-bg);
 }
@@ -941,7 +941,7 @@ button.outline {
 }
 
 .plan-date-label-compact {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--mz-text);
   text-align: center;
@@ -1011,6 +1011,12 @@ button.outline {
   flex-direction: column;
   padding: 8px;
   background: var(--mz-card);
+}
+
+.plan-carousel-track {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   will-change: transform;
 }
 
@@ -1027,7 +1033,7 @@ button.outline {
   width: 100%;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   border-radius: 14px;
   padding: 6px;
@@ -1037,12 +1043,12 @@ button.outline {
 }
 
 .plan-mode-btn-floating {
-  height: 40px;
+  height: 34px;
   background: transparent;
   border: none;
   border-radius: 10px;
   color: var(--mz-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: capitalize;
   cursor: pointer;
@@ -1058,15 +1064,57 @@ button.outline {
   background: var(--mz-card-soft);
 }
 
-.plan-today-btn {
+.plan-header-today-btn {
+  height: 30px;
   padding: 0 10px;
   white-space: nowrap;
   flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mz-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
 }
 
-.plan-today-btn.active {
+.plan-header-today-btn.active {
   background: var(--mz-primary);
   color: #fff;
+}
+
+.plan-header-today-btn:active {
+  background: var(--mz-primary-20);
+}
+
+.plan-header-search-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--mz-muted);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  flex-shrink: 0;
+}
+
+.plan-header-search-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.plan-header-search-btn:active {
+  background: var(--mz-primary-10);
+  color: var(--mz-primary);
+}
+
+.plan-header-search-btn.active {
+  color: var(--mz-primary);
 }
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
@@ -1353,22 +1401,40 @@ button.outline {
   background: var(--mz-success);
 }
 
-/* ── Period line (week view header) — full-width colored bar like Android ── */
-.week-head-day {
-  position: relative;
+/* ── Period vertical separator (week view) — full-height colored line between days ── */
+.week-separator-col {
+  width: 3px;
+  min-height: 100%;
 }
 
-.week-period-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
+.week-separator-session {
+  background: #ef5350;
 }
 
-.week-period-line-session  { background: #ef5350; }
-.week-period-line-break    { background: var(--mz-primary); }
-.week-period-line-holiday  { background: var(--mz-success); }
+.week-separator-break {
+  background: var(--mz-primary);
+}
+
+.week-separator-holiday {
+  background: var(--mz-success);
+}
+
+/* Separator in the header row */
+.week-head-separator {
+  width: 3px;
+}
+
+.week-head-separator-session {
+  background: rgba(239, 83, 80, 0.4);
+}
+
+.week-head-separator-break {
+  background: rgba(33, 150, 243, 0.4);
+}
+
+.week-head-separator-holiday {
+  background: rgba(76, 166, 114, 0.4);
+}
 
 /* ── Day timeline view ───────────────────────────────────────────────── */
 .day-tl-card {

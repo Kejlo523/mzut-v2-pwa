@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import type {
   Grade,
@@ -34,6 +34,7 @@ import {
 import { sortUsefulLinks } from './constants/usefulLinks';
 import { useAppNavigation, useExitAttemptToast } from './hooks/useAppNavigation';
 import { useSwipeGestures } from './hooks/useSwipeBack';
+import { createT } from './i18n';
 
 const APP_BASE = import.meta.env.BASE_URL;
 const LOGO_SRC = `${APP_BASE}icons/mzutv2-logo.png`;
@@ -42,6 +43,12 @@ const LOGO_SRC = `${APP_BASE}icons/mzutv2-logo.png`;
 
 function todayYmd(): string {
   const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDaysYmd(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00`);
+  d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -91,21 +98,19 @@ function isFinalGradeType(type: string): boolean {
   );
 }
 
-function screenTitle(s: ScreenKey): string {
-  const m: Record<ScreenKey, string> = {
-    login: 'mzutv2',
-    home: 'Strona główna',
-    plan: 'Plan zajęć',
-    grades: 'Oceny',
-    info: 'Dane studenta',
-    news: 'Aktualności',
-    'news-detail': 'Aktualność',
-    links: 'Przydatne strony',
-    settings: 'Ustawienia',
-    about: 'O aplikacji',
-  };
-  return m[s];
-}
+// screenTitle now uses t() – defined inside App, but we keep a static fallback
+const SCREEN_I18N_KEY: Record<ScreenKey, string> = {
+  login: 'screen.home',
+  home: 'screen.home',
+  plan: 'screen.plan',
+  grades: 'screen.grades',
+  info: 'screen.info',
+  news: 'screen.news',
+  'news-detail': 'screen.newsDetail',
+  links: 'screen.links',
+  settings: 'screen.settings',
+  about: 'screen.about',
+};
 
 
 function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
@@ -220,7 +225,7 @@ interface SelectedPlanEvent {
   event: PlanResult['dayColumns'][number]['events'][number];
 }
 
-const MONTH_WEEKDAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+const MONTH_WEEKDAY_KEYS = ['weekday.mon', 'weekday.tue', 'weekday.wed', 'weekday.thu', 'weekday.fri', 'weekday.sat', 'weekday.sun'];
 
 function App() {
   const [session, setSession] = useState<SessionData | null>(() => loadSession());
@@ -443,14 +448,17 @@ function App() {
     }
   }, [screen]);
 
+  // ── i18n ───────────────────────────────────────────────────────────────────
+  const t = useMemo(() => createT(settings.language), [settings.language]);
+
   // ── Exit toast ────────────────────────────────────────────────────────────
-  useExitAttemptToast(() => showToast('Naciśnij ponownie, aby wyjść'));
+  useExitAttemptToast(() => showToast(t('general.pressAgainToExit')));
 
   // ── Swipe gestures ────────────────────────────────────────────────────────
   const swipe = useSwipeGestures({
     canGoBack: false,
     onBack: () => { },
-    canOpenDrawer: !drawerOpen && screen !== 'login' && screen !== 'plan',
+    canOpenDrawer: !drawerOpen && screen !== 'login',
     onOpenDrawer: () => setDrawerOpen(true),
   });
 
@@ -515,6 +523,22 @@ function App() {
         setPlanResult(cached);
         hasCached = true;
       }
+      // Task 7: Reuse week cache for day view
+      if (!cached && planViewMode === 'day' && planResult && planResult.dayColumns) {
+        const dayCol = planResult.dayColumns.find(c => c.date === dateToUse);
+        if (dayCol) {
+          const syntheticResult: PlanResult = {
+            ...planResult,
+            dayColumns: [dayCol],
+            currentDate: dateToUse,
+            headerLabel: dateToUse,
+            prevDate: addDaysYmd(dateToUse, -1),
+            nextDate: addDaysYmd(dateToUse, 1),
+          };
+          setPlanResult(syntheticResult);
+          hasCached = true;
+        }
+      }
     }
 
     // Only show spinner if no cache or searching
@@ -539,7 +563,7 @@ function App() {
         // Check if session expired (401 Unauthorized)
         if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
           applySession(null);
-          showToast('Sesja wygasła, zaloguj się ponownie');
+          showToast(t('general.sessionExpired'));
         } else if (!planResult) {
           setGlobalError(errorMsg);
         }
@@ -549,7 +573,7 @@ function App() {
         setPlanLoading(false);
       }
     }
-  }, [session, planViewMode, planDate, activeStudyId, planResult]);
+  }, [session, planViewMode, planDate, activeStudyId, planResult, t]);
 
   // Fetch plan search suggestions with debouncing (300ms)
   const fetchPlanSearchSuggestions = useCallback(async (category: string, query: string) => {
@@ -921,14 +945,14 @@ function App() {
   // ── Drawer items ──────────────────────────────────────────────────────────
   type DrawerKey = Exclude<ScreenKey, 'login' | 'news-detail'>;
   const drawerItems: Array<{ key: DrawerKey; label: string; icon: string }> = [
-    { key: 'home', label: 'Strona główna', icon: 'home' },
-    { key: 'plan', label: 'Plan zajęć', icon: 'calendar' },
-    { key: 'grades', label: 'Oceny', icon: 'grade' },
-    { key: 'info', label: 'Dane studenta', icon: 'user' },
-    { key: 'news', label: 'Aktualności', icon: 'news' },
-    { key: 'links', label: 'Przydatne strony', icon: 'link' },
-    { key: 'settings', label: 'Ustawienia', icon: 'settings' },
-    { key: 'about', label: 'O aplikacji', icon: 'about' },
+    { key: 'home', label: t('drawer.home'), icon: 'home' },
+    { key: 'plan', label: t('drawer.plan'), icon: 'calendar' },
+    { key: 'grades', label: t('drawer.grades'), icon: 'grade' },
+    { key: 'info', label: t('drawer.info'), icon: 'user' },
+    { key: 'news', label: t('drawer.news'), icon: 'news' },
+    { key: 'links', label: t('drawer.links'), icon: 'link' },
+    { key: 'settings', label: t('drawer.settings'), icon: 'settings' },
+    { key: 'about', label: t('drawer.about'), icon: 'about' },
   ];
 
   // ── Plan carousel animation helpers ─────────────────────────────────────────
@@ -958,6 +982,8 @@ function App() {
   // ── Plan touch swipe handlers ─────────────────────────────────────────────
   const onPlanTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
+    // Give priority to drawer swipe from left edge
+    if (e.touches[0].clientX <= 44) return;
     if (carouselRef.current) carouselRef.current.style.transition = 'none';
     planDragRef.current = {
       startX: e.touches[0].clientX,
@@ -1168,49 +1194,64 @@ function App() {
     );
   }
 
+  function getWeekSeparatorPeriod(leftDate: string, rightDate: string, periods: SessionPeriod[]): PeriodMarker | null {
+    for (const p of periods) {
+      // A boundary exists if left is in period but right is not, or right is in but left is not
+      const leftIn = leftDate >= p.start && leftDate <= p.end;
+      const rightIn = rightDate >= p.start && rightDate <= p.end;
+      if (leftIn !== rightIn) {
+        return { label: getPeriodDisplayName(p.key), kind: getPeriodKind(p.key) };
+      }
+    }
+    return null;
+  }
+
   function renderPlan() {
     const cols = planResult?.dayColumns ?? [];
     const weekCols = weekVisibleColumns;
     const today = todayYmd();
     const activeFilter = planSearchQ.trim();
-    const viewLabel = planViewMode === 'day' ? 'Widok dnia' : planViewMode === 'week' ? 'Widok tygodnia' : 'Widok miesiaca';
+
+    // Build week grid template with separator columns
+    const buildWeekGridTemplate = (numCols: number) => {
+      if (numCols === 0) return '44px';
+      const parts: string[] = ['44px'];
+      for (let i = 0; i < numCols; i++) {
+        parts.push('1fr');
+        if (i < numCols - 1) {
+          // Check if separator needed between this col and next
+          const sep = weekCols.length > i + 1
+            ? getWeekSeparatorPeriod(weekCols[i].date, weekCols[i + 1].date, planResult?.sessionPeriods ?? [])
+            : null;
+          parts.push(sep ? '3px' : '0px');
+        }
+      }
+      return parts.join(' ');
+    };
+
+    const weekGridTemplate = buildWeekGridTemplate(weekCols.length);
 
     return (
       <section className="screen plan-screen">
         <aside className="plan-control-pane">
-          {/* Sticky Header */}
+          {/* Sticky Header — prev | center | Today | search | next */}
           <div className="plan-sticky-header">
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
               const newDate = planResult?.prevDate ?? planDate;
               commitPlanNavigate(newDate, true);
-            }} aria-label="Poprzedni">
+            }} aria-label={t('plan.prev')}>
               <Ic n="chevL" />
             </button>
             <div className="plan-header-center">
-              <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}</div>
-              <div className="plan-header-sub">{viewLabel}{activeFilter ? ` | Filtr: ${activeFilter}` : ''}</div>
+              <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}{activeFilter ? ` · ${activeFilter}` : ''}</div>
             </div>
-            <button type="button" className="plan-nav-btn-compact" onClick={() => {
-              const newDate = planResult?.nextDate ?? planDate;
-              commitPlanNavigate(newDate, false);
-            }} aria-label="Następny">
-              <Ic n="chevR" />
-            </button>
-          </div>
-
-          <div className="plan-floating-toolbar">
-            {(['day', 'week', 'month'] as ViewMode[]).map(m => (
-              <button key={m} type="button" className={`plan-mode-btn-floating ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
-                {m === 'day' ? 'Dzień' : m === 'week' ? 'Tydzień' : 'Miesiąc'}
-              </button>
-            ))}
             <button
               type="button"
-              className={`plan-mode-btn-floating plan-today-btn ${planDate === today && !planSearchQ?.trim() ? 'active' : ''}`}
+              className={`plan-header-today-btn ${planDate === today && !planSearchQ?.trim() ? 'active' : ''}`}
               onClick={() => {
-                const t = today;
-                if (planDate !== t || planSearchQ?.trim()) {
-                  commitPlanNavigate(t, planDate > t);
+                const td = today;
+                if (planDate !== td || planSearchQ?.trim()) {
+                  commitPlanNavigate(td, planDate > td);
                   if (planSearchQ?.trim()) {
                     setPlanSearchQ('');
                     setPlanSearchCat('album');
@@ -1218,211 +1259,253 @@ function App() {
                 }
               }}
             >
-              Dziś
+              {t('plan.today')}
             </button>
+            <button
+              type="button"
+              className={`plan-header-search-btn ${planSearchOpen ? 'active' : ''}`}
+              onClick={() => setPlanSearchOpen(p => !p)}
+              aria-label={t('plan.search')}
+            >
+              <Ic n="search" />
+            </button>
+            <button type="button" className="plan-nav-btn-compact" onClick={() => {
+              const newDate = planResult?.nextDate ?? planDate;
+              commitPlanNavigate(newDate, false);
+            }} aria-label={t('plan.next')}>
+              <Ic n="chevR" />
+            </button>
+          </div>
+
+          <div className="plan-floating-toolbar">
+            {(['day', 'week', 'month'] as ViewMode[]).map(m => (
+              <button key={m} type="button" className={`plan-mode-btn-floating ${planViewMode === m ? 'active' : ''}`} onClick={() => setPlanViewMode(m)}>
+                {m === 'day' ? t('plan.day') : m === 'week' ? t('plan.week') : t('plan.month')}
+              </button>
+            ))}
           </div>
         </aside>
 
         {/* Calendar Content */}
         <div className="plan-content">
           <div className="plan-content-surface">
-            <div
-              className="plan-container"
-              ref={carouselRef}
-              onTouchStart={onPlanTouchStart}
-              onTouchMove={onPlanTouchMove}
-              onTouchEnd={onPlanTouchEnd}
-              onTouchCancel={onPlanTouchCancel}
-            >
-              {planLoading && <Spinner text="Pobieranie planu…" />}
+            <div className="plan-container">
+              <div
+                className="plan-carousel-track"
+                ref={carouselRef}
+                onTouchStart={onPlanTouchStart}
+                onTouchMove={onPlanTouchMove}
+                onTouchEnd={onPlanTouchEnd}
+                onTouchCancel={onPlanTouchCancel}
+              >
+                {planLoading && <Spinner text={t('plan.loading')} />}
 
-              {!planLoading && planViewMode === 'day' && (
-                <div className="list-stack">
-                  {cols.map((col, ci) => {
-                    const periods = planResult?.sessionPeriods ?? [];
-                    const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
-                    const activeMarkers = getActivePeriods(col.date, periods);
-                    return (
-                    <div key={col.date}>
-                      {renderPeriodBanner(transMarkers)}
-                      <div className="card day-tl-card">
-                        <div className="day-tl-head">
-                          <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
-                          <div className="day-tl-head-right">
-                            {col.date === today && <span className="day-tl-today-badge">Dziś</span>}
-                            {activeMarkers.map((m, i) => (
-                              <span key={i} className={`day-period-chip day-period-chip-${m.kind}`}>{m.label}</span>
-                            ))}
-                          </div>
-                        </div>
+                {!planLoading && planViewMode === 'day' && (
+                  <div className="list-stack">
+                    {cols.map((col, ci) => {
+                      const periods = planResult?.sessionPeriods ?? [];
+                      const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
+                      const activeMarkers = getActivePeriods(col.date, periods);
+                      return (
+                        <div key={col.date}>
+                          {renderPeriodBanner(transMarkers)}
+                          <div className="card day-tl-card">
+                            <div className="day-tl-head">
+                              <div className="day-tl-head-date">{fmtDateLabel(col.date)}</div>
+                              <div className="day-tl-head-right">
+                                {col.date === today && <span className="day-tl-today-badge">{t('plan.today')}</span>}
+                                {activeMarkers.map((m, i) => (
+                                  <span key={i} className={`day-period-chip day-period-chip-${m.kind}`}>{m.label}</span>
+                                ))}
+                              </div>
+                            </div>
 
-                        {col.events.length === 0 ? (
-                          <div className="day-empty">Brak zajęć</div>
-                        ) : (
-                          <div className="day-tl-body">
-                            <div className="day-time-col">
-                              {weekLayout.slots.map(m => (
-                                <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
-                                  {fmtHour(m)}
+                            {col.events.length === 0 ? (
+                              <div className="day-empty">{t('plan.emptyDay')}</div>
+                            ) : (
+                              <div className="day-tl-body">
+                                <div className="day-time-col">
+                                  {weekLayout.slots.map(m => (
+                                    <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
+                                      {fmtHour(m)}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
 
-                            <div className="day-events-col" style={{ height: weekTrackH }}>
-                              {weekLayout.slots.map((m, idx) => (
-                                <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
-                              ))}
-                              {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
-                                <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
-                              )}
-                              {col.events.map(ev => {
-                                const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                                const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
-                                const left = `calc(${ev.leftPct}% + 2px)`;
-                                const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                                const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                                return (
-                                  <div
-                                    key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                    className={`day-event ev-${ev.typeClass}`}
-                                    style={{ top, height: h, left, width }}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={open}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        open();
-                                      }
-                                    }}
-                                    title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                  >
-                                    <div className="day-event-title">{ev.title}</div>
-                                    <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    );
-                  })}
-                  {cols.length === 0 && (
-                    <div className="empty-state">
-                      <div className="empty-icon">📅</div>
-                      <p>Brak zajęć w wybranym dniu</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!planLoading && planViewMode === 'week' && (
-                <div className="card week-card">
-                  {weekCols.length > 0 ? (
-                    <>
-                      <div className="week-grid week-head-row" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
-                        <div className="week-head-time">Godz.</div>
-                        {weekCols.map((col) => {
-                          const wActive = getActivePeriods(col.date, planResult?.sessionPeriods ?? []);
-                          const topPeriod = wActive.sort((a, b) => {
-                            const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
-                            return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
-                          })[0] ?? null;
-                          return (
-                            <div key={`h-${col.date}`} className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
-                              <strong>{fmtWeekdayShort(col.date)}</strong>
-                              <span>{fmtDayMonth(col.date)}</span>
-                              {topPeriod && <div className={`week-period-line week-period-line-${topPeriod.kind}`} title={topPeriod.label} />}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="week-grid" style={{ gridTemplateColumns: `44px repeat(${weekCols.length}, 1fr)` }}>
-                        <div className="week-time-col">
-                          {weekLayout.slots.map(m => (
-                            <div key={`w-time-${m}`} className="week-time-cell" style={{ height: weekLayout.hourHeight }}>
-                              {fmtHour(m)}
-                            </div>
-                          ))}
-                        </div>
-
-                        {weekCols.map(col => (
-                          <div key={`w-col-${col.date}`} className="week-day-col" style={{ height: weekTrackH }}>
-                            {weekLayout.slots.map((m, idx) => (
-                              <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
-                            ))}
-                            {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
-                              <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                                <div className="day-events-col" style={{ height: weekTrackH }}>
+                                  {weekLayout.slots.map((m, idx) => (
+                                    <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                                  ))}
+                                  {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                                    <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                                  )}
+                                  {col.events.map(ev => {
+                                    const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                    const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
+                                    const left = `calc(${ev.leftPct}% + 2px)`;
+                                    const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                    const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                    return (
+                                      <div
+                                        key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                        className={`day-event ev-${ev.typeClass}`}
+                                        style={{ top, height: h, left, width }}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={open}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            open();
+                                          }
+                                        }}
+                                        title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                      >
+                                        <div className="day-event-title">{ev.title}</div>
+                                        <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             )}
-                            {col.events.map(ev => {
-                              const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                              const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
-                              const left = `calc(${ev.leftPct}% + 2px)`;
-                              const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                              const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                              return (
-                                <div
-                                  key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                  className={`week-event ev-${ev.typeClass}`}
-                                  style={{ top, height: h, left, width }}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={open}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      open();
-                                    }
-                                  }}
-                                  title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                >
-                                  <div className="week-event-time">{ev.startStr}</div>
-                                  <div className="week-event-title">{ev.title}</div>
-                                </div>
-                              );
-                            })}
                           </div>
-                        ))}
+                        </div>
+                      );
+                    })}
+                    {cols.length === 0 && (
+                      <div className="empty-state">
+                        <div className="empty-icon">📅</div>
+                        <p>{t('plan.emptyDayLong')}</p>
                       </div>
-                    </>
-                  ) : (
-                    <div className="day-empty">Brak danych tygodnia</div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
 
-              {!planLoading && planViewMode === 'month' && (
-                <div className="month-shell">
-                  <div className="month-weekdays">{MONTH_WEEKDAYS.map(d => <span key={d}>{d}</span>)}</div>
-                  <div className="month-grid">
-                    {(planResult?.monthGrid ?? []).flat().map(cell => (
-                      <div
-                        key={cell.date}
-                        className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
-                        onClick={() => {
-                          setPlanDate(cell.date);
-                          setPlanViewMode('day');
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
+                {!planLoading && planViewMode === 'week' && (
+                  <div className="card week-card">
+                    {weekCols.length > 0 ? (
+                      <>
+                        <div className="week-grid week-head-row" style={{ gridTemplateColumns: weekGridTemplate }}>
+                          <div className="week-head-time">{t('plan.hour')}</div>
+                          {weekCols.map((col, ci) => {
+                            const wActive = getActivePeriods(col.date, planResult?.sessionPeriods ?? []);
+                            const topPeriod = wActive.sort((a, b) => {
+                              const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
+                              return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
+                            })[0] ?? null;
+
+                            // Separator between this col and next
+                            const sep = ci < weekCols.length - 1
+                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, planResult?.sessionPeriods ?? [])
+                              : null;
+
+                            return (
+                              <React.Fragment key={`h-${col.date}`}>
+                                <div className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
+                                  <strong>{fmtWeekdayShort(col.date)}</strong>
+                                  <span>{fmtDayMonth(col.date)}</span>
+                                </div>
+                                {sep && <div className={`week-head-separator week-head-separator-${sep.kind}`} title={sep.label} />}
+                                {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+
+                        <div className="week-grid" style={{ gridTemplateColumns: weekGridTemplate }}>
+                          <div className="week-time-col">
+                            {weekLayout.slots.map(m => (
+                              <div key={`w-time-${m}`} className="week-time-cell" style={{ height: weekLayout.hourHeight }}>
+                                {fmtHour(m)}
+                              </div>
+                            ))}
+                          </div>
+
+                          {weekCols.map((col, ci) => {
+                            const sep = ci < weekCols.length - 1
+                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, planResult?.sessionPeriods ?? [])
+                              : null;
+                            return (
+                              <React.Fragment key={`w-col-${col.date}`}>
+                                <div className="week-day-col" style={{ height: weekTrackH }}>
+                                  {weekLayout.slots.map((m, idx) => (
+                                    <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                                  ))}
+                                  {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                                    <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                                  )}
+                                  {col.events.map(ev => {
+                                    const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                    const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
+                                    const left = `calc(${ev.leftPct}% + 2px)`;
+                                    const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                    const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                    return (
+                                      <div
+                                        key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                        className={`week-event ev-${ev.typeClass}`}
+                                        style={{ top, height: h, left, width }}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={open}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            open();
+                                          }
+                                        }}
+                                        title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                      >
+                                        <div className="week-event-time">{ev.startStr}</div>
+                                        <div className="week-event-title">{ev.title}</div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {sep && <div className={`week-separator-col week-separator-${sep.kind}`} />}
+                                {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="day-empty">{t('plan.emptyWeek')}</div>
+                    )}
+                  </div>
+                )}
+
+                {!planLoading && planViewMode === 'month' && (
+                  <div className="month-shell">
+                    <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map(k => <span key={k}>{t(k)}</span>)}</div>
+                    <div className="month-grid">
+                      {(planResult?.monthGrid ?? []).flat().map(cell => (
+                        <div
+                          key={cell.date}
+                          className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
+                          onClick={() => {
                             setPlanDate(cell.date);
                             setPlanViewMode('day');
-                          }
-                        }}
-                      >
-                        <span className="month-cell-num">{cell.date.slice(-2)}</span>
-                        {cell.hasPlan && <span className="month-dot" />}
-                      </div>
-                    ))}
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setPlanDate(cell.date);
+                              setPlanViewMode('day');
+                            }
+                          }}
+                        >
+                          <span className="month-cell-num">{cell.date.slice(-2)}</span>
+                          {cell.hasPlan && <span className="month-dot" />}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1696,8 +1779,18 @@ function App() {
         <div className="settings-card">
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Odświeżanie</div>
-              <div className="settings-row-sub">Interwał synchronizacji</div>
+              <div className="settings-row-label">{t('settings.language')}</div>
+              <div className="settings-row-sub">{t('settings.languageSub')}</div>
+            </div>
+            <select value={settings.language} onChange={e => setSettings(p => ({ ...p, language: e.target.value as 'pl' | 'en' }))}>
+              <option value="pl">Polski</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div className="settings-row">
+            <div>
+              <div className="settings-row-label">{t('settings.refresh')}</div>
+              <div className="settings-row-sub">{t('settings.refreshSub')}</div>
             </div>
             <select value={settings.refreshMinutes} onChange={e => setSettings(p => ({ ...p, refreshMinutes: Number(e.target.value) as 30 | 60 | 120 }))}>
               <option value={30}>30 min</option>
@@ -1707,15 +1800,15 @@ function App() {
           </div>
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Kompaktowy plan</div>
-              <div className="settings-row-sub">Mniejsza wysokość godzin</div>
+              <div className="settings-row-label">{t('settings.compactPlan')}</div>
+              <div className="settings-row-sub">{t('settings.compactPlanSub')}</div>
             </div>
             <Toggle checked={settings.compactPlan} onChange={v => setSettings(p => ({ ...p, compactPlan: v }))} />
           </div>
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Grupowanie ocen</div>
-              <div className="settings-row-sub">Widok ocen pogrupowany po przedmiocie</div>
+              <div className="settings-row-label">{t('settings.gradeGroup')}</div>
+              <div className="settings-row-sub">{t('settings.gradeGroupSub')}</div>
             </div>
             <Toggle checked={settings.gradesGrouping} onChange={v => setSettings(p => ({ ...p, gradesGrouping: v }))} />
           </div>
@@ -2007,14 +2100,13 @@ function App() {
     const actions: Array<{ key: string; icon: string; label: string; onClick: () => void; active: boolean }> = [];
 
     if (screen === 'plan') {
-      actions.push({ key: 'search', icon: 'search', label: 'Szukaj w planie', onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadPlanData(undefined, true), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadPlanData(undefined, true), active: false });
     } else if (screen === 'grades') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadGradesData(false, true), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: t('grades.refreshLabel'), onClick: () => void loadGradesData(false, true), active: false });
     } else if (screen === 'info') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadInfoData(true), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadInfoData(true), active: false });
     } else if (screen === 'news') {
-      actions.push({ key: 'refresh', icon: 'refresh', label: 'Odśwież', onClick: () => void loadNewsData(true), active: false });
+      actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadNewsData(true), active: false });
     }
 
     return (
@@ -2025,8 +2117,8 @@ function App() {
               type="button"
               className={`grades-toggle-compact ${settings.gradesGrouping ? 'active' : ''}`}
               onClick={() => setSettings(prev => ({ ...prev, gradesGrouping: !prev.gradesGrouping }))}
-              title={settings.gradesGrouping ? 'Wyłącz grupowanie' : 'Włącz grupowanie'}
-              aria-label="Grupowanie przedmiotów"
+              title={settings.gradesGrouping ? t('grades.disableGrouping') : t('grades.enableGrouping')}
+              aria-label={t('grades.groupToggle')}
             >
               <Ic n="group" />
             </button>
@@ -2045,18 +2137,18 @@ function App() {
   return (
     <div
       className="app-shell"
-      onPointerDown={swipe.onPointerDown}
-      onPointerMove={swipe.onPointerMove}
-      onPointerUp={swipe.onPointerUp}
-      onPointerCancel={swipe.onPointerCancel}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+      onTouchCancel={swipe.onTouchCancel}
     >
       {/* AppBar */}
       {screen !== 'login' && (
         <header className="android-appbar">
-          <button type="button" className="icon-btn" onClick={screen === 'news-detail' ? nav.goBack : onNavIcon} aria-label={screen === 'news-detail' ? 'Wróć' : 'Otwórz menu'}>
+          <button type="button" className="icon-btn" onClick={screen === 'news-detail' ? nav.goBack : onNavIcon} aria-label={screen === 'news-detail' ? t('general.back') : t('general.openMenu')}>
             <Ic n={screen === 'news-detail' ? 'back' : 'menu'} />
           </button>
-          <h1>{screenTitle(screen)}</h1>
+          <h1>{t(SCREEN_I18N_KEY[screen])}</h1>
           {renderAppBarActions()}
         </header>
       )}

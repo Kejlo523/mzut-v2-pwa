@@ -1,0 +1,294 @@
+// ── i18n – Minimal PL/EN translation module ──────────────────────────────────
+
+const pl: Record<string, string> = {
+    // Screen titles
+    'screen.home': 'Strona główna',
+    'screen.plan': 'Plan zajęć',
+    'screen.grades': 'Oceny',
+    'screen.info': 'Dane studenta',
+    'screen.news': 'Aktualności',
+    'screen.newsDetail': 'Aktualność',
+    'screen.links': 'Przydatne strony',
+    'screen.settings': 'Ustawienia',
+    'screen.about': 'O aplikacji',
+
+    // Drawer items
+    'drawer.home': 'Strona główna',
+    'drawer.plan': 'Plan zajęć',
+    'drawer.grades': 'Oceny',
+    'drawer.info': 'Dane studenta',
+    'drawer.news': 'Aktualności',
+    'drawer.links': 'Przydatne strony',
+    'drawer.settings': 'Ustawienia',
+    'drawer.about': 'O aplikacji',
+    'drawer.logout': 'Wyloguj się',
+
+    // Plan
+    'plan.day': 'Dzień',
+    'plan.week': 'Tydzień',
+    'plan.month': 'Miesiąc',
+    'plan.today': 'Dziś',
+    'plan.prev': 'Poprzedni',
+    'plan.next': 'Następny',
+    'plan.loading': 'Pobieranie planu…',
+    'plan.emptyDay': 'Brak zajęć',
+    'plan.emptyDayLong': 'Brak zajęć w wybranym dniu',
+    'plan.emptyWeek': 'Brak danych tygodnia',
+    'plan.filter': 'Filtr',
+    'plan.viewDay': 'Widok dnia',
+    'plan.viewWeek': 'Widok tygodnia',
+    'plan.viewMonth': 'Widok miesiąca',
+    'plan.hour': 'Godz.',
+    'plan.search': 'Szukaj w planie',
+    'plan.refresh': 'Odśwież',
+
+    // Plan search sheet
+    'search.title': 'Szukaj w planie',
+    'search.category': 'Kategoria',
+    'search.catAlbum': 'Numer albumu',
+    'search.catTeacher': 'Nauczyciel',
+    'search.catRoom': 'Sala',
+    'search.catSubject': 'Przedmiot',
+    'search.queryPlaceholder': 'Szukaj...',
+    'search.queryLabel': 'Fraza',
+    'search.search': 'Szukaj',
+    'search.clear': 'Wyczyść',
+    'search.noResults': 'Brak wyników wyszukiwania',
+
+    // Grades
+    'grades.refreshLabel': 'Odśwież',
+    'grades.groupToggle': 'Grupowanie przedmiotów',
+    'grades.noData': 'Brak ocen',
+    'grades.semester': 'Semestr',
+    'grades.ects': 'ECTS',
+    'grades.enableGrouping': 'Włącz grupowanie',
+    'grades.disableGrouping': 'Wyłącz grupowanie',
+
+    // Settings
+    'settings.refresh': 'Odświeżanie',
+    'settings.refreshSub': 'Interwał synchronizacji',
+    'settings.compactPlan': 'Kompaktowy plan',
+    'settings.compactPlanSub': 'Mniejsza wysokość godzin',
+    'settings.gradeGroup': 'Grupowanie ocen',
+    'settings.gradeGroupSub': 'Widok ocen pogrupowany po przedmiocie',
+    'settings.language': 'Język',
+    'settings.languageSub': 'Język interfejsu',
+
+    // General
+    'general.loading': 'Ładowanie danych…',
+    'general.ok': 'OK',
+    'general.cancel': 'Anuluj',
+    'general.back': 'Wróć',
+    'general.openMenu': 'Otwórz menu',
+    'general.closeMenu': 'Zamknij menu',
+    'general.sessionExpired': 'Sesja wygasła, zaloguj się ponownie',
+    'general.pressAgainToExit': 'Naciśnij ponownie, aby wyjść',
+    'general.logoutConfirm': 'Czy na pewno chcesz się wylogować?',
+
+    // Home
+    'home.hello': 'Cześć,',
+    'home.tiles': 'Skróty',
+    'home.quickActions': 'Szybkie akcje',
+
+    // Login
+    'login.title': 'Zaloguj się',
+    'login.username': 'Nazwa użytkownika',
+    'login.password': 'Hasło',
+    'login.submit': 'Zaloguj',
+    'login.info': 'Zaloguj się swoimi danymi z ePortalu ZUT',
+
+    // Periods
+    'period.session': 'Sesja',
+    'period.examSession': 'Sesja egzaminacyjna',
+    'period.retakeSession': 'Sesja poprawkowa',
+    'period.break': 'Przerwa',
+    'period.summerBreak': 'Przerwa letnia',
+    'period.winterBreak': 'Przerwa zimowa',
+    'period.holiday': 'Święto',
+    'period.independenceDay': 'Święto Niepodległości',
+    'period.christmas': 'Święta Bożego Narodzenia',
+    'period.easter': 'Wielkanoc',
+    'period.allSaints': 'Wszystkich Świętych',
+    'period.corpusChristi': 'Boże Ciało',
+    'period.freeDay': 'Dzień wolny',
+
+    // Weekday short names
+    'weekday.mon': 'Pon',
+    'weekday.tue': 'Wt',
+    'weekday.wed': 'Śr',
+    'weekday.thu': 'Czw',
+    'weekday.fri': 'Pt',
+    'weekday.sat': 'Sob',
+    'weekday.sun': 'Nd',
+
+    // Install tip
+    'install.tip': 'Wiesz, że możesz zainstalować tę stronę jako skrót i korzystać jak ze zwykłej aplikacji systemowej?',
+    'install.now': 'Zainstaluj teraz',
+    'install.howIos': 'Jak zainstalować?',
+    'install.dismiss': 'Odrzuć',
+    'install.iosTitle': 'Instalacja na iOS',
+    'install.iosStep1': 'Naciśnij ikonę <strong>Udostępnij</strong> (kwadrat ze strzałką) w dolnym pasku Safari',
+    'install.iosStep2': 'Wybierz <strong>„Dodaj do ekranu początkowego"</strong>',
+    'install.iosStep3': 'Naciśnij <strong>„Dodaj"</strong> w prawym górnym rogu',
+    'install.iosOk': 'Rozumiem',
+
+    // Event sheet
+    'event.details': 'Szczegóły zajęć',
+    'event.time': 'Czas',
+    'event.room': 'Sala',
+    'event.teacher': 'Prowadzący',
+    'event.group': 'Grupa',
+    'event.type': 'Typ',
+};
+
+const en: Record<string, string> = {
+    // Screen titles
+    'screen.home': 'Home',
+    'screen.plan': 'Schedule',
+    'screen.grades': 'Grades',
+    'screen.info': 'Student Info',
+    'screen.news': 'News',
+    'screen.newsDetail': 'Article',
+    'screen.links': 'Useful Links',
+    'screen.settings': 'Settings',
+    'screen.about': 'About',
+
+    // Drawer items
+    'drawer.home': 'Home',
+    'drawer.plan': 'Schedule',
+    'drawer.grades': 'Grades',
+    'drawer.info': 'Student Info',
+    'drawer.news': 'News',
+    'drawer.links': 'Useful Links',
+    'drawer.settings': 'Settings',
+    'drawer.about': 'About',
+    'drawer.logout': 'Log out',
+
+    // Plan
+    'plan.day': 'Day',
+    'plan.week': 'Week',
+    'plan.month': 'Month',
+    'plan.today': 'Today',
+    'plan.prev': 'Previous',
+    'plan.next': 'Next',
+    'plan.loading': 'Loading schedule…',
+    'plan.emptyDay': 'No classes',
+    'plan.emptyDayLong': 'No classes on this day',
+    'plan.emptyWeek': 'No week data',
+    'plan.filter': 'Filter',
+    'plan.viewDay': 'Day view',
+    'plan.viewWeek': 'Week view',
+    'plan.viewMonth': 'Month view',
+    'plan.hour': 'Hour',
+    'plan.search': 'Search schedule',
+    'plan.refresh': 'Refresh',
+
+    // Plan search sheet
+    'search.title': 'Search schedule',
+    'search.category': 'Category',
+    'search.catAlbum': 'Student ID',
+    'search.catTeacher': 'Teacher',
+    'search.catRoom': 'Room',
+    'search.catSubject': 'Subject',
+    'search.queryPlaceholder': 'Search...',
+    'search.queryLabel': 'Query',
+    'search.search': 'Search',
+    'search.clear': 'Clear',
+    'search.noResults': 'No search results',
+
+    // Grades
+    'grades.refreshLabel': 'Refresh',
+    'grades.groupToggle': 'Subject grouping',
+    'grades.noData': 'No grades',
+    'grades.semester': 'Semester',
+    'grades.ects': 'ECTS',
+    'grades.enableGrouping': 'Enable grouping',
+    'grades.disableGrouping': 'Disable grouping',
+
+    // Settings
+    'settings.refresh': 'Refresh',
+    'settings.refreshSub': 'Sync interval',
+    'settings.compactPlan': 'Compact schedule',
+    'settings.compactPlanSub': 'Reduced hour height',
+    'settings.gradeGroup': 'Grade grouping',
+    'settings.gradeGroupSub': 'Group grades by subject',
+    'settings.language': 'Language',
+    'settings.languageSub': 'Interface language',
+
+    // General
+    'general.loading': 'Loading data…',
+    'general.ok': 'OK',
+    'general.cancel': 'Cancel',
+    'general.back': 'Back',
+    'general.openMenu': 'Open menu',
+    'general.closeMenu': 'Close menu',
+    'general.sessionExpired': 'Session expired, please log in again',
+    'general.pressAgainToExit': 'Press again to exit',
+    'general.logoutConfirm': 'Are you sure you want to log out?',
+
+    // Home
+    'home.hello': 'Hello,',
+    'home.tiles': 'Shortcuts',
+    'home.quickActions': 'Quick actions',
+
+    // Login
+    'login.title': 'Log in',
+    'login.username': 'Username',
+    'login.password': 'Password',
+    'login.submit': 'Log in',
+    'login.info': 'Log in with your ePortal ZUT credentials',
+
+    // Periods
+    'period.session': 'Exam session',
+    'period.examSession': 'Exam session',
+    'period.retakeSession': 'Retake session',
+    'period.break': 'Break',
+    'period.summerBreak': 'Summer break',
+    'period.winterBreak': 'Winter break',
+    'period.holiday': 'Holiday',
+    'period.independenceDay': 'Independence Day',
+    'period.christmas': 'Christmas',
+    'period.easter': 'Easter',
+    'period.allSaints': 'All Saints\' Day',
+    'period.corpusChristi': 'Corpus Christi',
+    'period.freeDay': 'Day off',
+
+    // Weekday short names
+    'weekday.mon': 'Mon',
+    'weekday.tue': 'Tue',
+    'weekday.wed': 'Wed',
+    'weekday.thu': 'Thu',
+    'weekday.fri': 'Fri',
+    'weekday.sat': 'Sat',
+    'weekday.sun': 'Sun',
+
+    // Install tip
+    'install.tip': 'Did you know you can install this page as a shortcut and use it like a regular app?',
+    'install.now': 'Install now',
+    'install.howIos': 'How to install?',
+    'install.dismiss': 'Dismiss',
+    'install.iosTitle': 'Install on iOS',
+    'install.iosStep1': 'Tap the <strong>Share</strong> icon (square with arrow) in Safari\'s toolbar',
+    'install.iosStep2': 'Choose <strong>"Add to Home Screen"</strong>',
+    'install.iosStep3': 'Tap <strong>"Add"</strong> in the top right corner',
+    'install.iosOk': 'Got it',
+
+    // Event sheet
+    'event.details': 'Class details',
+    'event.time': 'Time',
+    'event.room': 'Room',
+    'event.teacher': 'Teacher',
+    'event.group': 'Group',
+    'event.type': 'Type',
+};
+
+const dictionaries = { pl, en } as const;
+
+export type Language = 'pl' | 'en';
+
+export type TFunction = (key: string) => string;
+
+export function createT(lang: Language): TFunction {
+    const dict = dictionaries[lang] ?? dictionaries.pl;
+    return (key: string) => dict[key] ?? dictionaries.pl[key] ?? key;
+}
