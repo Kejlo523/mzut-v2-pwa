@@ -342,7 +342,7 @@ main {
 @keyframes scr-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(.98);
+    transform: scale(.97);
   }
 
   to {
@@ -354,7 +354,7 @@ main {
 @keyframes scr-back {
   from {
     opacity: 0;
-    transform: translateY(-8px) scale(.98);
+    transform: scale(1.02);
   }
 
   to {
@@ -894,7 +894,7 @@ button.outline {
   position: static;
   z-index: 1;
   display: grid;
-  grid-template-columns: 36px 1fr auto auto 36px;
+  grid-template-columns: 36px 1fr 36px;
   align-items: center;
   gap: 6px;
   padding: 6px 6px 4px;
@@ -927,8 +927,8 @@ button.outline {
 }
 
 .plan-nav-btn-compact svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .plan-header-center {
@@ -1064,58 +1064,118 @@ button.outline {
   background: var(--mz-card-soft);
 }
 
-.plan-header-today-btn {
-  height: 30px;
-  padding: 0 10px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 8px;
+/* ── Plan legend button ──────────────────────────────────────────────────────── */
+.plan-legend-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 0;
+  margin-top: 4px;
   background: transparent;
+  border: 1px solid var(--mz-border-soft);
+  border-radius: 12px;
   color: var(--mz-muted);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 120ms, color 120ms;
-}
-
-.plan-header-today-btn.active {
-  background: var(--mz-primary);
-  color: #fff;
-}
-
-.plan-header-today-btn:active {
-  background: var(--mz-primary-20);
-}
-
-.plan-header-search-btn {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--mz-muted);
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: background 150ms, color 150ms;
+}
+
+.plan-legend-btn:active {
+  background: var(--mz-card-soft);
+  color: var(--mz-text);
+}
+
+.plan-legend-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Legend bottom sheet ─────────────────────────────────────────────────────── */
+.legend-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, .5);
+  display: flex;
+  align-items: flex-end;
+}
+
+.legend-sheet {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--mz-surface);
+  border-radius: 20px 20px 0 0;
+  padding: 0 0 32px;
+  animation: sheet-up 250ms cubic-bezier(.2, 0, 0, 1);
+  max-height: 80dvh;
+  overflow-y: auto;
+}
+
+.legend-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--mz-muted);
+  border-radius: 2px;
+  margin: 10px auto;
+  opacity: .4;
+}
+
+.legend-sheet-title {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 4px 20px 12px;
+  color: var(--mz-text);
+}
+
+.legend-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mz-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 12px 20px 4px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 20px;
+}
+
+.legend-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   flex-shrink: 0;
 }
 
-.plan-header-search-btn svg {
-  width: 18px;
-  height: 18px;
+.legend-line-swatch {
+  width: 20px;
+  height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
-.plan-header-search-btn:active {
-  background: var(--mz-primary-10);
-  color: var(--mz-primary);
+.legend-label {
+  font-size: 13px;
+  color: var(--mz-text-soft);
 }
 
-.plan-header-search-btn.active {
-  color: var(--mz-primary);
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: none;
+  }
 }
+
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
 /* ── Search Sheet (Material Design style matching Android) ──────────────────── */
