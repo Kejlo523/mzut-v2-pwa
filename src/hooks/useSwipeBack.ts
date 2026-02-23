@@ -63,11 +63,12 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     startX.current = null;
     startY.current = null;
 
-    // Reject if mostly vertical
-    if (dy > Math.abs(dx) * 0.8) return;
+    // Reject if mostly vertical (unless it's a very clear horizontal swipe)
+    if (dy > Math.abs(dx) && dy > 40) return;
 
-    // Swipe right from left edge → open drawer
-    if (isFromEdge.current && dx > 50 && dy < 70 && canOpenDrawer) {
+    // Swipe right from left edge → open drawer 
+    // Relaxed requirement: dx > 40 and origX <= 60
+    if (origX <= 60 && dx > 40 && canOpenDrawer) {
       onOpenDrawer();
       return;
     }
