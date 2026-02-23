@@ -208,6 +208,8 @@ const pl: Record<string, string> = {
     'newsDetail.openBrowser': 'Otwórz w przeglądarce',
     'period.end': 'Koniec',
     'period.start': 'Początek',
+    'period.zima': 'Zima',
+    'period.lato': 'Lato',
     'plan.eventTypes': 'Typy zajęć',
     'plan.legend': 'Legenda',
     'plan.periodMarkers': 'Markery okresów',
@@ -368,6 +370,9 @@ const en: Record<string, string> = {
     'event.teacher': 'Teacher',
     'event.group': 'Group',
     'event.type': 'Type',
+
+    'period.zima': 'Winter',
+    'period.lato': 'Summer',
 };
 
 const dictionaries = { pl, en } as const;
