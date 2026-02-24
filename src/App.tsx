@@ -95,14 +95,26 @@ function normalizeMatch(value: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-function isFinalGradeType(type: string): boolean {
+function isFinalGradeType(type: string, subjectName?: string): boolean {
   const t = normalizeMatch(type);
-  return (
+  if (
     t.includes('ocena koncowa') ||
     t.includes('koncowa') ||
     t.includes('final') ||
     t.includes('abschluss')
-  );
+  ) {
+    return true;
+  }
+  if (!t) {
+    const s = normalizeMatch(subjectName || '');
+    return (
+      s.includes('ocena koncowa') ||
+      s.includes('koncowa') ||
+      s.includes('final') ||
+      s.includes('abschluss')
+    );
+  }
+  return false;
 }
 
 // screenTitle now uses t() – defined inside App, but we keep a static fallback
@@ -872,13 +884,13 @@ function App() {
     return [...bySubject.entries()]
       .map(([subject, rawItems]) => {
         const items = [...rawItems].sort((a, b) => {
-          const aOrder = isFinalGradeType(a.type) ? 0 : 1;
-          const bOrder = isFinalGradeType(b.type) ? 0 : 1;
+          const aOrder = isFinalGradeType(a.type, a.subjectName) ? 0 : 1;
+          const bOrder = isFinalGradeType(b.type, b.subjectName) ? 0 : 1;
           if (aOrder !== bOrder) return aOrder - bOrder;
           return (a.type || '').localeCompare(b.type || '', 'pl');
         });
 
-        const finalItem = items.find(item => isFinalGradeType(item.type));
+        const finalItem = items.find(item => isFinalGradeType(item.type, item.subjectName));
         const finalGrade = finalItem?.grade?.trim() ? finalItem.grade : '–';
 
         const ects = items.reduce((max, item) => (item.weight > max ? item.weight : max), 0);
@@ -914,14 +926,47 @@ function App() {
   }, [groupedGrades]);
 
   const gradesSummary = useMemo(() => {
-    let total = 0;
-    let count = 0;
+    let sumWeighted = 0;
+    let sumWeights = 0;
+    let usedFinal = false;
+
     for (const g of grades) {
+      if (!isFinalGradeType(g.type, g.subjectName)) continue;
       const v = parseGradeNum(g.grade);
-      if (v !== null) { total += v; count++; }
+      if (v === null) continue;
+
+      usedFinal = true;
+      const ects = g.weight > 0 ? g.weight : 0;
+      if (ects <= 0) {
+        sumWeighted += v;
+        sumWeights += 1;
+      } else {
+        sumWeighted += v * ects;
+        sumWeights += ects;
+      }
     }
+
+    if (!usedFinal) {
+      sumWeighted = 0;
+      sumWeights = 0;
+      for (const g of grades) {
+        const v = parseGradeNum(g.grade);
+        if (v === null) continue;
+
+        const ects = g.weight > 0 ? g.weight : 0;
+        if (ects <= 0) {
+          sumWeighted += v;
+          sumWeights += 1;
+        } else {
+          sumWeighted += v * ects;
+          sumWeights += ects;
+        }
+      }
+    }
+
+    const avg = sumWeights > 0 ? fmtDec(sumWeighted / sumWeights, 2) : '-';
     const ects = sumUniqueEcts(grades);
-    return { avg: count > 0 ? fmtDec(total / count, 2) : '-', ects: fmtDec(ects, 1) };
+    return { avg, ects: fmtDec(ects, 1) };
   }, [grades]);
 
   const links = useMemo(() => sortUsefulLinks(studies), [studies]);
