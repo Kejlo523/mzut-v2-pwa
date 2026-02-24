@@ -1,4 +1,4 @@
-import type { Grade, NewsItem, PlanResult, Semester, SessionData, Study, StudyDetails, StudyHistoryItem } from '../types';
+import type { CalendarEvent, ElsCard, Grade, NewsItem, PlanResult, Semester, SessionData, Study, StudyDetails, StudyHistoryItem } from '../types';
 
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
@@ -145,11 +145,11 @@ export const cache = {
   loadGradesForce: (semId: string): Grade[] | null => loadCForce(ck('grades', semId)),
 
   // Info per study
-  saveInfo: (studyId: string, data: { details: StudyDetails | null; history: StudyHistoryItem[] }) =>
+  saveInfo: (studyId: string, data: { details: StudyDetails | null; history: StudyHistoryItem[]; els?: ElsCard | null; calendarEvents?: CalendarEvent[] }) =>
     saveC(ck('info', studyId), data),
-  loadInfo: (studyId: string): { details: StudyDetails | null; history: StudyHistoryItem[] } | null =>
+  loadInfo: (studyId: string): { details: StudyDetails | null; history: StudyHistoryItem[]; els?: ElsCard | null; calendarEvents?: CalendarEvent[] } | null =>
     loadC(ck('info', studyId), TTL_MS.info),
-  loadInfoForce: (studyId: string): { details: StudyDetails | null; history: StudyHistoryItem[] } | null =>
+  loadInfoForce: (studyId: string): { details: StudyDetails | null; history: StudyHistoryItem[]; els?: ElsCard | null; calendarEvents?: CalendarEvent[] } | null =>
     loadCForce(ck('info', studyId)),
 
   // Plan (keyed by viewMode+date+studyId)

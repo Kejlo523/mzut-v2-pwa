@@ -11,6 +11,8 @@ import type {
   Study,
   StudyDetails,
   StudyHistoryItem,
+  ElsCard,
+  CalendarEvent,
   ViewMode,
 } from './types';
 import {
@@ -329,6 +331,8 @@ function App() {
   // Info
   const [details, setDetails] = useState<StudyDetails | null>(null);
   const [history, setHistory] = useState<StudyHistoryItem[]>([]);
+  const [els, setEls] = useState<ElsCard | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [infoLoading, setInfoLoading] = useState(false);
   const [studentPhotoError, setStudentPhotoError] = useState(false);
 
@@ -472,7 +476,32 @@ function App() {
   });
 
   // ── Session management ────────────────────────────────────────────────────
-  const applySession = useCallback((s: SessionData | null) => setSession(s), []);
+  const applySession = useCallback((s: SessionData | null) => {
+    setSession(s);
+    if (!s) {
+      // Clear storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Clear Cache API (service worker caches)
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          for (const name of names) {
+            caches.delete(name);
+          }
+        });
+      }
+
+      // Unregister Service Workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    }
+  }, []);
 
   // ── USOS OAuth Callback Handling ──────────────────────────────────────────
   useEffect(() => {
@@ -728,7 +757,12 @@ function App() {
   const loadInfoData = useCallback(async (forceRefresh = false) => {
     if (!session || !activeStudyId) return;
     const forceCached = cache.loadInfoForce(activeStudyId);
-    if (forceCached && !forceRefresh) { setDetails(forceCached.details); setHistory(forceCached.history); }
+    if (forceCached && !forceRefresh) {
+      setDetails(forceCached.details);
+      setHistory(forceCached.history);
+      if (forceCached.els) setEls(forceCached.els);
+      if (forceCached.calendarEvents) setCalendarEvents(forceCached.calendarEvents);
+    }
     if (cache.loadInfo(activeStudyId) && !forceRefresh) return; // fresh cache, skip fetch
     setInfoLoading(true);
     setGlobalError('');
@@ -737,6 +771,8 @@ function App() {
       cache.saveInfo(activeStudyId, payload);
       setDetails(payload.details);
       setHistory(payload.history);
+      setEls(payload.els ?? null);
+      setCalendarEvents(payload.calendarEvents ?? []);
     } catch (e) {
       if (!forceCached) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać danych.');
     } finally {
@@ -792,6 +828,8 @@ function App() {
     setTotalEctsAll(0);
     setDetails(null);
     setHistory([]);
+    setEls(null);
+    setCalendarEvents([]);
     setPlanResult(null);
     setSelectedPlanEvent(null);
 
@@ -1833,6 +1871,45 @@ function App() {
                 <div key={i} className="history-row">
                   <span className="history-label">{h.label}</span>
                   <span className="history-status">{h.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {els && (
+            <div className="info-card">
+              <div className="info-card-head">Legitymacja Elektroniczna (ELS)</div>
+              <div className="info-row">
+                <div className="info-row-label">Status</div>
+                <div className="info-row-value">
+                  <span className={`grade-pill ${els.isActive ? 'ok' : 'bad'}`} style={{ padding: '4px 8px', fontSize: '13px' }}>
+                    {els.isActive ? 'Aktywna' : 'Nieaktywna'}
+                  </span>
+                </div>
+              </div>
+              <div className="info-row">
+                <div className="info-row-label">Ważna do</div>
+                <div className="info-row-value">{els.expirationDate}</div>
+              </div>
+            </div>
+          )}
+
+          {calendarEvents && calendarEvents.length > 0 && (
+            <div className="info-card">
+              <div className="info-card-head">Kalendarz Akademicki (30 dni)</div>
+              {calendarEvents.map((ev, i) => (
+                <div key={i} className="history-row" style={{ alignItems: 'flex-start', padding: '12px 16px' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="history-label">{ev.name}</div>
+                    <div className="history-status" style={{ fontSize: '12px', opacity: 0.8, textAlign: 'left' }}>
+                      {ev.startDate === ev.endDate ? ev.startDate : `${ev.startDate} – ${ev.endDate}`}
+                    </div>
+                  </div>
+                  {ev.isDayOff && (
+                    <span className="grade-pill ok" style={{ padding: '2px 6px', fontSize: '11px', alignSelf: 'center' }}>
+                      Dzień wolny
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

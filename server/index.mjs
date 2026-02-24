@@ -255,7 +255,7 @@ app.get('/api/proxy/image', async (req, res) => {
 app.get('/api/usos/image', async (req, res) => {
   try {
     const url = String(req.query.url ?? '').trim();
-    if (!url || !url.startsWith('https://usosapi.zut.edu.pl/')) {
+    if (!url || !url.includes('zut.edu.pl')) {
       return res.status(400).json({ error: 'Invalid USOS image URL' });
     }
 
@@ -287,7 +287,7 @@ app.get('/api/usos/image', async (req, res) => {
 
 app.get('/api/usos/request-token', async (req, res) => {
   try {
-    const scopes = String(req.query.scopes || 'studies|grades|personal|email');
+    const scopes = String(req.query.scopes || 'studies|grades|personal|photo|email|mobile_numbers|payments|cards');
     const callbackUrl = String(req.query.callbackUrl || '');
 
     const url = `${USOS_BASE_URL}services/oauth/request_token`;
