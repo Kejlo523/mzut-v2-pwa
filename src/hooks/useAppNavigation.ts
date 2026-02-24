@@ -7,14 +7,24 @@ export interface ScreenEntry<TScreen extends string = string, TParams = unknown>
 }
 
 const EXIT_EVENT = 'mzutv2-exit-attempt';
+const LAST_SCREEN_KEY = 'mzutv2_last_screen';
 
 export function useAppNavigation<TScreen extends string>(initialScreen: TScreen) {
   const idRef = useRef(1);
-  const [stack, setStack] = useState<ScreenEntry<TScreen>[]>([{ key: initialScreen, id: 1 }]);
+
+  // Try to load the last screen strictly if it wasn't a manual reset during boot
+  const storedScreen = window.localStorage.getItem(LAST_SCREEN_KEY) as TScreen | null;
+  const startScreen = (storedScreen && initialScreen === 'home') ? storedScreen : initialScreen;
+
+  const [stack, setStack] = useState<ScreenEntry<TScreen>[]>([{ key: startScreen, id: 1 }]);
   const stackRef = useRef(stack);
 
   useEffect(() => {
     stackRef.current = stack;
+    const currentKey = stack[stack.length - 1].key;
+    if (currentKey !== 'login') {
+      window.localStorage.setItem(LAST_SCREEN_KEY, currentKey);
+    }
   }, [stack]);
 
   useEffect(() => {
