@@ -45,6 +45,21 @@ export interface Grade {
   date: string;
 }
 
+export interface ElsCard {
+  id: string;
+  expirationDate: string;
+  isActive: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  type: string;
+  isDayOff: boolean;
+}
+
 export interface StudyDetails {
   album: string;
   wydzial: string;

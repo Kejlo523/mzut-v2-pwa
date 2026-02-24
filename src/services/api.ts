@@ -1,4 +1,6 @@
 import type {
+  CalendarEvent,
+  ElsCard,
   Grade,
   NewsItem,
   PlanResult,
@@ -220,7 +222,8 @@ export async function login(loginValue: string, password: string): Promise<Sessi
 }
 
 export async function fetchUsosRequestToken(callbackUrl: string): Promise<{ oauth_token: string; oauth_token_secret: string }> {
-  const response = await fetch(`${API_BASE}/usos/request-token?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  const scopes = 'studies|grades|personal|photo|email|mobile_numbers|payments|cards';
+  const response = await fetch(`${API_BASE}/usos/request-token?callbackUrl=${encodeURIComponent(callbackUrl)}&scopes=${scopes}`);
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || 'Błąd pobierania tokenu USOS.');
   return body;
@@ -445,10 +448,10 @@ export async function fetchCombinedGrades(session: SessionData, semesterId: stri
 export async function fetchInfo(
   session: SessionData,
   studyId: string | null,
-): Promise<{ details: StudyDetails | null; history: StudyHistoryItem[] }> {
+): Promise<{ details: StudyDetails | null; history: StudyHistoryItem[]; els?: ElsCard | null; calendarEvents?: CalendarEvent[] }> {
   const resolvedStudyId = studyId || session.activeStudyId;
   if (!resolvedStudyId) {
-    return { details: null, history: [] };
+    return { details: null, history: [], els: null, calendarEvents: [] };
   }
 
   if (session.usos) {
@@ -474,6 +477,7 @@ export async function fetchInfo(
       let targetProg = progs.find(p => String(p.programme?.id) === resolvedStudyId);
       if (!targetProg && progs.length > 0) targetProg = progs[progs.length - 1];
 
+      let facultyIdStr = '';
       if (targetProg && targetProg.programme) {
         const prog = targetProg.programme;
         const pid = String(prog.id || '');
@@ -487,6 +491,7 @@ export async function fetchInfo(
           });
           if (facultyObj?.faculty) {
             details.wydzial = extractLocalized(facultyObj.faculty, 'name');
+            facultyIdStr = String(facultyObj.faculty.id || '');
           }
         } catch (e) {
           // Ignore faculty fetch errors
@@ -544,11 +549,59 @@ export async function fetchInfo(
           historyItems.sort((a, b) => b.label.localeCompare(a.label));
         }
       } catch (e) { }
+      // Fetch ELS cards
+      let els: ElsCard | null = null;
+      try {
+        const cards = await proxyUsos<any[]>(session, 'services/cards/user', {
+          fields: 'id|expiration_date|is_active',
+        });
+        if (Array.isArray(cards) && cards.length > 0) {
+          const card = cards[0];
+          els = {
+            id: String(card.id),
+            expirationDate: String(card.expiration_date || ''),
+            isActive: !!card.is_active,
+          };
+        }
+      } catch (e) {
+        console.warn("Failed to fetch cards:", e);
+      }
 
-      return { details, history: historyItems };
+      // Fetch upcoming calendar events (next 30 days)
+      let calendarEvents: CalendarEvent[] = [];
+      try {
+        const today = new Date();
+        const nextMonth = new Date(today);
+        nextMonth.setMonth(today.getMonth() + 1);
+        const formatD = (d: Date) => d.toISOString().split('T')[0];
+
+        const calParams: Record<string, string> = {
+          start_date: formatD(today),
+          end_date: formatD(nextMonth),
+          fields: 'id|name|start_date|end_date|type|is_day_off',
+        };
+        if (facultyIdStr) calParams.faculty_id = facultyIdStr;
+
+        const cals = await proxyUsos<any[]>(session, 'services/calendar/search', calParams);
+
+        if (Array.isArray(cals)) {
+          calendarEvents = cals.map(c => ({
+            id: String(c.id),
+            name: extractLocalized(c, 'name'),
+            startDate: String(c.start_date || ''),
+            endDate: String(c.end_date || ''),
+            type: String(c.type || ''),
+            isDayOff: !!c.is_day_off,
+          }));
+        }
+      } catch (e) {
+        console.warn("Failed to fetch calendar:", e);
+      }
+
+      return { details, history: historyItems, els, calendarEvents };
     } catch (e) {
       console.warn("Failed to fetch info from USOS", e);
-      return { details: null, history: [] };
+      return { details: null, history: [], els: null, calendarEvents: [] };
     }
   }
 
@@ -584,7 +637,7 @@ export async function fetchInfo(
     status: firstNonEmpty(row.status, row.statusO),
   }));
 
-  return { details, history };
+  return { details, history, els: null, calendarEvents: [] };
 }
 
 function startOfDay(date: Date): Date {
