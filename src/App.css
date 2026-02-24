@@ -2960,6 +2960,66 @@ button.outline {
   transform: translateX(20px);
 }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  color: var(--mz-text-dim);
+  font-size: 14px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--mz-border-soft);
+}
+
+.login-divider span {
+  padding: 0 12px;
+}
+
+.login-usos-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid var(--mz-border);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.login-usos-btn:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.login-usos-btn:active {
+  transform: translateY(1px);
+  background: #f1f3f5;
+}
+
+.login-usos-icon {
+  width: 24px;
+  height: 24px;
+  background: #005a9c; /* USOS Blue */
+  color: white;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+}
+
 .settings-toggle {
   position: relative;
   width: 44px;

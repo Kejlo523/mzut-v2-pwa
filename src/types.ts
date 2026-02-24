@@ -1,5 +1,10 @@
 export type ViewMode = 'day' | 'week' | 'month';
 
+export interface UsosSessionData {
+  accessToken: string;
+  accessTokenSecret: string;
+}
+
 export interface SessionData {
   userId: string;
   username: string;
@@ -7,6 +12,15 @@ export interface SessionData {
   imageUrl: string;
   tokenJpg?: string;
   activeStudyId: string | null;
+  usos?: UsosSessionData;
+}
+
+export interface UsosGrade {
+  courseId: string;
+  courseName: string;
+  grade: string;
+  date: string;
+  term: number;
 }
 
 export interface Study {

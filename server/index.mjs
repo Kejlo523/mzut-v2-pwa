@@ -1,5 +1,13 @@
+import dotenv from 'dotenv';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Try loading from several locations: root, current dir
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '.env') });
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,6 +16,10 @@ import { Agent } from 'undici';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
+
+const USOS_CONSUMER_KEY = process.env.USOS_CONSUMER_KEY || '';
+const USOS_CONSUMER_SECRET = process.env.USOS_CONSUMER_SECRET || '';
+const USOS_BASE_URL = (process.env.USOS_BASE_URL || 'https://usosapi.zut.edu.pl/').replace(/\/+$/, '') + '/';
 
 const MZUT_API_BASE = 'https://www.zut.edu.pl/app-json-proxy/index.php';
 const PLAN_STUDENT_BASE = 'https://plan.zut.edu.pl/schedule_student.php';
@@ -62,6 +74,60 @@ async function passthroughJson(response) {
   } catch {
     throw new Error('Niepoprawny JSON z upstream');
   }
+}
+
+// ── USOS OAuth 1.0a Signing ────────────────────────────────────────────────
+
+function pct(s) {
+  if (!s) return '';
+  return encodeURIComponent(String(s))
+    .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%20/g, '+') // Simple OAuth 1.0 implementation often uses + for space, but RFC 3986 says %20.
+    // However, the Android implementation used .replace("+", "%20"), so it wants %20.
+    .replace(/\+/g, '%20')
+    .replace(/%7E/g, '~');
+}
+
+function signOAuth1(method, baseUrl, params, consumerSecret, tokenSecret = '') {
+  // Sort and join params
+  const sortedPairs = Object.entries(params)
+    .map(([k, v]) => `${pct(k)}=${pct(v)}`)
+    .sort()
+    .join('&');
+
+  const sigBase = [
+    method.toUpperCase(),
+    pct(baseUrl),
+    pct(sortedPairs)
+  ].join('&');
+
+  const signingKey = [
+    pct(consumerSecret),
+    pct(tokenSecret)
+  ].join('&');
+
+  return crypto
+    .createHmac('sha1', signingKey)
+    .update(sigBase)
+    .digest('base64');
+}
+
+function getAuthHeader(oauthParams, signature) {
+  const parts = Object.entries(oauthParams)
+    .map(([k, v]) => `${pct(k)}="${pct(v)}"`)
+    .sort();
+  parts.push(`oauth_signature="${pct(signature)}"`);
+  return `OAuth ${parts.join(', ')}`;
+}
+
+function baseOAuthParams() {
+  return {
+    oauth_consumer_key: USOS_CONSUMER_KEY,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_version: '1.0'
+  };
 }
 
 app.get('/api/health', (_req, res) => {
@@ -186,6 +252,173 @@ app.get('/api/proxy/image', async (req, res) => {
   }
 });
 
+app.get('/api/usos/image', async (req, res) => {
+  try {
+    const url = String(req.query.url ?? '').trim();
+    if (!url || !url.startsWith('https://usosapi.zut.edu.pl/')) {
+      return res.status(400).json({ error: 'Invalid USOS image URL' });
+    }
+
+    const response = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'mZUTv2-PWA-Proxy/1.0' },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).end();
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0) {
+      return res.status(404).end();
+    }
+
+    let contentType = 'image/jpeg';
+    if (buffer[0] === 0x89 && buffer[1] === 0x50) contentType = 'image/png';
+    else if (buffer[0] === 0x47 && buffer[1] === 0x49) contentType = 'image/gif';
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(502).end();
+  }
+});
+
+// ── USOS API Endpoints ──────────────────────────────────────────────────────
+
+app.get('/api/usos/request-token', async (req, res) => {
+  try {
+    const scopes = String(req.query.scopes || 'studies|grades|personal|email');
+    const callbackUrl = String(req.query.callbackUrl || '');
+
+    const url = `${USOS_BASE_URL}services/oauth/request_token`;
+    const oauthParams = {
+      ...baseOAuthParams(),
+      oauth_callback: callbackUrl
+    };
+
+    const allParams = { ...oauthParams, scopes };
+    const sig = signOAuth1('POST', url, allParams, USOS_CONSUMER_SECRET);
+    const authHeader = getAuthHeader(oauthParams, sig);
+
+    const body = new URLSearchParams();
+    body.set('scopes', scopes);
+
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'User-Agent': 'mZUT-PWA-Proxy/1.0',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `USOS Request Token error: ${text}` });
+    }
+
+    const result = Object.fromEntries(new URLSearchParams(text));
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/usos/access-token', async (req, res) => {
+  try {
+    const { oauth_token, oauth_token_secret, oauth_verifier } = req.body;
+    if (!oauth_token || !oauth_token_secret || !oauth_verifier) {
+      return res.status(400).json({ error: 'Missing parameters' });
+    }
+
+    const url = `${USOS_BASE_URL}services/oauth/access_token`;
+    const oauthParams = {
+      ...baseOAuthParams(),
+      oauth_token,
+      oauth_verifier
+    };
+
+    const sig = signOAuth1('POST', url, oauthParams, USOS_CONSUMER_SECRET, oauth_token_secret);
+    const authHeader = getAuthHeader(oauthParams, sig);
+
+    const body = new URLSearchParams();
+    body.set('oauth_verifier', oauth_verifier);
+
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'User-Agent': 'mZUT-PWA-Proxy/1.0',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `USOS Access Token error: ${text}` });
+    }
+
+    const result = Object.fromEntries(new URLSearchParams(text));
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/usos/proxy', async (req, res) => {
+  try {
+    const { endpoint, token, secret, params = {} } = req.body;
+    if (!endpoint || !token || !secret) {
+      return res.status(400).json({ error: 'Missing endpoint or credentials' });
+    }
+
+    const baseUrl = `${USOS_BASE_URL}${endpoint.startsWith('/') ? endpoint.slice(1) : endpoint}`;
+
+    const oauthParams = {
+      ...baseOAuthParams(),
+      oauth_token: token
+    };
+
+    const allForSig = { ...oauthParams, ...params };
+    const sig = signOAuth1('GET', baseUrl, allForSig, USOS_CONSUMER_SECRET, secret);
+    const authHeader = getAuthHeader(oauthParams, sig);
+
+    // USOS quirk: query parameters should NOT be percent encoded for commas etc.
+    // but the parameters in the signature base string SHOULD be.
+    // fetch URL builder will encode them, so we build it manually or use a trick.
+    let fullUrl = baseUrl;
+    if (Object.keys(params).length > 0) {
+      const query = Object.entries(params)
+        .map(([k, v]) => `${k}=${v}`) // No encoding here, just like in Android buildUrl()
+        .join('&');
+      fullUrl += `?${query}`;
+    }
+
+    const response = await fetchWithTimeout(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'User-Agent': 'mZUT-PWA-Proxy/1.0'
+      }
+    });
+
+    const body = await response.text();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `USOS API error: ${body}` });
+    }
+
+    try {
+      return res.json(JSON.parse(body));
+    } catch {
+      return res.send(body);
+    }
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // ── Academic calendar (session periods) ─────────────────────────────────────
 const CALENDAR_URLS = (() => {
   const year = new Date().getFullYear();
@@ -198,14 +431,14 @@ const CALENDAR_URLS = (() => {
 })();
 
 const CALENDAR_PERIODS = [
-  { key: 'sesja_zimowa',               pattern: /sesja\s+zimowa/i },
-  { key: 'sesja_letnia',               pattern: /sesja\s+letnia/i },
-  { key: 'sesja_poprawkowa',           pattern: /sesja\s+poprawkowa/i },
+  { key: 'sesja_zimowa', pattern: /sesja\s+zimowa/i },
+  { key: 'sesja_letnia', pattern: /sesja\s+letnia/i },
+  { key: 'sesja_poprawkowa', pattern: /sesja\s+poprawkowa/i },
   { key: 'przerwa_dydaktyczna_zimowa', pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych\s+w\s+semestrze\s+zimowym/i },
   { key: 'przerwa_dydaktyczna_letnia', pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych\s+w\s+semestrze\s+letnim/i },
-  { key: 'przerwa_dydaktyczna',        pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych/i },
-  { key: 'wakacje_zimowe',             pattern: /(wakacje|ferie)\s+zimowe/i },
-  { key: 'wakacje_letnie',             pattern: /wakacje\s+letnie/i },
+  { key: 'przerwa_dydaktyczna', pattern: /przerwa\s+od\s+zaj[eęE]\w*\s+dydaktycznych/i },
+  { key: 'wakacje_zimowe', pattern: /(wakacje|ferie)\s+zimowe/i },
+  { key: 'wakacje_letnie', pattern: /wakacje\s+letnie/i },
 ];
 
 function stripHtmlTags(html) {
@@ -233,7 +466,7 @@ function parseCalendarHtml(html) {
       const dates = [...after.matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)];
       if (dates.length >= 2) {
         const start = `${dates[0][3]}-${dates[0][2]}-${dates[0][1]}`;
-        const end   = `${dates[1][3]}-${dates[1][2]}-${dates[1][1]}`;
+        const end = `${dates[1][3]}-${dates[1][2]}-${dates[1][1]}`;
         if (start <= end) {
           const dedup = `${period.key}|${start}|${end}`;
           if (!seen.has(dedup)) {

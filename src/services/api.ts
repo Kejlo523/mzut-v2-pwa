@@ -8,6 +8,7 @@ import type {
   Study,
   StudyDetails,
   StudyHistoryItem,
+  UsosSessionData,
   ViewMode,
 } from '../types';
 
@@ -121,6 +122,40 @@ async function proxyRssXml(): Promise<string> {
   return body.xml || '';
 }
 
+async function proxyUsos<T = unknown>(
+  session: SessionData,
+  endpoint: string,
+  params: Record<string, string> = {},
+): Promise<T> {
+  if (!session.usos) throw new Error('Brak aktywnej sesji USOS.');
+
+  const response = await fetch(`${API_BASE}/usos/proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      endpoint,
+      token: session.usos.accessToken,
+      secret: session.usos.accessTokenSecret,
+      params,
+    }),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as { error: string } & T;
+  if (!response.ok) {
+    throw new Error(body.error || `USOS API error: ${response.status}`);
+  }
+  return body as T;
+}
+
+function extractLocalized(obj: any, key: string): string {
+  if (!obj || typeof obj !== 'object') return '';
+  const val = obj[key];
+  if (val && typeof val === 'object') {
+    return val.pl || val.en || '';
+  }
+  return String(val ?? '');
+}
+
 function normalizeStudyId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -181,6 +216,57 @@ export async function login(loginValue: string, password: string): Promise<Sessi
     imageUrl: `${API_BASE}/proxy/image?userId=${encodeURIComponent(userId)}&tokenJpg=${encodeURIComponent(tokenJpgFromApi)}`,
     tokenJpg: tokenJpgFromApi,
     activeStudyId: null,
+  };
+}
+
+export async function fetchUsosRequestToken(callbackUrl: string): Promise<{ oauth_token: string; oauth_token_secret: string }> {
+  const response = await fetch(`${API_BASE}/usos/request-token?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Błąd pobierania tokenu USOS.');
+  return body;
+}
+
+export async function loginWithUsos(verifier: string, token: string, secret: string): Promise<SessionData> {
+  const response = await fetch(`${API_BASE}/usos/access-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      oauth_token: token,
+      oauth_token_secret: secret,
+      oauth_verifier: verifier,
+    }),
+  });
+
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Błąd logowania USOS.');
+
+  const usos: UsosSessionData = {
+    accessToken: body.oauth_token,
+    accessTokenSecret: body.oauth_token_secret,
+  };
+
+  // Once logged into USOS, we also need mZUT session to fetch the plan (which uses album number).
+  // Strategy: Try to find student in USOS, get their details.
+  const sessionStub: SessionData = {
+    userId: 'usos_user',
+    username: 'Użytkownik USOS',
+    authKey: '',
+    imageUrl: '',
+    activeStudyId: null,
+    usos,
+  };
+
+  const user = await proxyUsos<{ first_name: string; last_name: string; id: string; student_number?: string; photo_urls?: Record<string, string> }>(sessionStub, 'services/users/user', {
+    fields: 'id|first_name|last_name|student_number|photo_urls',
+  });
+
+  const rawPhoto = user.photo_urls?.['100x100'] || user.photo_urls?.['50x50'] || '';
+
+  return {
+    ...sessionStub,
+    userId: user.student_number || user.id || 'usos_user',
+    username: `${user.first_name} ${user.last_name}`.trim(),
+    imageUrl: rawPhoto ? `${API_BASE}/usos/image?url=${encodeURIComponent(rawPhoto)}` : '',
   };
 }
 
@@ -251,6 +337,111 @@ export async function fetchGrades(session: SessionData, semesterId: string): Pro
   });
 }
 
+export async function fetchCombinedStudies(session: SessionData): Promise<Study[]> {
+  if (session.usos) {
+    const payload = await proxyUsos<Array<{ programme: any }>>(session, 'services/progs/student', {
+      fields: 'programme[id|description|mode_of_studies|level_of_studies]|status',
+      active_only: 'false',
+    });
+
+    return payload
+      .map((row) => {
+        const prog = row.programme;
+        if (!prog) return null;
+        const id = String(prog.id || '');
+        let label = extractLocalized(prog, 'description') || id;
+        const mode = Number(prog.mode_of_studies);
+        if (mode > 0) label += ` (${mode === 1 ? 'stacj.' : 'niestacj.'})`;
+        return { przynaleznoscId: id, label };
+      })
+      .filter((s): s is Study => Boolean(s?.przynaleznoscId));
+  }
+  return fetchStudies(session);
+}
+
+export async function fetchCombinedSemesters(session: SessionData, studyId: string | null): Promise<Semester[]> {
+  if (session.usos) {
+    const ceResp = await proxyUsos<{ course_editions: Record<string, any[]> }>(session, 'services/courses/user', {
+      active_terms_only: 'false',
+      fields: 'course_editions',
+    });
+
+    const termIds = Object.keys(ceResp.course_editions || {}).sort();
+    if (termIds.length === 0) return [];
+
+    const tDetails = await proxyUsos<Record<string, any>>(session, 'services/terms/terms', {
+      term_ids: termIds.join('|'),
+      fields: 'id|name|is_active',
+    });
+
+    return termIds.map((tid) => {
+      const tObj = tDetails[tid];
+      return {
+        listaSemestrowId: tid,
+        nrSemestru: tid,
+        pora: tid.endsWith('Z') ? 'Zimowy' : tid.endsWith('L') ? 'Letni' : '',
+        rokAkademicki: tObj ? extractLocalized(tObj, 'name') : tid,
+        status: tObj?.is_active ? 'Aktywny' : 'Zakończony',
+      };
+    });
+  }
+  return fetchSemesters(session, studyId);
+}
+
+export async function fetchCombinedGrades(session: SessionData, semesterId: string): Promise<Grade[]> {
+  if (session.usos) {
+    const [courseNamesResp, courseEctsResp, gradesResp] = await Promise.all([
+      proxyUsos<any>(session, 'services/courses/user', { active_terms_only: 'false' }),
+      proxyUsos<any>(session, 'services/courses/user_ects_points'),
+      proxyUsos<Record<string, Record<string, any>>>(session, 'services/grades/terms2', {
+        term_ids: semesterId,
+        fields: 'value_symbol|passes|value_description|counts_into_average|date_modified|date_acquisition|comment',
+      }),
+    ]);
+
+    const namesMap: Record<string, string> = {};
+    const editions = courseNamesResp.course_editions?.[semesterId] || [];
+    for (const c of editions) {
+      if (c.course_id) namesMap[c.course_id] = extractLocalized(c, 'course_name');
+    }
+
+    const ectsMap = courseEctsResp[semesterId] || {};
+    const termData = gradesResp[semesterId] || {};
+    const results: Grade[] = [];
+
+    for (const [courseId, courseData] of Object.entries(termData)) {
+      const name = namesMap[courseId] || courseId;
+      const ects = parseFlexibleDouble(ectsMap[courseId]);
+      let hasAny = false;
+
+      const addUsosGrade = (gObj: any, type: string) => {
+        if (!gObj) return;
+        const dateRaw = gObj.date_acquisition || gObj.date_modified || '';
+        results.push({
+          subjectName: name,
+          grade: String(gObj.value_symbol || ''),
+          weight: ects,
+          type,
+          teacher: '',
+          date: dateRaw.split(' ')[0],
+        });
+        hasAny = true;
+      };
+
+      for (const g of courseData.course_grades || []) addUsosGrade(g, 'Ocena końcowa');
+      for (const list of Object.values(courseData.course_units_grades || {})) {
+        for (const g of (list as any[])) addUsosGrade(g, 'Zaliczenie');
+      }
+
+      if (!hasAny) {
+        results.push({ subjectName: name, grade: '', weight: ects, type: '', teacher: '', date: '' });
+      }
+    }
+    return results;
+  }
+  return fetchGrades(session, semesterId);
+}
+
 export async function fetchInfo(
   session: SessionData,
   studyId: string | null,
@@ -258,6 +449,107 @@ export async function fetchInfo(
   const resolvedStudyId = studyId || session.activeStudyId;
   if (!resolvedStudyId) {
     return { details: null, history: [] };
+  }
+
+  if (session.usos) {
+    try {
+      const details: StudyDetails = {
+        album: session.userId || '',
+        wydzial: '',
+        kierunek: '',
+        forma: '',
+        poziom: '',
+        specjalnosc: '',
+        specjalizacja: '',
+        status: '',
+        rokAkademicki: '',
+        semestrLabel: '',
+      };
+
+      const progs = await proxyUsos<Array<{ programme: any; status: string }>>(session, 'services/progs/student', {
+        fields: 'programme[id|description|mode_of_studies|level_of_studies]|status',
+        active_only: 'false',
+      });
+
+      let targetProg = progs.find(p => String(p.programme?.id) === resolvedStudyId);
+      if (!targetProg && progs.length > 0) targetProg = progs[progs.length - 1];
+
+      if (targetProg && targetProg.programme) {
+        const prog = targetProg.programme;
+        const pid = String(prog.id || '');
+
+        details.kierunek = extractLocalized(prog, 'description') || pid;
+
+        try {
+          const facultyObj = await proxyUsos<{ faculty: any }>(session, 'services/progs/programme', {
+            programme_id: pid,
+            fields: 'faculty[id|name]',
+          });
+          if (facultyObj?.faculty) {
+            details.wydzial = extractLocalized(facultyObj.faculty, 'name');
+          }
+        } catch (e) {
+          // Ignore faculty fetch errors
+        }
+
+        const mode = Number(prog.mode_of_studies);
+        details.forma = mode === 1 ? 'Stacjonarne' : 'Niestacjonarne';
+        details.poziom = extractLocalized(prog, 'level_of_studies');
+
+        const statusRaw = targetProg.status || '';
+        switch (statusRaw) {
+          case "active": details.status = "Aktywny"; break;
+          case "cancelled": details.status = "Anulowany"; break;
+          case "graduated_diploma": details.status = "Absolwent"; break;
+          case "graduated_end_of_study":
+          case "graduated_before_diploma": details.status = "Absolwent (ukończone)"; break;
+          default: details.status = statusRaw;
+        }
+      }
+
+      // Fetch active term for rok/semestr
+      try {
+        const ceResp = await proxyUsos<{ course_editions: Record<string, any> }>(session, 'services/courses/user', {
+          active_terms_only: 'true',
+          fields: 'course_editions',
+        });
+        const editions = Object.keys(ceResp.course_editions || {});
+        if (editions.length > 0) {
+          const tid = editions[0];
+          details.semestrLabel = tid.endsWith('Z') ? 'zimowy' : (tid.endsWith('L') ? 'letni' : '');
+          if (tid.length >= 7) {
+            details.rokAkademicki = `${tid.substring(0, 4)}/20${tid.substring(5, 7)}`;
+          } else {
+            details.rokAkademicki = tid.replace(/[ZL]$/, '');
+          }
+        }
+      } catch (e) { }
+
+      // Fetch history terms
+      let historyItems: StudyHistoryItem[] = [];
+      try {
+        const termsResp = await proxyUsos<{ terms: Array<{ id: string }> }>(session, 'services/courses/user', {
+          fields: 'terms',
+        });
+        if (termsResp.terms) {
+          for (const term of termsResp.terms) {
+            if (term.id) {
+              const pora = term.id.endsWith('Z') ? 'Zimowy' : (term.id.endsWith('L') ? 'Letni' : '');
+              historyItems.push({
+                label: `${term.id} ${pora}`.trim(),
+                status: 'Zaliczone/Aktywne',
+              });
+            }
+          }
+          historyItems.sort((a, b) => b.label.localeCompare(a.label));
+        }
+      } catch (e) { }
+
+      return { details, history: historyItems };
+    } catch (e) {
+      console.warn("Failed to fetch info from USOS", e);
+      return { details: null, history: [] };
+    }
   }
 
   const [study, studies] = await Promise.all([
@@ -579,13 +871,22 @@ export async function fetchPlan(
       };
     }
 
-    const study = await proxyMzut<Record<string, unknown>>('getStudy', {
-      login: session.userId,
-      token: session.authKey,
-      przynaleznoscId: resolvedStudyId,
-    });
+    // If userId looks like an album number (e.g. 5 digits or starts with 's'), use it directly
+    if (/^(s?\d{4,6})$/i.test(session.userId)) {
+      album = session.userId;
+    } else if (session.authKey) {
+      try {
+        const study = await proxyMzut<Record<string, unknown>>('getStudy', {
+          login: session.userId,
+          token: session.authKey,
+          przynaleznoscId: resolvedStudyId,
+        });
+        album = firstNonEmpty(study.album);
+      } catch (e) {
+        console.warn('Failed to fetch album from getStudy', e);
+      }
+    }
 
-    album = firstNonEmpty(study.album);
     if (!album) throw new Error('Brak numeru albumu.');
 
     urlParams = {
