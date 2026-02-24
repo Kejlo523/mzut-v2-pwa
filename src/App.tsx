@@ -302,7 +302,6 @@ function App() {
   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
   const [planSearchLoading, setPlanSearchLoading] = useState(false);
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
-  const [showLegend, setShowLegend] = useState(false);
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Plan carousel swipe (direct DOM animation — no React state per frame)
@@ -1208,6 +1207,81 @@ function App() {
     return null;
   }
 
+  // Legend data
+  const EVENT_LEGEND: Array<{ cls: string; label: string; color: string }> = [
+    { cls: 'ev-lecture', label: 'Wykład / Ćwiczenia', color: 'var(--ev-lecture)' },
+    { cls: 'ev-lab', label: 'Laboratorium', color: 'var(--ev-lab)' },
+    { cls: 'ev-auditory', label: 'Audytoryjne', color: 'var(--ev-auditory)' },
+    { cls: 'ev-exam', label: 'Egzamin', color: 'var(--ev-exam)' },
+    { cls: 'ev-remote', label: 'Zdalne', color: 'var(--ev-remote)' },
+    { cls: 'ev-cancelled', label: 'Odwołane', color: 'var(--ev-cancelled)' },
+    { cls: 'ev-pass', label: 'Zaliczenie', color: 'var(--ev-pass)' },
+    { cls: 'ev-project', label: 'Projekt', color: 'var(--ev-project)' },
+    { cls: 'ev-seminar', label: 'Seminarium', color: 'var(--ev-seminar)' },
+    { cls: 'ev-diploma', label: 'Dyplomowe', color: 'var(--ev-diploma)' },
+    { cls: 'ev-lectorate', label: 'Lektorat', color: 'var(--ev-lectorate)' },
+    { cls: 'ev-conservatory', label: 'Konwersatorium', color: 'var(--ev-conservatory)' },
+    { cls: 'ev-consultation', label: 'Konsultacje', color: 'var(--ev-consultation)' },
+    { cls: 'ev-field', label: 'Terenowe', color: 'var(--ev-field)' },
+  ];
+
+  const MARKER_LEGEND: Array<{ kind: string; label: string; color: string }> = [
+    { kind: 'session', label: 'Sesja egzaminacyjna', color: '#ef5350' },
+    { kind: 'break', label: 'Przerwa dydaktyczna', color: 'var(--mz-primary)' },
+    { kind: 'holiday', label: 'Święto / Dzień wolny', color: 'var(--mz-success)' },
+  ];
+
+  function renderInlineLegend(className: string) {
+    if (planLoading) return null;
+
+    // Dynamically calculate what to show in the legend based on the current week/day events
+    const cols = planResult?.dayColumns ?? [];
+    const activeEventClasses = new Set<string>();
+    cols.forEach(col => col.events.forEach(ev => activeEventClasses.add(`ev-${ev.typeClass}`)));
+
+    const activeMarkerKinds = new Set<string>();
+    const periods = planResult?.sessionPeriods ?? [];
+    cols.forEach(col => {
+      const markers = getActivePeriods(col.date, periods);
+      markers.forEach(m => activeMarkerKinds.add(m.kind));
+    });
+
+    const visibleEvents = EVENT_LEGEND.filter(ev => activeEventClasses.has(ev.cls));
+    const visibleMarkers = MARKER_LEGEND.filter(m => activeMarkerKinds.has(m.kind));
+
+    if (visibleEvents.length === 0 && visibleMarkers.length === 0) return null;
+
+    return (
+      <div className={`plan-legend-inline ${className}`}>
+        <div className="plan-legend-inline-title">{t('plan.legend') || 'Legenda'}</div>
+
+        {visibleEvents.length > 0 && (
+          <>
+            <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zajęć'}</div>
+            {visibleEvents.map(ev => (
+              <div key={ev.cls} className="legend-row">
+                <div className="legend-swatch" style={{ background: ev.color }} />
+                <span className="legend-label">{ev.label}</span>
+              </div>
+            ))}
+          </>
+        )}
+
+        {visibleMarkers.length > 0 && (
+          <>
+            <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okresów'}</div>
+            {visibleMarkers.map(m => (
+              <div key={m.kind} className="legend-row">
+                <div className="legend-line-swatch" style={{ background: m.color }} />
+                <span className="legend-label">{m.label}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  }
+
   function renderPlan() {
     const cols = planResult?.dayColumns ?? [];
     const weekCols = weekVisibleColumns;
@@ -1263,13 +1337,7 @@ function App() {
             ))}
           </div>
 
-          {/* Legend button below calendar in mobile, below filters in landscape */}
-          {!planLoading && (
-            <button type="button" className="plan-legend-btn" onClick={() => setShowLegend(true)}>
-              <Ic n="layers" />
-              {t('plan.legend') || 'Legenda'}
-            </button>
-          )}
+          {renderInlineLegend('plan-legend-side')}
         </aside>
 
         {/* Calendar Content */}
@@ -1284,7 +1352,7 @@ function App() {
                 onTouchEnd={onPlanTouchEnd}
                 onTouchCancel={onPlanTouchCancel}
               >
-                {planLoading && !planResult && <Spinner text={t('plan.loading')} />}
+                {/* Loader removed since skeleton acts as loader over timeline grid */}
 
                 {planViewMode === 'day' && (
                   <div className="list-stack">
@@ -1325,33 +1393,47 @@ function App() {
                                   {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
                                     <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
                                   )}
-                                  {col.events.map(ev => {
-                                    const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                                    const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
-                                    const left = `calc(${ev.leftPct}% + 2px)`;
-                                    const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                                    const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                                    return (
-                                      <div
-                                        key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                        className={`day-event ev-${ev.typeClass}`}
-                                        style={{ top, height: h, left, width }}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={open}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            open();
-                                          }
-                                        }}
-                                        title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                      >
-                                        <div className="day-event-title">{ev.title}</div>
-                                        <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
-                                      </div>
-                                    );
-                                  })}
+                                  {planLoading ? (
+                                    [0, 1].map(idx => {
+                                      const rTop = idx === 0 ? 120 : 340;
+                                      const rH = idx === 0 ? 90 : 120;
+                                      return (
+                                        <div
+                                          key={`sk-day-${col.date}-${idx}`}
+                                          className="skeleton-event day-event"
+                                          style={{ top: rTop, height: rH, left: '8px', width: 'calc(100% - 16px)' }}
+                                        />
+                                      );
+                                    })
+                                  ) : (
+                                    col.events.map(ev => {
+                                      const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                      const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
+                                      const left = `calc(${ev.leftPct}% + 2px)`;
+                                      const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                      const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                      return (
+                                        <div
+                                          key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                          className={`day-event ev-${ev.typeClass}`}
+                                          style={{ top, height: h, left, width }}
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={open}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault();
+                                              open();
+                                            }
+                                          }}
+                                          title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                        >
+                                          <div className="day-event-title">{ev.title}</div>
+                                          <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -1421,33 +1503,47 @@ function App() {
                                   {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
                                     <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
                                   )}
-                                  {col.events.map(ev => {
-                                    const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                                    const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
-                                    const left = `calc(${ev.leftPct}% + 2px)`;
-                                    const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                                    const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                                    return (
-                                      <div
-                                        key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                        className={`week-event ev-${ev.typeClass}`}
-                                        style={{ top, height: h, left, width }}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={open}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            open();
-                                          }
-                                        }}
-                                        title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                      >
-                                        <div className="week-event-time">{ev.startStr}</div>
-                                        <div className="week-event-title">{ev.title}</div>
-                                      </div>
-                                    );
-                                  })}
+                                  {planLoading ? (
+                                    [0, 1].map(idx => {
+                                      const rTop = idx === 0 ? 120 : 340;
+                                      const rH = idx === 0 ? 90 : 120;
+                                      return (
+                                        <div
+                                          key={`sk-week-${col.date}-${idx}`}
+                                          className="skeleton-event week-event"
+                                          style={{ top: rTop, height: rH, left: '3px', width: 'calc(100% - 6px)' }}
+                                        />
+                                      );
+                                    })
+                                  ) : (
+                                    col.events.map(ev => {
+                                      const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                      const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
+                                      const left = `calc(${ev.leftPct}% + 2px)`;
+                                      const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                      const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                      return (
+                                        <div
+                                          key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                          className={`week-event ev-${ev.typeClass}`}
+                                          style={{ top, height: h, left, width }}
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={open}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault();
+                                              open();
+                                            }
+                                          }}
+                                          title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                        >
+                                          <div className="week-event-time">{ev.startStr}</div>
+                                          <div className="week-event-title">{ev.title}</div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
                                 </div>
                                 {sep && <div className={`week-separator-col week-separator-${sep.kind}`} />}
                                 {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
@@ -1494,117 +1590,48 @@ function App() {
               </div>
             </div>
           </div>
-          {/* Inline legend – visible only in portrait on phones */}
-          {!planLoading && (
-            <div className="plan-legend-inline">
-              <div className="plan-legend-inline-title">{t('plan.legend') || 'Legenda'}</div>
-              <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zajęć'}</div>
-              {EVENT_LEGEND.map(ev => (
-                <div key={ev.cls} className="legend-row">
-                  <div className="legend-swatch" style={{ background: ev.color }} />
-                  <span className="legend-label">{ev.label}</span>
-                </div>
-              ))}
-              <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okresów'}</div>
-              {MARKER_LEGEND.map(m => (
-                <div key={m.kind} className="legend-row">
-                  <div className="legend-line-swatch" style={{ background: m.color }} />
-                  <span className="legend-label">{m.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderInlineLegend('plan-legend-bottom')}
         </div>
 
       </section>
     );
   }
 
-  // Legend data
-  const EVENT_LEGEND: Array<{ cls: string; label: string; color: string }> = [
-    { cls: 'ev-lecture', label: 'Wykład / Ćwiczenia', color: 'var(--ev-lecture)' },
-    { cls: 'ev-lab', label: 'Laboratorium', color: 'var(--ev-lab)' },
-    { cls: 'ev-auditory', label: 'Audytoryjne', color: 'var(--ev-auditory)' },
-    { cls: 'ev-exam', label: 'Egzamin', color: 'var(--ev-exam)' },
-    { cls: 'ev-remote', label: 'Zdalne', color: 'var(--ev-remote)' },
-    { cls: 'ev-cancelled', label: 'Odwołane', color: 'var(--ev-cancelled)' },
-    { cls: 'ev-pass', label: 'Zaliczenie', color: 'var(--ev-pass)' },
-    { cls: 'ev-project', label: 'Projekt', color: 'var(--ev-project)' },
-    { cls: 'ev-seminar', label: 'Seminarium', color: 'var(--ev-seminar)' },
-    { cls: 'ev-diploma', label: 'Dyplomowe', color: 'var(--ev-diploma)' },
-    { cls: 'ev-lectorate', label: 'Lektorat', color: 'var(--ev-lectorate)' },
-    { cls: 'ev-conservatory', label: 'Konwersatorium', color: 'var(--ev-conservatory)' },
-    { cls: 'ev-consultation', label: 'Konsultacje', color: 'var(--ev-consultation)' },
-    { cls: 'ev-field', label: 'Terenowe', color: 'var(--ev-field)' },
-  ];
-
-  const MARKER_LEGEND: Array<{ kind: string; label: string; color: string }> = [
-    { kind: 'session', label: 'Sesja egzaminacyjna', color: '#ef5350' },
-    { kind: 'break', label: 'Przerwa dydaktyczna', color: 'var(--mz-primary)' },
-    { kind: 'holiday', label: 'Święto / Dzień wolny', color: 'var(--mz-success)' },
-  ];
-
-  function renderPlanLegendSheet() {
-    if (!showLegend) return null;
-    return (
-      <div className="legend-overlay" onClick={() => setShowLegend(false)}>
-        <div className="legend-sheet" onClick={e => e.stopPropagation()}>
-          <div className="legend-sheet-handle" />
-          <div className="legend-sheet-title">{t('plan.legend') || 'Legenda'}</div>
-
-          <div className="legend-section-title">{t('plan.eventTypes') || 'Typy zajęć'}</div>
-          {EVENT_LEGEND.map(ev => (
-            <div key={ev.cls} className="legend-row">
-              <div className="legend-swatch" style={{ background: ev.color }} />
-              <span className="legend-label">{ev.label}</span>
-            </div>
-          ))}
-
-          <div className="legend-section-title">{t('plan.periodMarkers') || 'Markery okresów'}</div>
-          {MARKER_LEGEND.map(m => (
-            <div key={m.kind} className="legend-row">
-              <div className="legend-line-swatch" style={{ background: m.color }} />
-              <span className="legend-label">{m.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   function renderGrades() {
     return (
       <section className="screen grades-screen">
-        <div className="grades-hero">
-          <div className="metrics-row">
-            <div className="metric-card"><div className="metric-label">{t('grades.avg')}</div><div className="metric-value">{gradesSummary.avg}</div></div>
-            <div className="metric-card"><div className="metric-label">{t('grades.ectsSem')}</div><div className="metric-value">{gradesSummary.ects}</div></div>
-            <div className="metric-card"><div className="metric-label">{t('grades.ectsTotal')}</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+        <div className="grades-header-wrapper">
+          <div className="grades-hero">
+            <div className="metrics-row">
+              <div className="metric-card"><div className="metric-label">{t('grades.avg')}</div><div className="metric-value">{gradesSummary.avg}</div></div>
+              <div className="metric-card"><div className="metric-label">{t('grades.ectsSem')}</div><div className="metric-value">{gradesSummary.ects}</div></div>
+              <div className="metric-card"><div className="metric-label">{t('grades.ectsTotal')}</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
+            </div>
           </div>
-        </div>
 
-        <div className="grades-filters-container">
-          <div className="grades-filters">
-            {studies.length > 0 && (
-              <label className="field-label">
-                {t('grades.studyField')}
-                <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-                  {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-                </select>
-              </label>
-            )}
-            {semesters.length > 0 && (
-              <label className="field-label">
-                {t('grades.semLabel')}
-                <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
-                  {semesters.map(s => (
-                    <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
-                      {t('grades.semOption')} {s.nrSemestru} ({t(`period.${s.pora.toLowerCase()}`) || s.pora}) {s.rokAkademicki}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+          <div className="grades-filters-container">
+            <div className="grades-filters">
+              {studies.length > 0 && (
+                <label className="field-label">
+                  {t('grades.studyField')}
+                  <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
+                    {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
+                  </select>
+                </label>
+              )}
+              {semesters.length > 0 && (
+                <label className="field-label">
+                  {t('grades.semLabel')}
+                  <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
+                    {semesters.map(s => (
+                      <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
+                        {t('grades.semOption')} {s.nrSemestru} ({t(`period.${s.pora.toLowerCase()}`) || s.pora}) {s.rokAkademicki}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2308,7 +2335,6 @@ function App() {
 
       {renderPlanEventSheet()}
       {renderPlanSearchSheet()}
-      {renderPlanLegendSheet()}
 
       {/* Navigation Drawer */}
       {screen !== 'login' && (

@@ -905,41 +905,44 @@ button.outline {
   position: static;
   z-index: 1;
   display: grid;
-  grid-template-columns: 36px 1fr 36px;
+  grid-template-columns: 44px 1fr 44px;
   align-items: center;
-  gap: 6px;
-  padding: 6px 6px 4px;
+  gap: 8px;
+  padding: 8px 12px;
   flex-shrink: 0;
   background: var(--mz-bg);
 }
 
 .plan-nav-btn-compact {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: none;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--mz-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mz-text-soft);
   cursor: pointer;
-  transition: background 150ms, color 150ms;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .plan-nav-btn-compact:hover {
-  background: var(--mz-primary-10);
-  color: var(--mz-primary);
+  background: var(--mz-card-soft);
+  color: var(--mz-text);
 }
 
 .plan-nav-btn-compact:active {
-  transform: scale(.88);
-  background: var(--mz-primary-20);
+  transform: scale(0.9);
+  background: var(--mz-border-soft);
 }
 
 .plan-nav-btn-compact svg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  transform: scale(1.6);
 }
 
 .plan-header-center {
@@ -1075,73 +1078,6 @@ button.outline {
   background: var(--mz-card-soft);
 }
 
-/* ── Plan legend button ──────────────────────────────────────────────────────── */
-.plan-legend-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px 0;
-  margin-top: 4px;
-  background: transparent;
-  border: 1px solid var(--mz-border-soft);
-  border-radius: 12px;
-  color: var(--mz-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms, color 150ms;
-}
-
-.plan-legend-btn:active {
-  background: var(--mz-card-soft);
-  color: var(--mz-text);
-}
-
-.plan-legend-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* ── Legend bottom sheet ─────────────────────────────────────────────────────── */
-.legend-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, .5);
-  display: flex;
-  align-items: flex-end;
-}
-
-.legend-sheet {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  background: var(--mz-surface);
-  border-radius: 20px 20px 0 0;
-  padding: 0 0 32px;
-  animation: sheet-up 250ms cubic-bezier(.2, 0, 0, 1);
-  max-height: 80dvh;
-  overflow-y: auto;
-}
-
-.legend-sheet-handle {
-  width: 36px;
-  height: 4px;
-  background: var(--mz-muted);
-  border-radius: 2px;
-  margin: 10px auto;
-  opacity: .4;
-}
-
-.legend-sheet-title {
-  font-size: 16px;
-  font-weight: 700;
-  padding: 4px 20px 12px;
-  color: var(--mz-text);
-}
-
 .legend-section-title {
   font-size: 11px;
   font-weight: 700;
@@ -1176,17 +1112,6 @@ button.outline {
   font-size: 13px;
   color: var(--mz-text-soft);
 }
-
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: none;
-  }
-}
-
 
 /* ── Plan search ─────────────────────────────────────────────────────── */
 /* ── Search Sheet (Material Design style matching Android) ──────────────────── */
@@ -1617,10 +1542,12 @@ button.outline {
   color: #ffffff;
   font-size: 11px;
   min-height: 22px;
+  animation: event-enter 0.3s cubic-bezier(0.1, 0.9, 0.2, 1) both;
 }
 
 .day-event:active {
   filter: brightness(.92);
+  transform: scale(.98);
 }
 
 .day-event-title {
@@ -1761,6 +1688,7 @@ button.outline {
   flex-direction: column;
   backface-visibility: hidden;
   min-height: 22px;
+  animation: event-enter 0.3s cubic-bezier(0.1, 0.9, 0.2, 1) both;
 }
 
 .week-event:active {
@@ -1977,6 +1905,39 @@ button.outline {
   contain: layout style;
 }
 
+/* ── Skeletons & Animations ───────────────────────────────────────── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes event-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.skeleton-event {
+  position: absolute;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--mz-card) 25%, var(--mz-card-soft) 50%, var(--mz-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  pointer-events: none;
+  border: 1px solid var(--mz-border-soft);
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    EVENT DETAIL BOTTOM SHEET
 ════════════════════════════════════════════════════════════════════════ */
@@ -2072,6 +2033,18 @@ button.outline {
 /* ══════════════════════════════════════════════════════════════════════
    GRADES SCREEN
 ════════════════════════════════════════════════════════════════════════ */
+.grades-header-wrapper {
+  position: sticky;
+  top: -6px;
+  z-index: 10;
+  background: var(--mz-bg);
+  padding: 6px 0 8px;
+  margin-top: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .grades-hero {
   background: var(--mz-card-soft);
   border-radius: 20px;
@@ -4082,29 +4055,48 @@ button.outline {
   }
 }
 
-/* ── Plan legend inline (portrait phone) ──────────────────────────────────── */
+/* ── Plan legend inline ──────────────────────────────────── */
 .plan-legend-inline {
+  background: var(--mz-card);
+  border-radius: var(--r-card);
+  padding: 4px 0 16px;
+  margin-top: 8px;
+}
+
+.plan-legend-inline-title {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 20px 8px;
+  color: var(--mz-text);
+}
+
+.plan-legend-side {
   display: none;
 }
 
-@media (max-width: 599px) and (orientation: portrait) {
-  .plan-legend-btn {
+.plan-legend-bottom {
+  display: block;
+  margin: 16px 12px;
+}
+
+/* Tablet Landscape & PC */
+@media (min-width: 900px) and (orientation: landscape),
+(min-width: 1024px) {
+  .plan-legend-side {
+    display: block;
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .plan-legend-bottom {
     display: none;
   }
 
-  .plan-legend-inline {
-    display: block;
-    background: var(--mz-card);
-    border-radius: var(--r-card);
-    padding: 4px 0 16px;
-    margin-top: 8px;
-  }
-
-  .plan-legend-inline-title {
-    font-size: 16px;
-    font-weight: 700;
-    padding: 10px 20px 8px;
-    color: var(--mz-text);
+  .plan-control-pane {
+    max-height: calc(100dvh - 20px);
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -4294,17 +4286,21 @@ button.outline {
     align-items: start;
   }
 
-  .grades-screen>.grades-hero {
+  .grades-screen>.grades-header-wrapper {
+    display: contents;
+  }
+
+  .grades-screen .grades-hero {
     grid-area: hero;
   }
 
-  .grades-screen>.grades-filters-container {
+  .grades-screen .grades-filters-container {
     grid-area: filters;
     position: sticky;
     top: 8px;
   }
 
-  .grades-screen>.grades-surface {
+  .grades-screen .grades-surface {
     grid-area: list;
     min-height: calc(100dvh - 210px);
   }
