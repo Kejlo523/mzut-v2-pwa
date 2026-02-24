@@ -219,6 +219,7 @@ textarea {
 
 @media (min-width: 481px) {
   .app-shell {
+    max-width: 560px;
     box-shadow: 0 0 0 1px var(--mz-border-soft), var(--shadow-drawer);
   }
 }
@@ -4451,4 +4452,412 @@ button.outline {
 .app-shell {
   touch-action: pan-y;
   overscroll-behavior-x: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESPONSIVE UI ENHANCEMENTS – tablet & desktop polish
+   Extends base styles; fills gaps between existing breakpoints.
+════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet portrait small (640 – 899 px) ────────────────────────────── */
+@media (min-width: 640px) and (max-width: 899px) {
+  .app-shell {
+    max-width: 740px;
+  }
+
+  main {
+    padding: 8px 18px 28px;
+  }
+
+  .screen {
+    gap: 10px;
+  }
+
+  .home-hero-card {
+    padding: 24px 22px 20px;
+    border-radius: 22px;
+  }
+
+  .home-hero-name {
+    font-size: 26px;
+  }
+
+  .home-hero-avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .home-hero-hello {
+    font-size: 14px;
+  }
+
+  .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .tile {
+    min-height: 116px;
+    padding: 16px 14px 14px;
+  }
+
+  .tile-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    margin-bottom: 11px;
+  }
+
+  .tile-icon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .tile-label {
+    font-size: 15px;
+  }
+
+  .tile-desc {
+    font-size: 12px;
+  }
+
+  .section-title,
+  .home-tiles-label {
+    font-size: 12px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .android-appbar h1 {
+    font-size: 20px;
+  }
+
+  .login-logo {
+    width: 96px;
+    height: 96px;
+  }
+
+  .login-title {
+    font-size: 32px;
+  }
+
+  /* Home scroll content */
+  .home-scroll-content {
+    padding: 20px;
+    gap: 16px;
+  }
+
+  /* News: 2-column grid on tablet portrait */
+  .news-screen .list-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+  }
+
+  .news-screen .news-card {
+    height: 100%;
+  }
+}
+
+/* ── Large portrait tablet (900 – 1023 px portrait) ──────────────────── */
+@media (min-width: 900px) and (max-width: 1023px) and (orientation: portrait) {
+  .app-shell {
+    max-width: 860px;
+    box-shadow: 0 0 0 1px var(--mz-border-soft), var(--shadow-drawer);
+  }
+
+  main {
+    padding: 10px 22px 28px;
+  }
+
+  .screen {
+    gap: 12px;
+  }
+
+  .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .android-appbar h1 {
+    font-size: 20px;
+  }
+}
+
+/* ── Hover & focus states for pointer devices ─────────────────────────── */
+@media (hover: hover) and (pointer: fine) {
+  .tile {
+    transition: background 120ms, box-shadow 200ms, transform 200ms;
+  }
+
+  .tile:hover {
+    background: var(--mz-card-soft);
+    box-shadow: var(--shadow-2);
+    transform: translateY(-1px);
+  }
+
+  .card.pressable {
+    transition: background 120ms, box-shadow 180ms, transform 180ms;
+  }
+
+  .card.pressable:hover {
+    background: var(--mz-card-soft);
+    box-shadow: var(--shadow-2);
+  }
+
+  .list-menu-item:hover {
+    background: var(--mz-bg-soft);
+  }
+
+  .drawer-item:hover:not(.active) {
+    background: var(--mz-primary-10);
+    color: var(--mz-primary);
+  }
+
+  .icon-btn:hover {
+    background: rgba(127, 127, 127, .14);
+  }
+
+  .grades-toggle-compact:hover {
+    background: rgba(127, 127, 127, .12);
+  }
+
+  .link-card {
+    transition: background 120ms, box-shadow 180ms, transform 180ms;
+  }
+
+  .link-card:hover {
+    background: var(--mz-card-soft);
+    box-shadow: var(--shadow-2);
+    transform: translateY(-1px);
+  }
+
+  .news-card:hover {
+    background: var(--mz-card-soft);
+  }
+
+  .about-action-card {
+    transition: background 120ms, box-shadow 180ms, transform 180ms;
+  }
+
+  .about-action-card:hover {
+    background: var(--mz-card-soft);
+    box-shadow: var(--shadow-2);
+    transform: translateY(-1px);
+  }
+
+  .about-link-item:hover {
+    background: var(--mz-border-soft);
+  }
+
+  .grade-group-head:hover {
+    background: var(--mz-card-soft);
+  }
+
+  .login-button:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  .settings-row:hover {
+    background: var(--mz-bg-soft);
+  }
+
+  .plan-mode-btn-floating:hover:not(.active) {
+    background: var(--mz-card-soft);
+    color: var(--mz-text-soft);
+  }
+
+  .plan-nav-btn-compact:hover {
+    background: var(--mz-card-soft);
+    color: var(--mz-text);
+  }
+
+  .segmented button:hover:not(.active) {
+    background: rgba(127, 127, 127, .10);
+    color: var(--mz-text-soft);
+  }
+}
+
+/* ── Desktop refinements (extends existing 1024px block) ─────────────── */
+@media (min-width: 1024px) and (pointer: fine) {
+  :root {
+    --desktop-sidebar-w: 280px;
+    --appbar-h: 62px;
+  }
+
+  .android-appbar {
+    padding-inline: 20px;
+    background: var(--mz-bg-soft);
+    border-bottom: 1px solid var(--mz-border-soft);
+    box-shadow: none;
+  }
+
+  .android-appbar h1 {
+    font-size: 21px;
+  }
+
+  main {
+    padding: 14px 26px 28px;
+  }
+
+  .screen {
+    gap: 12px;
+  }
+
+  .drawer-panel {
+    background: var(--mz-bg-soft);
+    border-right: 1px solid var(--mz-border-soft);
+    box-shadow: none;
+  }
+
+  .drawer-header {
+    margin: 18px 16px 8px;
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .drawer-list {
+    padding: 4px 12px 8px;
+  }
+
+  .drawer-item {
+    height: 46px;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .drawer-footer {
+    padding: 16px 16px 28px;
+  }
+
+  .home-hero-card {
+    padding: 26px 24px 22px;
+    border-radius: 22px;
+  }
+
+  .home-hero-name {
+    font-size: 28px;
+  }
+
+  .home-hero-avatar {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+  }
+
+  .home-hero-hello {
+    font-size: 14px;
+  }
+
+  .home-hero-study {
+    font-size: 12px;
+  }
+
+  .tile {
+    min-height: 124px;
+    padding: 18px 16px 14px;
+  }
+
+  .tile-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  .tile-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tile-label {
+    font-size: 15px;
+  }
+
+  .tile-desc {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .section-title,
+  .home-tiles-label {
+    font-size: 12px;
+    letter-spacing: .09em;
+  }
+
+  .grade-group-head {
+    padding: 16px;
+  }
+
+  .grade-row {
+    padding: 12px 14px;
+    margin-left: 22px;
+  }
+
+  .metric-value {
+    font-size: 22px;
+  }
+
+  .news-title {
+    font-size: 14px;
+  }
+
+  .news-snippet {
+    font-size: 12px;
+  }
+
+  .list-stack {
+    gap: 10px;
+  }
+
+  .login-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .login-title {
+    font-size: 32px;
+  }
+}
+
+/* ── Ultra-wide enhancements (1440 px+, pointer: fine) ───────────────── */
+@media (min-width: 1440px) and (pointer: fine) {
+  .tile-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .news-screen .list-stack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-hero-name {
+    font-size: 30px;
+  }
+
+  .home-hero-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+  }
+
+  main {
+    padding: 16px 32px 32px;
+  }
+
+  .drawer-list {
+    padding: 6px 14px 10px;
+  }
+
+  .drawer-item {
+    height: 48px;
+    font-size: 15px;
+  }
 }
