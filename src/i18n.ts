@@ -109,6 +109,8 @@ const pl: Record<string, string> = {
     'login.password': 'Hasło',
     'login.submit': 'Zaloguj',
     'login.info': 'Zaloguj się swoimi danymi z ePortalu ZUT',
+    'login.or': 'lub',
+    'login.usosBtn': 'Zaloguj przez USOS',
 
     // Periods
     'period.session': 'Sesja',
@@ -332,6 +334,8 @@ const en: Record<string, string> = {
     'login.password': 'Password',
     'login.submit': 'Log in',
     'login.info': 'Log in with your ePortal ZUT credentials',
+    'login.or': 'or',
+    'login.usosBtn': 'Log in with USOS',
 
     // Periods
     'period.session': 'Exam session',

@@ -24,7 +24,7 @@ export function loadSession(): SessionData | null {
     const raw = window.localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SessionData;
-    if (!parsed.userId || !parsed.authKey) return null;
+    if (!parsed.userId || (!parsed.authKey && !parsed.usos?.accessToken)) return null;
 
     // Migrate: extract tokenJpg from old imageUrl if not stored separately
     if (!parsed.tokenJpg && parsed.imageUrl) {

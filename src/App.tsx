@@ -14,14 +14,16 @@ import type {
   ViewMode,
 } from './types';
 import {
-  fetchGrades,
+  fetchCombinedGrades,
+  fetchCombinedSemesters,
+  fetchCombinedStudies,
   fetchInfo,
   fetchNews,
   fetchPlan,
   fetchPlanSuggestions,
-  fetchSemesters,
-  fetchStudies,
+  fetchUsosRequestToken,
   login,
+  loginWithUsos,
 } from './services/api';
 import {
   cache,
@@ -472,6 +474,34 @@ function App() {
   // ── Session management ────────────────────────────────────────────────────
   const applySession = useCallback((s: SessionData | null) => setSession(s), []);
 
+  // ── USOS OAuth Callback Handling ──────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verifier = params.get('oauth_verifier');
+    const token = params.get('oauth_token');
+
+    if (verifier && token) {
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      const secret = sessionStorage.getItem('usos_request_token_secret');
+      if (!secret) {
+        setGlobalError('Brak sekretu tokenu USOS. Spróbuj ponownie.');
+        return;
+      }
+
+      setGlobalLoad(true);
+      loginWithUsos(verifier, token, secret)
+        .then(s => {
+          applySession(s);
+          showToast('Zalogowano przez USOS');
+          sessionStorage.removeItem('usos_request_token_secret');
+        })
+        .catch(e => setGlobalError(e instanceof Error ? e.message : 'Błąd logowania USOS.'))
+        .finally(() => setGlobalLoad(false));
+    }
+  }, [applySession, showToast]);
+
   const updateActiveStudy = useCallback((id: string | null) => {
     setSession(prev => (prev ? { ...prev, activeStudyId: id } : prev));
   }, []);
@@ -492,7 +522,7 @@ function App() {
       setGlobalLoad(true);
       setGlobalError('');
       try {
-        const fresh = await fetchStudies(sess);
+        const fresh = await fetchCombinedStudies(sess);
         cache.saveStudies(fresh);
         setStudies(fresh);
         if (!sess.activeStudyId && fresh[0].przynaleznoscId) {
@@ -625,7 +655,7 @@ function App() {
     try {
       let sems = cachedSem;
       if (!cache.loadSemesters(activeStudyId)) {
-        sems = await fetchSemesters(session, activeStudyId);
+        sems = await fetchCombinedSemesters(session, activeStudyId);
         cache.saveSemesters(activeStudyId, sems);
         setSemesters(sems);
       }
@@ -641,7 +671,7 @@ function App() {
 
       setSelSemId(curSemId);
       if (!cache.loadGrades(curSemId)) {
-        const fresh = await fetchGrades(session, curSemId);
+        const fresh = await fetchCombinedGrades(session, curSemId);
         cache.saveGrades(curSemId, fresh);
         setGrades(fresh);
       }
@@ -666,7 +696,7 @@ function App() {
         let semGrades = cache.loadGradesForce(sem.listaSemestrowId);
         if (!semGrades) {
           try {
-            semGrades = await fetchGrades(session, sem.listaSemestrowId);
+            semGrades = await fetchCombinedGrades(session, sem.listaSemestrowId);
             cache.saveGrades(sem.listaSemestrowId, semGrades);
           } catch {
             semGrades = cache.loadGradesForce(sem.listaSemestrowId) ?? [];
@@ -781,7 +811,7 @@ function App() {
       selSemPrev.current = selSemId;
       if (!cache.loadGrades(selSemId)) {
         setGradesLoad(true);
-        fetchGrades(session, selSemId)
+        fetchCombinedGrades(session, selSemId)
           .then(g => { cache.saveGrades(selSemId, g); setGrades(g); })
           .catch(() => {/* use cached */ })
           .finally(() => setGradesLoad(false));
@@ -1095,11 +1125,36 @@ function App() {
               {loginLoading ? t('login.loggingIn') : t('login.loginBtn')}
             </button>
 
+            <div className="login-divider">
+              <span>{t('login.or') || 'lub'}</span>
+            </div>
+
+            <button
+              type="button"
+              className="login-usos-btn"
+              onClick={async () => {
+                setGlobalLoad(true);
+                try {
+                  const callbackUrl = window.location.origin + window.location.pathname;
+                  const { oauth_token, oauth_token_secret } = await fetchUsosRequestToken(callbackUrl);
+                  sessionStorage.setItem('usos_request_token_secret', oauth_token_secret);
+                  window.location.href = `https://usosapi.zut.edu.pl/services/oauth/authorize?oauth_token=${oauth_token}`;
+                } catch (e) {
+                  setGlobalError(e instanceof Error ? e.message : 'Błąd inicjacji USOS.');
+                  setGlobalLoad(false);
+                }
+              }}
+            >
+              <div className="login-usos-icon">U</div>
+              {(t('login.usosBtn') || 'Zaloguj przez USOS') + ' (Wczesny dostęp)'}
+            </button>
+
             <p className="login-info-text" style={{ whiteSpace: 'pre-line' }}>
               {t('login.infoText')}
             </p>
           </div>
         </div>
+
       </section>
     );
   }
@@ -1119,6 +1174,13 @@ function App() {
               </div>
               <div className="home-hero-avatar">{firstName[0]?.toUpperCase() ?? 'S'}</div>
             </div>
+
+            {session?.usos && (
+              <div className="usos-warning-banner" style={{ marginTop: '16px', background: 'rgba(255, 152, 0, 0.1)', border: '1px solid rgba(255, 152, 0, 0.3)', borderRadius: '8px', padding: '12px', fontSize: '14px', color: 'var(--mz-text)' }}>
+                <strong style={{ color: '#ff9800', display: 'block', marginBottom: '4px' }}>⚠ Uwaga (Tryb USOS)</strong>
+                Zalogowano za pomocą systemu USOS. Niektóre funkcje mogą działać nieprawidłowo lub nie wyświetlać wszystkich danych, ponieważ uczelnia wciąż wdraża ten system.
+              </div>
+            )}
             {!isOnline && (
               <span className="offline-badge"><Ic n="wifi-off" />{t('home.offlineMode')}</span>
             )}
