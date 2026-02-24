@@ -908,7 +908,7 @@ button.outline {
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 0 12px;
   flex-shrink: 0;
   background: var(--mz-bg);
 }
@@ -960,6 +960,7 @@ button.outline {
   color: var(--mz-text);
   text-align: center;
   min-width: 0;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4240,7 +4241,7 @@ button.outline {
     max-width: none;
     width: 100%;
     margin: 0;
-    padding: 10px;
+    padding: 0 10px;
     border: 1px solid var(--mz-border-soft);
     border-radius: 14px;
     background: var(--mz-card);
