@@ -236,30 +236,48 @@ export function PlanFiltersSheet({
 }: PlanFiltersSheetProps) {
   if (!open) return null;
 
+  const excludedCount = hiddenKeys.length;
+
   return (
     <div className="event-sheet-overlay" onClick={onClose}>
-      <div className="event-sheet search-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Filtruj przedmioty">
+      <div className="event-sheet search-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Wyklucz przedmioty">
         <div className="event-sheet-handle" />
         <div className="search-container">
-          <h2 className="search-title">Filtruj przedmioty</h2>
+          <h2 className="search-title">Wyklucz przedmioty</h2>
+
+          <div className="plan-filter-intro">
+            <span className="plan-filter-intro-badge">
+              {excludedCount > 0 ? `Wykluczono: ${excludedCount}` : 'Bez wykluczeń'}
+            </span>
+            <p className="plan-filter-intro-text">
+              Dotknij przedmiotu, aby ukryć go w planie. Ponowne dotknięcie przywraca go do widoku.
+            </p>
+          </div>
 
           {options.length === 0 ? (
             <div className="search-placeholder">Brak dostępnych przedmiotów w aktualnym zakresie.</div>
           ) : (
             <div className="plan-filter-list">
               {options.map((option) => {
-                const visible = !hiddenKeys.includes(option.key);
+                const excluded = hiddenKeys.includes(option.key);
                 return (
                   <button
                     key={option.key}
                     type="button"
-                    className={`plan-filter-item${visible ? ' is-visible' : ''}`}
+                    className={`plan-filter-item${excluded ? ' is-excluded' : ''}`}
                     onClick={() => onToggle(option.key)}
                   >
-                    <span className="plan-filter-label">{option.label}</span>
+                    <span className="plan-filter-copy">
+                      <span className="plan-filter-label">{option.label}</span>
+                      <span className="plan-filter-hint">
+                        {excluded ? 'Dotknij, aby przywrócić do planu' : 'Dotknij, aby wykluczyć z planu'}
+                      </span>
+                    </span>
                     <span className="plan-filter-meta">
                       <span className="plan-filter-count">{option.count}</span>
-                      <span className={`plan-filter-check${visible ? ' checked' : ''}`} aria-hidden>{visible ? '✓' : ''}</span>
+                      <span className={`plan-filter-state${excluded ? ' is-excluded' : ''}`}>
+                        {excluded ? 'Wykluczony' : 'Widoczny'}
+                      </span>
                     </span>
                   </button>
                 );
@@ -274,14 +292,14 @@ export function PlanFiltersSheet({
               onClick={onReset}
               disabled={hiddenKeys.length === 0}
             >
-              Reset
+              Pokaż wszystko
             </button>
             <button
               type="button"
               className="search-btn-primary"
               onClick={onClose}
             >
-              Zamknij
+              Gotowe
             </button>
           </div>
         </div>

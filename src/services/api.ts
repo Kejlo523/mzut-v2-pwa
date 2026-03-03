@@ -944,6 +944,182 @@ function layoutDayEvents<T extends PlanLayoutEvent>(events: T[]): T[] {
   return positioned;
 }
 
+function groupPlanEventsByDay(events: Record<string, string>[]): Map<string, Record<string, string>[]> {
+  const grouped = new Map<string, Record<string, string>[]>();
+
+  for (const event of events) {
+    const eventStart = parseEventDate(event.start);
+    if (!eventStart) continue;
+    const key = formatYmd(eventStart);
+    const list = grouped.get(key) ?? [];
+    list.push(event);
+    grouped.set(key, list);
+  }
+
+  return grouped;
+}
+
+function buildPlanDayColumns(
+  grouped: Map<string, Record<string, string>[]>,
+  rangeStart: Date,
+  rangeEnd: Date,
+): Pick<PlanResult, 'dayColumns' | 'hasAnyEventsInRange'> {
+  const dayColumns: PlanResult['dayColumns'] = [];
+  let hasAnyEventsInRange = false;
+
+  for (let day = new Date(rangeStart); day <= rangeEnd; day = addDays(day, 1)) {
+    const key = formatYmd(day);
+    const dayEventsBase = (grouped.get(key) ?? []).map((event) => {
+      const start = parseEventDate(event.start) as Date;
+      const end = parseEventDate(event.end) as Date;
+      const startMin = minutesFromMidnight(start);
+      const endMin = Math.max(startMin + 15, minutesFromMidnight(end));
+      const typeClass = eventTypeClass(event);
+
+      return {
+        startMin,
+        endMin,
+        topPx: Math.max(0, (startMin - 360) * 0.8),
+        heightPx: Math.max(36, (endMin - startMin) * 0.8),
+        leftPct: 0,
+        widthPct: 100,
+        title: firstNonEmpty(event.subject, event.title),
+        room: firstNonEmpty(event.room, '-'),
+        group: firstNonEmpty(event.groupName, event.tokName),
+        startStr: formatHm(start),
+        endStr: formatHm(end),
+        tooltip: firstNonEmpty(event.description, event.subject, event.title),
+        typeClass,
+        typeLabel: eventTypeLabel(typeClass, event),
+        subjectKey: firstNonEmpty(event.subject, event.title),
+        teacher: firstNonEmpty(event.workerTitle, event.worker),
+      };
+    }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.title.localeCompare(b.title, 'pl'));
+
+    const dayEvents = layoutDayEvents(dayEventsBase);
+
+    if (dayEvents.length > 0) hasAnyEventsInRange = true;
+    dayColumns.push({ date: key, events: dayEvents });
+  }
+
+  return { dayColumns, hasAnyEventsInRange };
+}
+
+function buildPlanSubjectFilters(dayColumns: PlanResult['dayColumns']): PlanResult['subjectFilters'] {
+  const subjectFilterMap = new Map<string, { key: string; label: string; count: number }>();
+
+  for (const column of dayColumns) {
+    for (const event of column.events) {
+      const key = getPlanEventFilterKey(event);
+      if (!key) continue;
+      const label = getPlanEventFilterLabel(event);
+      const existing = subjectFilterMap.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        subjectFilterMap.set(key, { key, label, count: 1 });
+      }
+    }
+  }
+
+  return [...subjectFilterMap.values()].sort((a, b) => a.label.localeCompare(b.label, 'pl'));
+}
+
+async function resolvePlanAlbum(session: SessionData, resolvedStudyId: string): Promise<string> {
+  const directAlbum = firstNonEmpty(session.userId);
+  if (/^(s?\d{4,6})$/i.test(directAlbum)) {
+    return directAlbum;
+  }
+
+  let album = '';
+  if (session.authKey) {
+    try {
+      const study = await proxyMzut<Record<string, unknown>>('getStudy', {
+        login: session.userId,
+        token: session.authKey,
+        przynaleznoscId: resolvedStudyId,
+      });
+      album = firstNonEmpty(study.album);
+    } catch (error) {
+      rethrowIfSessionExpired(error);
+      console.warn('Failed to fetch album from getStudy', error);
+    }
+  }
+
+  if (!album) throw new Error('Brak numeru albumu.');
+  return album;
+}
+
+function findPeriodByYear(
+  periods: SessionPeriod[],
+  key: string,
+  year: number,
+  field: 'start' | 'end' = 'start',
+): SessionPeriod | null {
+  const matches = periods
+    .filter((period) => period.key === key && Number(period[field].slice(0, 4)) === year)
+    .sort((a, b) => a.start.localeCompare(b.start));
+  return matches[0] ?? null;
+}
+
+function resolveSemesterRange(currentDateText: string, sessionPeriods: SessionPeriod[]): { current: Date; rangeStart: Date; rangeEnd: Date } {
+  const current = parseYmdOrToday(currentDateText);
+  const month = current.getMonth();
+  const isWinterSemester = month >= 8 || month <= 1;
+  const academicYearStart = month >= 8 ? current.getFullYear() : current.getFullYear() - 1;
+  const summerYear = academicYearStart + 1;
+
+  const winterDefaults = {
+    start: new Date(academicYearStart, 9, 1),
+    end: new Date(summerYear, 2, 0),
+  };
+  const summerDefaults = {
+    start: new Date(summerYear, 1, 15),
+    end: new Date(summerYear, 6, 15),
+  };
+
+  let rangeStart = isWinterSemester ? winterDefaults.start : summerDefaults.start;
+  let rangeEnd = isWinterSemester ? winterDefaults.end : summerDefaults.end;
+
+  if (isWinterSemester) {
+    const summerBreak = findPeriodByYear(sessionPeriods, 'wakacje_letnie', academicYearStart, 'end');
+    if (summerBreak) {
+      rangeStart = addDays(parseYmdOrToday(summerBreak.end), 1);
+    }
+
+    const winterSession = findPeriodByYear(sessionPeriods, 'sesja_zimowa', summerYear);
+    if (winterSession) {
+      rangeEnd = addDays(parseYmdOrToday(winterSession.start), -1);
+    }
+  } else {
+    const winterBreak = findPeriodByYear(sessionPeriods, 'wakacje_zimowe', summerYear, 'end');
+    if (winterBreak) {
+      rangeStart = addDays(parseYmdOrToday(winterBreak.end), 1);
+    } else {
+      const winterSession = findPeriodByYear(sessionPeriods, 'sesja_zimowa', summerYear, 'end');
+      if (winterSession) {
+        rangeStart = addDays(parseYmdOrToday(winterSession.end), 1);
+      }
+    }
+
+    const summerSession = findPeriodByYear(sessionPeriods, 'sesja_letnia', summerYear);
+    if (summerSession) {
+      rangeEnd = addDays(parseYmdOrToday(summerSession.start), -1);
+    }
+  }
+
+  if (rangeEnd < rangeStart) {
+    rangeStart = isWinterSemester ? winterDefaults.start : summerDefaults.start;
+    rangeEnd = isWinterSemester ? winterDefaults.end : summerDefaults.end;
+  }
+
+  return {
+    current,
+    rangeStart: startOfDay(rangeStart),
+    rangeEnd: startOfDay(rangeEnd),
+  };
+}
+
 export async function fetchSessionPeriods(): Promise<SessionPeriod[]> {
   try {
     const response = await fetch(`${API_BASE}/proxy/calendar`);
@@ -1004,24 +1180,7 @@ export async function fetchPlan(
       };
     }
 
-    // If userId looks like an album number (e.g. 5 digits or starts with 's'), use it directly
-    if (/^(s?\d{4,6})$/i.test(session.userId)) {
-      album = session.userId;
-    } else if (session.authKey) {
-      try {
-        const study = await proxyMzut<Record<string, unknown>>('getStudy', {
-          login: session.userId,
-          token: session.authKey,
-          przynaleznoscId: resolvedStudyId,
-        });
-        album = firstNonEmpty(study.album);
-      } catch (e) {
-        rethrowIfSessionExpired(e);
-        console.warn('Failed to fetch album from getStudy', e);
-      }
-    }
-
-    if (!album) throw new Error('Brak numeru albumu.');
+    album = await resolvePlanAlbum(session, resolvedStudyId);
 
     urlParams = {
       number: album,
@@ -1035,53 +1194,8 @@ export async function fetchPlan(
     fetchSessionPeriods(),
   ]);
   const events = rawEvents.map(parsePlanEventRow).filter((event): event is Record<string, string> => Boolean(event));
-
-  const grouped = new Map<string, Record<string, string>[]>();
-  for (const event of events) {
-    const eventStart = parseEventDate(event.start);
-    if (!eventStart) continue;
-    const key = formatYmd(eventStart);
-    const list = grouped.get(key) ?? [];
-    list.push(event);
-    grouped.set(key, list);
-  }
-
-  const dayColumns: PlanResult['dayColumns'] = [];
-  let hasAnyEventsInRange = false;
-  for (let day = new Date(rangeStart); day <= rangeEnd; day = addDays(day, 1)) {
-    const key = formatYmd(day);
-    const dayEventsBase = (grouped.get(key) ?? []).map((event) => {
-      const start = parseEventDate(event.start) as Date;
-      const end = parseEventDate(event.end) as Date;
-      const startMin = minutesFromMidnight(start);
-      const endMin = Math.max(startMin + 15, minutesFromMidnight(end));
-      const typeClass = eventTypeClass(event);
-
-      return {
-        startMin,
-        endMin,
-        topPx: Math.max(0, (startMin - 360) * 0.8),
-        heightPx: Math.max(36, (endMin - startMin) * 0.8),
-        leftPct: 0,
-        widthPct: 100,
-        title: firstNonEmpty(event.subject, event.title),
-        room: firstNonEmpty(event.room, '-'),
-        group: firstNonEmpty(event.groupName, event.tokName),
-        startStr: formatHm(start),
-        endStr: formatHm(end),
-        tooltip: firstNonEmpty(event.description, event.subject, event.title),
-        typeClass,
-        typeLabel: eventTypeLabel(typeClass, event),
-        subjectKey: firstNonEmpty(event.subject, event.title),
-        teacher: firstNonEmpty(event.workerTitle, event.worker),
-      };
-    }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.title.localeCompare(b.title, 'pl'));
-
-    const dayEvents = layoutDayEvents(dayEventsBase);
-
-    if (dayEvents.length > 0) hasAnyEventsInRange = true;
-    dayColumns.push({ date: key, events: dayEvents });
-  }
+  const grouped = groupPlanEventsByDay(events);
+  const { dayColumns, hasAnyEventsInRange } = buildPlanDayColumns(grouped, rangeStart, rangeEnd);
 
   const monthGrid: PlanResult['monthGrid'] = [];
   if (viewMode === 'month') {
@@ -1104,21 +1218,7 @@ export async function fetchPlan(
     }
   }
 
-  const subjectFilterMap = new Map<string, { key: string; label: string; count: number }>();
-  for (const column of dayColumns) {
-    for (const event of column.events) {
-      const key = getPlanEventFilterKey(event);
-      if (!key) continue;
-      const label = getPlanEventFilterLabel(event);
-      const existing = subjectFilterMap.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        subjectFilterMap.set(key, { key, label, count: 1 });
-      }
-    }
-  }
-  const subjectFilters = [...subjectFilterMap.values()].sort((a, b) => a.label.localeCompare(b.label, 'pl'));
+  const subjectFilters = buildPlanSubjectFilters(dayColumns);
 
   return {
     viewMode,
@@ -1133,6 +1233,63 @@ export async function fetchPlan(
     nextDate: formatYmd(next),
     todayDate: formatYmd(startOfDay(new Date())),
     headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
+    sessionPeriods,
+    debug: {
+      album,
+      entriesTotal: events.length,
+      daysWithData: [...grouped.keys()].sort(),
+    },
+  };
+}
+
+export async function fetchPlanSemesterExport(
+  session: SessionData,
+  payload: { currentDate: string; studyId: string | null; search: { category: string; query: string } },
+): Promise<PlanResult> {
+  const sessionPeriods = await fetchSessionPeriods();
+  const { current, rangeStart, rangeEnd } = resolveSemesterRange(payload.currentDate, sessionPeriods);
+
+  let album = '';
+  let urlParams: Record<string, string>;
+
+  if (firstNonEmpty(payload.search.query)) {
+    urlParams = {
+      [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
+      start: toOffsetIso(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate(), 23, 59, 59)),
+    };
+  } else {
+    const resolvedStudyId = payload.studyId || session.activeStudyId;
+    if (!resolvedStudyId) {
+      throw new Error('Brak aktywnego toku studiów.');
+    }
+
+    album = await resolvePlanAlbum(session, resolvedStudyId);
+    urlParams = {
+      number: album,
+      start: toOffsetIso(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate(), 23, 59, 59)),
+    };
+  }
+
+  const rawEvents = await proxyPlanStudent(urlParams);
+  const events = rawEvents.map(parsePlanEventRow).filter((event): event is Record<string, string> => Boolean(event));
+  const grouped = groupPlanEventsByDay(events);
+  const { dayColumns, hasAnyEventsInRange } = buildPlanDayColumns(grouped, rangeStart, rangeEnd);
+
+  return {
+    viewMode: 'month',
+    currentDate: formatYmd(current),
+    rangeStart: formatYmd(rangeStart),
+    rangeEnd: formatYmd(rangeEnd),
+    dayColumns,
+    hasAnyEventsInRange,
+    monthGrid: [],
+    subjectFilters: buildPlanSubjectFilters(dayColumns),
+    prevDate: formatYmd(addDays(current, -1)),
+    nextDate: formatYmd(addDays(current, 1)),
+    todayDate: formatYmd(startOfDay(new Date())),
+    headerLabel: 'Semestr',
     sessionPeriods,
     debug: {
       album,
