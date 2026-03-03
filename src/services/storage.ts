@@ -2,6 +2,7 @@ import type { CalendarEvent, ElsCard, Grade, NewsItem, PlanResult, Semester, Ses
 
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
+const PLAN_FILTERS_KEY = 'mzutv2_pwa_plan_hidden_subjects';
 
 export interface AppSettings {
   language: 'pl' | 'en';
@@ -42,6 +43,8 @@ export function loadSession(): SessionData | null {
       parsed.imageUrl = `/api/proxy/image?userId=${encodeURIComponent(parsed.userId)}&tokenJpg=${encodeURIComponent(parsed.tokenJpg)}`;
     }
 
+    parsed.persistedAt = Date.now();
+
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
     return parsed;
   } catch {
@@ -54,7 +57,10 @@ export function saveSession(session: SessionData | null): void {
     window.localStorage.removeItem(SESSION_KEY);
     return;
   }
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({
+    ...session,
+    persistedAt: session.persistedAt ?? Date.now(),
+  }));
 }
 
 export function loadSettings(): AppSettings {
@@ -76,6 +82,31 @@ export function loadSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings): void {
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+export function loadPlanHiddenSubjects(): string[] {
+  try {
+    const raw = window.localStorage.getItem(PLAN_FILTERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function savePlanHiddenSubjects(keys: string[]): void {
+  const normalized = [...new Set(
+    keys
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
+  window.localStorage.setItem(PLAN_FILTERS_KEY, JSON.stringify(normalized));
 }
 
 // ── API cache with TTL ────────────────────────────────────────────────────────

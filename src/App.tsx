@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import type {
+  CalendarEvent,
+  ElsCard,
   Grade,
   NewsItem,
   PlanResult,
@@ -11,8 +13,6 @@ import type {
   Study,
   StudyDetails,
   StudyHistoryItem,
-  ElsCard,
-  CalendarEvent,
   ViewMode,
 } from './types';
 import {
@@ -31,8 +31,10 @@ import {
 } from './services/api';
 import {
   cache,
+  loadPlanHiddenSubjects,
   loadSession,
   loadSettings,
+  savePlanHiddenSubjects,
   saveSession,
   saveSettings,
   type AppSettings,
@@ -41,224 +43,33 @@ import { sortUsefulLinks } from './constants/usefulLinks';
 import { useAppNavigation, useExitAttemptToast } from './hooks/useAppNavigation';
 import { useSwipeGestures } from './hooks/useSwipeBack';
 import { createT } from './i18n';
+import { getPlanEventFilterKey, getPlanEventFilterLabel } from './planFilters';
+import { exportPlanToIcs } from './app/planExport';
+import { relayoutDayEvents } from './app/planLayout';
+import { LOGO_SRC, MONTH_WEEKDAY_KEYS, SCREEN_I18N_KEY } from './app/constants';
+import {
+  addDaysYmd,
+  fmtDateLabel,
+  fmtDayMonth,
+  fmtDec,
+  fmtHour,
+  fmtWeekdayShort,
+  getSessionSignature,
+  isFinalGradeType,
+  isWeekendDate,
+  parseGradeNum,
+  planCacheKey,
+  sumUniqueEcts,
+  todayYmd,
+} from './app/helpers';
+import { Ic } from './app/ui';
+import type { DrawerScreenKey, NewsDetailParams, SelectedPlanEvent } from './app/viewTypes';
+import { HomeScreen, LoginScreen } from './app/screens/AuthScreens';
+import { AboutScreen, LinksScreen, NewsDetailScreen, NewsScreen, SettingsScreen } from './app/screens/ContentScreens';
+import { PlanEventSheet, PlanFiltersSheet, PlanSearchSheet } from './app/screens/PlanOverlays';
+import { GradesScreen, InfoScreen } from './app/screens/StudyScreens';
 
-const APP_BASE = import.meta.env.BASE_URL;
-const LOGO_SRC = `${APP_BASE}icons/mzutv2-logo.png`;
-
-// ─────────────────────────────────────────────────────────── helpers ──────
-
-function todayYmd(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function addDaysYmd(ymd: string, n: number): string {
-  const d = new Date(`${ymd}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function fmtDateLabel(v: string, lang: string = 'pl'): string {
-  const d = new Date(`${v}T00:00:00`);
-  if (!Number.isFinite(d.getTime())) return v;
-  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
-  return new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit', weekday: 'short' }).format(d);
-}
-
-function fmtWeekdayShort(v: string, lang: string = 'pl'): string {
-  const d = new Date(`${v}T00:00:00`);
-  if (!Number.isFinite(d.getTime())) return v;
-  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
-  return new Intl.DateTimeFormat(loc, { weekday: 'short' }).format(d);
-}
-
-function fmtDayMonth(v: string, lang: string = 'pl'): string {
-  const d = new Date(`${v}T00:00:00`);
-  if (!Number.isFinite(d.getTime())) return v;
-  const loc = lang === 'en' ? 'en-US' : 'pl-PL';
-  return new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit' }).format(d);
-}
-
-function fmtHour(min: number): string {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-}
-
-function isWeekendDate(dateYmd: string): boolean {
-  const d = new Date(`${dateYmd}T00:00:00`);
-  if (!Number.isFinite(d.getTime())) return false;
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
-function normalizeMatch(value: string): string {
-  return (value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
-function isFinalGradeType(type: string, subjectName?: string): boolean {
-  const t = normalizeMatch(type);
-  if (
-    t.includes('ocena koncowa') ||
-    t.includes('koncowa') ||
-    t.includes('final') ||
-    t.includes('abschluss')
-  ) {
-    return true;
-  }
-  if (!t) {
-    const s = normalizeMatch(subjectName || '');
-    return (
-      s.includes('ocena koncowa') ||
-      s.includes('koncowa') ||
-      s.includes('final') ||
-      s.includes('abschluss')
-    );
-  }
-  return false;
-}
-
-function getSessionSignature(session: SessionData | null): string {
-  if (!session) return '';
-  return [
-    session.userId,
-    session.authKey,
-    session.usos?.accessToken ?? '',
-    session.usos?.accessTokenSecret ?? '',
-  ].join('|');
-}
-
-// screenTitle now uses t() – defined inside App, but we keep a static fallback
-const SCREEN_I18N_KEY: Record<ScreenKey, string> = {
-  login: 'screen.home',
-  home: 'screen.home',
-  plan: 'screen.plan',
-  grades: 'screen.grades',
-  info: 'screen.info',
-  news: 'screen.news',
-  'news-detail': 'screen.newsDetail',
-  links: 'screen.links',
-  settings: 'screen.settings',
-  about: 'screen.about',
-};
-
-
-function gradeTone(g: string): 'ok' | 'warn' | 'bad' | 'neutral' {
-  const normalized = g.trim().toLowerCase();
-  if (normalized === '-' || normalized === '') return 'neutral';
-  if (normalized === 'zal' || normalized === 'zaliczone') return 'ok';
-  if (normalized === 'niezal' || normalized === 'niezaliczone') return 'bad';
-
-  const v = Number.parseFloat(g.replace(',', '.'));
-  if (!Number.isFinite(v)) return 'neutral';
-  if (v > 2) return 'ok';
-  return 'bad';
-}
-
-function parseGradeNum(g: string): number | null {
-  const v = Number.parseFloat(g.replace(',', '.'));
-  return Number.isFinite(v) ? v : null;
-}
-
-function fmtDec(v: number, d: number): string {
-  if (!Number.isFinite(v)) return '-';
-  return v.toFixed(d).replace('.', ',');
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(' ').filter(Boolean);
-  if (parts.length === 0) return 'S';
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function planCacheKey(viewMode: ViewMode, date: string, studyId: string | null | undefined): string {
-  return `${viewMode}_${date}_${studyId ?? 'nostudy'}`;
-}
-
-function sumUniqueEcts(items: Grade[]): number {
-  const bySubject = new Map<string, number>();
-  for (const g of items) {
-    const ects = Number.isFinite(g.weight) && g.weight > 0 ? g.weight : 0;
-    if (!ects) continue;
-    const subject = g.subjectName || 'przedmiot';
-    const prev = bySubject.get(subject) ?? 0;
-    if (ects > prev) bySubject.set(subject, ects);
-  }
-  let total = 0;
-  for (const value of bySubject.values()) total += value;
-  return total;
-}
-
-// ─────────────────────────────────────────────────────────── SVG icons ───
-
-const SV = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-
-function Ic({ n }: { n: string }) {
-  if (n === 'menu') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M3 6h18M3 12h18M3 18h18" /></svg>;
-  if (n === 'back') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M19 12H5M12 5l-7 7 7 7" /></svg>;
-  if (n === 'search') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="11" cy="11" r="7" /><path {...SV} d="m21 21-4.35-4.35" /></svg>;
-  if (n === 'refresh') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M1 4v6h6M23 20v-6h-6" /><path {...SV} d="M20.49 9A9 9 0 0 0 5.64 5.64M3.51 15A9 9 0 0 0 18.36 18.36" /></svg>;
-  if (n === 'more') return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="5" r="1.5" fill="currentColor" /><circle cx="12" cy="12" r="1.5" fill="currentColor" /><circle cx="12" cy="19" r="1.5" fill="currentColor" /></svg>;
-  if (n === 'chevL') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M15 18l-6-6 6-6" /></svg>;
-  if (n === 'chevR') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M9 18l6-6-6-6" /></svg>;
-  if (n === 'minus') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M5 12h14" /></svg>;
-  if (n === 'plus') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M12 5v14M5 12h14" /></svg>;
-  if (n === 'home') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline {...SV} points="9 22 9 12 15 12 15 22" /></svg>;
-  if (n === 'calendar') return <svg viewBox="0 0 24 24" aria-hidden><rect {...SV} x="3" y="4" width="18" height="18" rx="2" /><line {...SV} x1="16" y1="2" x2="16" y2="6" /><line {...SV} x1="8" y1="2" x2="8" y2="6" /><line {...SV} x1="3" y1="10" x2="21" y2="10" /></svg>;
-  if (n === 'grade') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M22 10v6M2 10l10-5 10 5-10 5z" /><path {...SV} d="M6 12v5c3 3 9 3 12 0v-5" /></svg>;
-  if (n === 'group') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle {...SV} cx="9" cy="7" r="4" /><path {...SV} d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /></svg>;
-  if (n === 'user') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle {...SV} cx="12" cy="7" r="4" /></svg>;
-  if (n === 'news') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" /><path {...SV} d="M18 14h-8M15 18h-5M10 6h8v4h-8z" /></svg>;
-  if (n === 'present') return <svg viewBox="0 0 24 24" aria-hidden><polyline {...SV} points="9 11 12 14 22 4" /><path {...SV} d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>;
-  if (n === 'link') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path {...SV} d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
-  if (n === 'lock') return <svg viewBox="0 0 24 24" aria-hidden><rect {...SV} x="3" y="11" width="18" height="11" rx="2" ry="2" /><path {...SV} d="M7 11V7a5 5 0 0110 0v4" /></svg>;
-  if (n === 'eye') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle {...SV} cx="12" cy="12" r="3" /></svg>;
-  if (n === 'settings') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="3" /><path {...SV} d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" /></svg>;
-  if (n === 'info') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><line {...SV} x1="12" y1="8" x2="12" y2="12" /><line {...SV} x1="12" y1="16" x2="12.01" y2="16" /></svg>;
-  if (n === 'logout') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline {...SV} points="16 17 21 12 16 7" /><line {...SV} x1="21" y1="12" x2="9" y2="12" /></svg>;
-  if (n === 'wifi-off') return <svg viewBox="0 0 24 24" aria-hidden><line {...SV} x1="1" y1="1" x2="23" y2="23" /><path {...SV} d="M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" /></svg>;
-  if (n === 'about') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><path {...SV} d="M12 16v-4M12 8h.01" /></svg>;
-  if (n === 'clock') return <svg viewBox="0 0 24 24" aria-hidden><circle {...SV} cx="12" cy="12" r="10" /><polyline {...SV} points="12 6 12 12 16 14" /></svg>;
-  if (n === 'location') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle {...SV} cx="12" cy="10" r="3" /></svg>;
-  if (n === 'download') return <svg viewBox="0 0 24 24" aria-hidden><path {...SV} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline {...SV} points="7 10 12 15 17 10" /><line {...SV} x1="12" y1="15" x2="12" y2="3" /></svg>;
-  if (n === 'layers') return <svg viewBox="0 0 24 24" aria-hidden><polygon {...SV} points="12 2 2 7 12 12 22 7 12 2" /><polyline {...SV} points="2 17 12 22 22 17" /><polyline {...SV} points="2 12 12 17 22 12" /></svg>;
-  // fallback
-  return <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="4" fill="currentColor" /></svg>;
-}
-
-// ─────────────────────────────────────────────────────────── Spinner ──────
-
-function Spinner({ text }: { text: string }) {
-  return (
-    <div className="spinner-wrap">
-      <div className="spinner" />
-      {text && <span>{text}</span>}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────── Toggle ───────
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="settings-toggle">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
-      <span className="settings-toggle-track" />
-    </label>
-  );
-}
-
-// ─────────────────────────────────────────────────────────── App ──────────
-
-interface NewsDetailParams { item: NewsItem; }
-interface SelectedPlanEvent {
-  date: string;
-  event: PlanResult['dayColumns'][number]['events'][number];
-}
-
-const MONTH_WEEKDAY_KEYS = ['weekday.mon', 'weekday.tue', 'weekday.wed', 'weekday.thu', 'weekday.fri', 'weekday.sat', 'weekday.sun'];
+const SESSION_VALIDATE_INTERVAL_MS = 30 * 24 * 60 * 60_000;
 
 function App() {
   const [session, setSession] = useState<SessionData | null>(() => loadSession());
@@ -330,11 +141,13 @@ function App() {
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planSearchOpen, setPlanSearchOpen] = useState(false);
+  const [planFiltersOpen, setPlanFiltersOpen] = useState(false);
   const [planSearchCat, setPlanSearchCat] = useState('album');
   const [planSearchQ, setPlanSearchQ] = useState('');
   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
   const [planSearchLoading, setPlanSearchLoading] = useState(false);
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
+  const [hiddenPlanSubjectKeys, setHiddenPlanSubjectKeys] = useState<string[]>(() => loadPlanHiddenSubjects());
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Plan carousel swipe (direct DOM animation — no React state per frame)
@@ -397,30 +210,33 @@ function App() {
     return () => clearInterval(id);
   }, []);
 
-  // ── Session inactivity timeout (30 minutes) ───────────────────────────────
+  // ── Session inactivity timeout (30 days, without overflowing setTimeout) ─
   useEffect(() => {
     if (!session) return;
-    let inactivityTimer: ReturnType<typeof setTimeout>;
-    const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    const SESSION_TIMEOUT = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const CHECK_INTERVAL = 60_000; // 1 minute
+    let lastActivityTs = Date.now();
 
-    const resetTimer = () => {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        setSession(null);
-        showToast('Sesja wygasła, zaloguj się ponownie');
-      }, SESSION_TIMEOUT);
+    const touchActivity = () => {
+      lastActivityTs = Date.now();
     };
 
-    // Reset timer on user activity
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => window.addEventListener(event, resetTimer));
+    const checkInactivity = () => {
+      if (Date.now() - lastActivityTs >= SESSION_TIMEOUT) {
+        setSession(null);
+        setToast('Sesja wygasła, zaloguj się ponownie');
+      }
+    };
 
-    // Initial timer
-    resetTimer();
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => window.addEventListener(event, touchActivity));
+
+    const intervalId = window.setInterval(checkInactivity, CHECK_INTERVAL);
+    touchActivity();
 
     return () => {
-      clearTimeout(inactivityTimer);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      window.clearInterval(intervalId);
+      events.forEach(event => window.removeEventListener(event, touchActivity));
     };
   }, [session]);
 
@@ -471,6 +287,7 @@ function App() {
 
   // ── Sync settings ─────────────────────────────────────────────────────────
   useEffect(() => { saveSettings(settings); }, [settings]);
+  useEffect(() => { savePlanHiddenSubjects(hiddenPlanSubjectKeys); }, [hiddenPlanSubjectKeys]);
 
   // ── Session → navigation sync ─────────────────────────────────────────────
   useEffect(() => {
@@ -491,9 +308,9 @@ function App() {
 
     if (lastSessionCheckRef.current.key !== sessionKey) {
       sessionCheckInFlightRef.current = null;
-      lastSessionCheckRef.current = { key: '', ts: 0 };
+      lastSessionCheckRef.current = { key: sessionKey, ts: session?.persistedAt ?? 0 };
     }
-  }, [sessionKey]);
+  }, [sessionKey, session?.persistedAt]);
 
   // ── Close drawer on screen change ────────────────────────────────────────
   useEffect(() => {
@@ -522,8 +339,13 @@ function App() {
 
   // ── Session management ────────────────────────────────────────────────────
   const applySession = useCallback((s: SessionData | null) => {
-    setSession(s);
-    if (!s) {
+    const nextSession = s ? { ...s, persistedAt: Date.now() } : null;
+    setSession(nextSession);
+    if (!nextSession) {
+      setHiddenPlanSubjectKeys([]);
+      setPlanFiltersOpen(false);
+      setPlanSearchOpen(false);
+
       // Clear storage
       localStorage.clear();
       sessionStorage.clear();
@@ -568,7 +390,7 @@ function App() {
 
     const key = getSessionSignature(sess);
     const recentCheck = lastSessionCheckRef.current;
-    if (!force && recentCheck.key === key && Date.now() - recentCheck.ts < 60_000) {
+    if (!force && recentCheck.key === key && Date.now() - recentCheck.ts < SESSION_VALIDATE_INTERVAL_MS) {
       return true;
     }
 
@@ -606,7 +428,7 @@ function App() {
     void ensureSessionStillValid(session);
 
     const revalidate = () => {
-      void ensureSessionStillValid(session, true);
+      void ensureSessionStillValid(session);
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -1091,15 +913,61 @@ function App() {
     }
 
     const avg = sumWeights > 0 ? fmtDec(sumWeighted / sumWeights, 2) : '-';
-    const ects = sumUniqueEcts(grades);
-    return { avg, ects: fmtDec(ects, 1) };
+    const ects = Math.round(Math.max(0, sumUniqueEcts(grades)));
+    return { avg, ects: String(ects) };
   }, [grades]);
 
   const links = useMemo(() => sortUsefulLinks(studies), [studies]);
 
+  const planSubjectFilters = useMemo(() => {
+    if (planResult?.subjectFilters?.length) {
+      return planResult.subjectFilters;
+    }
+
+    const filterMap = new Map<string, { key: string; label: string; count: number }>();
+    for (const col of planResult?.dayColumns ?? []) {
+      for (const ev of col.events) {
+        const key = getPlanEventFilterKey(ev);
+        if (!key) continue;
+        const existing = filterMap.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          filterMap.set(key, { key, label: getPlanEventFilterLabel(ev), count: 1 });
+        }
+      }
+    }
+    return [...filterMap.values()].sort((a, b) => a.label.localeCompare(b.label, 'pl'));
+  }, [planResult]);
+
+  const visiblePlanResult = useMemo(() => {
+    if (!planResult) return null;
+    if (!hiddenPlanSubjectKeys.length) return planResult;
+
+    const hiddenKeys = new Set(hiddenPlanSubjectKeys);
+    const dayColumns = planResult.dayColumns.map((column) => ({
+      ...column,
+      events: relayoutDayEvents(
+        column.events.filter((event) => !hiddenKeys.has(getPlanEventFilterKey(event))),
+      ),
+    }));
+    const visibleDates = new Set(dayColumns.filter((column) => column.events.length > 0).map((column) => column.date));
+    const monthGrid = planResult.monthGrid.map((week) => week.map((cell) => ({
+      ...cell,
+      hasPlan: visibleDates.has(cell.date),
+    })));
+
+    return {
+      ...planResult,
+      dayColumns,
+      monthGrid,
+      hasAnyEventsInRange: dayColumns.some((column) => column.events.length > 0),
+    };
+  }, [planResult, hiddenPlanSubjectKeys]);
+
   const weekLayout = useMemo(() => {
     let minS = Infinity, maxE = 0;
-    for (const col of planResult?.dayColumns ?? []) {
+    for (const col of visiblePlanResult?.dayColumns ?? []) {
       for (const ev of col.events) { minS = Math.min(minS, ev.startMin); maxE = Math.max(maxE, ev.endMin); }
     }
     const s0 = Number.isFinite(minS) ? minS : 7 * 60;
@@ -1111,16 +979,16 @@ function App() {
     for (let m = startMin; m < endMin; m += 60) slots.push(m);
     if (!slots.length) slots.push(startMin);
     return { startMin, endMin, hourHeight: hh, slots };
-  }, [planResult?.dayColumns, settings.compactPlan]);
+  }, [visiblePlanResult?.dayColumns, settings.compactPlan]);
 
   const weekVisibleColumns = useMemo(() => {
-    const cols = planResult?.dayColumns ?? [];
+    const cols = visiblePlanResult?.dayColumns ?? [];
     const weekendCols = cols.filter(col => isWeekendDate(col.date));
     const hideWeekend = weekendCols.length === 2 && weekendCols.every(col => col.events.length === 0);
     if (!hideWeekend) return cols;
     const workweekCols = cols.filter(col => !isWeekendDate(col.date));
     return workweekCols.length > 0 ? workweekCols : cols;
-  }, [planResult?.dayColumns]);
+  }, [visiblePlanResult?.dayColumns]);
 
   const weekTrackH = weekLayout.slots.length * weekLayout.hourHeight;
   const min2px = weekLayout.hourHeight / 60;
@@ -1137,6 +1005,22 @@ function App() {
     }
     setDrawerOpen(false);
   }, [nav, screen]);
+
+  const togglePlanSubjectFilter = useCallback((key: string) => {
+    setHiddenPlanSubjectKeys((prev) => (
+      prev.includes(key)
+        ? prev.filter((item) => item !== key)
+        : [...prev, key]
+    ));
+  }, []);
+
+  const handlePlanExport = useCallback(() => {
+    if (!visiblePlanResult || !exportPlanToIcs(visiblePlanResult)) {
+      setGlobalError('Brak zajęć do eksportu w aktualnym widoku.');
+      return;
+    }
+    showToast('Wyeksportowano plan do pliku ICS');
+  }, [visiblePlanResult, showToast]);
 
   // ── Login ─────────────────────────────────────────────────────────────────
   const [loginVal, setLoginVal] = useState('');
@@ -1189,8 +1073,7 @@ function App() {
   const onNavIcon = () => setDrawerOpen(true);
 
   // ── Drawer items ──────────────────────────────────────────────────────────
-  type DrawerKey = Exclude<ScreenKey, 'login' | 'news-detail'>;
-  const drawerItems: Array<{ key: DrawerKey; label: string; icon: string }> = [
+  const drawerItems: Array<{ key: DrawerScreenKey; label: string; icon: string }> = [
     { key: 'home', label: t('drawer.home'), icon: 'home' },
     { key: 'plan', label: t('drawer.plan'), icon: 'calendar' },
     { key: 'grades', label: t('drawer.grades'), icon: 'grade' },
@@ -1256,12 +1139,12 @@ function App() {
     const drag = planDragRef.current;
     planDragRef.current = null;
     if (!drag?.locked) { applyCarouselTransform(0, true); return; }
-    if (!planResult || planLoading) { applyCarouselTransform(0, true); return; }
+    if (!visiblePlanResult || planLoading) { applyCarouselTransform(0, true); return; }
     const dx = e.changedTouches[0].clientX - drag.startX;
     const dt = Math.max(1, Date.now() - drag.startTime);
     const velocity = Math.abs(dx) / dt;
     if (Math.abs(dx) < 50 && velocity < 0.35) { applyCarouselTransform(0, true); return; }
-    const targetDate = dx > 0 ? planResult.prevDate : planResult.nextDate;
+    const targetDate = dx > 0 ? visiblePlanResult.prevDate : visiblePlanResult.nextDate;
     if (!targetDate) { applyCarouselTransform(0, true); return; }
     commitPlanNavigate(targetDate, dx > 0);
   };
@@ -1275,147 +1158,34 @@ function App() {
 
   function renderLogin() {
     return (
-      <section className="screen login-screen">
-        <div className="login-header">
-          <img src={LOGO_SRC} alt="mZUT v2" className="login-logo" />
-          <h1 className="login-title">mzutv2</h1>
-        </div>
-
-        <div className="login-card">
-          <div className="login-card-title">{t('login.cardTitle')}</div>
-
-          <div className="login-form">
-            <div className="login-field">
-              <label htmlFor="login-input" className="login-field-label">
-                <Ic n="user" />
-              </label>
-              <input
-                id="login-input"
-                type="text"
-                value={loginVal}
-                onChange={e => setLoginVal(e.target.value)}
-                placeholder={t('login.usernamePlaceholder') || "s12345 lub email"}
-                autoComplete="username"
-                onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
-                className="login-field-input"
-              />
-            </div>
-
-            <div className="login-field">
-              <label htmlFor="password-input" className="login-field-label">
-                <Ic n="lock" />
-              </label>
-              <input
-                id="password-input"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder={t('login.password')}
-                autoComplete="current-password"
-                onKeyDown={e => e.key === 'Enter' && void onLoginSubmit()}
-                className="login-field-input"
-              />
-              <button
-                type="button"
-                className="login-field-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
-              >
-                <Ic n="eye" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void onLoginSubmit()}
-              disabled={loginLoading}
-              className="login-button"
-            >
-              {loginLoading ? t('login.loggingIn') : t('login.loginBtn')}
-            </button>
-
-            <div className="login-divider">
-              <span>{t('login.or') || 'lub'}</span>
-            </div>
-
-            <button
-              type="button"
-              className="login-usos-btn"
-              onClick={async () => {
-                setGlobalLoad(true);
-                try {
-                  const callbackUrl = window.location.origin + window.location.pathname;
-                  const { oauth_token, oauth_token_secret } = await fetchUsosRequestToken(callbackUrl);
-                  sessionStorage.setItem('usos_request_token_secret', oauth_token_secret);
-                  window.location.href = `https://usosapi.zut.edu.pl/services/oauth/authorize?oauth_token=${oauth_token}`;
-                } catch (e) {
-                  setGlobalError(e instanceof Error ? e.message : 'Błąd inicjacji USOS.');
-                  setGlobalLoad(false);
-                }
-              }}
-            >
-              <div className="login-usos-icon">U</div>
-              {(t('login.usosBtn') || 'Zaloguj przez USOS') + ' (Wczesny dostęp)'}
-            </button>
-
-            <p className="login-info-text" style={{ whiteSpace: 'pre-line' }}>
-              {t('login.infoText')}
-            </p>
-          </div>
-        </div>
-
-      </section>
+      <LoginScreen
+        t={t}
+        loginVal={loginVal}
+        setLoginVal={setLoginVal}
+        password={password}
+        setPassword={setPassword}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        loginLoading={loginLoading}
+        onLoginSubmit={onLoginSubmit}
+        onUsosLogin={async () => {
+          setGlobalLoad(true);
+          try {
+            const callbackUrl = window.location.origin + window.location.pathname;
+            const { oauth_token, oauth_token_secret } = await fetchUsosRequestToken(callbackUrl);
+            sessionStorage.setItem('usos_request_token_secret', oauth_token_secret);
+            window.location.href = `https://usosapi.zut.edu.pl/services/oauth/authorize?oauth_token=${oauth_token}`;
+          } catch (e) {
+            setGlobalError(e instanceof Error ? e.message : 'Błąd inicjacji USOS.');
+            setGlobalLoad(false);
+          }
+        }}
+      />
     );
   }
 
   function renderHome() {
-    const firstName = session?.username?.split(' ')[0] ?? 'Student';
-
-    return (
-      <section className="screen home-screen">
-        <div className="home-scroll-content">
-          {/* Hero */}
-          <div className="home-hero-card">
-            <div className="home-hero-greeting-row">
-              <div>
-                <div className="home-hero-hello">{t('home.hello')}</div>
-                <div className="home-hero-name">{firstName}</div>
-              </div>
-              <div className="home-hero-avatar">{firstName[0]?.toUpperCase() ?? 'S'}</div>
-            </div>
-
-            {session?.usos && (
-              <div className="usos-warning-banner" style={{ marginTop: '16px', background: 'rgba(255, 152, 0, 0.1)', border: '1px solid rgba(255, 152, 0, 0.3)', borderRadius: '8px', padding: '12px', fontSize: '14px', color: 'var(--mz-text)' }}>
-                <strong style={{ color: '#ff9800', display: 'block', marginBottom: '4px' }}>⚠ Uwaga (Tryb USOS)</strong>
-                Zalogowano za pomocą systemu USOS. Niektóre funkcje mogą działać nieprawidłowo lub nie wyświetlać wszystkich danych, ponieważ uczelnia wciąż wdraża ten system.
-              </div>
-            )}
-            {!isOnline && (
-              <span className="offline-badge"><Ic n="wifi-off" />{t('home.offlineMode')}</span>
-            )}
-          </div>
-
-          {/* Quick access tiles */}
-          <div className="home-tiles-label">{t('home.quickAccess')}</div>
-          <div className="tile-grid">
-            {([
-              { key: 'plan' as DrawerKey, label: t('home.tilePlan'), desc: t('home.tilePlanDesc'), icon: 'calendar' },
-              { key: 'grades' as DrawerKey, label: t('home.tileGrades'), desc: t('home.tileGradesDesc'), icon: 'grade' },
-              { key: 'info' as DrawerKey, label: t('home.tileInfo'), desc: t('home.tileInfoDesc'), icon: 'user' },
-              { key: 'news' as DrawerKey, label: t('home.tileNews'), desc: t('home.tileNewsDesc'), icon: 'news' },
-              { key: 'links' as DrawerKey, label: t('home.tileLinks'), desc: t('home.tileLinksDesc'), icon: 'link' },
-              { key: 'settings' as DrawerKey, label: t('home.tileSettings'), desc: t('home.tileSettingsDesc'), icon: 'settings' },
-            ] as const).map(tile => (
-              <button key={tile.key} type="button" className="tile" onClick={() => openScreen(tile.key)}>
-                <div className="tile-icon"><Ic n={tile.icon} /></div>
-                <span className="tile-label">{tile.label}</span>
-                <span className="tile-desc">{tile.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
+    return <HomeScreen session={session} isOnline={isOnline} t={t} openScreen={openScreen} />;
   }
 
   function getPeriodDisplayName(key: string): string {
@@ -1506,12 +1276,12 @@ function App() {
     if (planLoading) return null;
 
     // Dynamically calculate what to show in the legend based on the current week/day events
-    const cols = planResult?.dayColumns ?? [];
+    const cols = visiblePlanResult?.dayColumns ?? [];
     const activeEventClasses = new Set<string>();
     cols.forEach(col => col.events.forEach(ev => activeEventClasses.add(`ev-${ev.typeClass}`)));
 
     const activeMarkerKinds = new Set<string>();
-    const periods = planResult?.sessionPeriods ?? [];
+    const periods = visiblePlanResult?.sessionPeriods ?? [];
     cols.forEach(col => {
       const markers = getActivePeriods(col.date, periods);
       markers.forEach(m => activeMarkerKinds.add(m.kind));
@@ -1554,10 +1324,13 @@ function App() {
   }
 
   function renderPlan() {
-    const cols = planResult?.dayColumns ?? [];
+    const cols = visiblePlanResult?.dayColumns ?? [];
     const weekCols = weekVisibleColumns;
     const today = todayYmd();
-    const activeFilter = planSearchQ.trim();
+    const activeFilter = [
+      planSearchQ.trim(),
+      hiddenPlanSubjectKeys.length > 0 ? `ukryto: ${hiddenPlanSubjectKeys.length}` : '',
+    ].filter(Boolean).join(' · ');
 
     // Build week grid template with separator columns
     const buildWeekGridTemplate = (numCols: number) => {
@@ -1568,7 +1341,7 @@ function App() {
         if (i < numCols - 1) {
           // Check if separator needed between this col and next
           const sep = weekCols.length > i + 1
-            ? getWeekSeparatorPeriod(weekCols[i].date, weekCols[i + 1].date, planResult?.sessionPeriods ?? [])
+            ? getWeekSeparatorPeriod(weekCols[i].date, weekCols[i + 1].date, visiblePlanResult?.sessionPeriods ?? [])
             : null;
           parts.push(sep ? '3px' : '0px');
         }
@@ -1584,16 +1357,16 @@ function App() {
           {/* Sticky Header — prev | center | Today | search | next */}
           <div className="plan-sticky-header">
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
-              const newDate = planResult?.prevDate ?? planDate;
+              const newDate = visiblePlanResult?.prevDate ?? planDate;
               commitPlanNavigate(newDate, true);
             }} aria-label={t('plan.prev')}>
               <Ic n="chevL" />
             </button>
             <div className="plan-header-center">
-              <div className="plan-date-label-compact">{planResult?.headerLabel || planDate}{activeFilter ? ` · ${activeFilter}` : ''}</div>
+              <div className="plan-date-label-compact">{visiblePlanResult?.headerLabel || planDate}{activeFilter ? ` · ${activeFilter}` : ''}</div>
             </div>
             <button type="button" className="plan-nav-btn-compact" onClick={() => {
-              const newDate = planResult?.nextDate ?? planDate;
+              const newDate = visiblePlanResult?.nextDate ?? planDate;
               commitPlanNavigate(newDate, false);
             }} aria-label={t('plan.next')}>
               <Ic n="chevR" />
@@ -1628,7 +1401,7 @@ function App() {
                 {planViewMode === 'day' && (
                   <div className="list-stack">
                     {cols.map((col, ci) => {
-                      const periods = planResult?.sessionPeriods ?? [];
+                      const periods = visiblePlanResult?.sessionPeriods ?? [];
                       const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
                       const activeMarkers = getActivePeriods(col.date, periods);
                       return (
@@ -1728,7 +1501,7 @@ function App() {
                         <div className="week-grid week-head-row" style={{ gridTemplateColumns: weekGridTemplate }}>
                           <div className="week-head-time">{t('plan.hour')}</div>
                           {weekCols.map((col, ci) => {
-                            const wActive = getActivePeriods(col.date, planResult?.sessionPeriods ?? []);
+                            const wActive = getActivePeriods(col.date, visiblePlanResult?.sessionPeriods ?? []);
                             const topPeriod = wActive.sort((a, b) => {
                               const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
                               return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
@@ -1736,7 +1509,7 @@ function App() {
 
                             // Separator between this col and next
                             const sep = ci < weekCols.length - 1
-                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, planResult?.sessionPeriods ?? [])
+                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
                               : null;
 
                             return (
@@ -1763,7 +1536,7 @@ function App() {
 
                           {weekCols.map((col, ci) => {
                             const sep = ci < weekCols.length - 1
-                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, planResult?.sessionPeriods ?? [])
+                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
                               : null;
                             return (
                               <React.Fragment key={`w-col-${col.date}`}>
@@ -1809,7 +1582,9 @@ function App() {
                                           }}
                                           title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
                                         >
-                                          <div className="week-event-time">{ev.startStr}</div>
+                                          <div className="week-event-time">
+                                            {ev.startStr}-{ev.endStr}{ev.room && ev.room !== '-' ? ` - ${ev.room}` : ''}
+                                          </div>
                                           <div className="week-event-title">{ev.title}</div>
                                         </div>
                                       );
@@ -1833,7 +1608,7 @@ function App() {
                   <div className="month-shell">
                     <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map(k => <span key={k}>{t(k)}</span>)}</div>
                     <div className="month-grid">
-                      {(planResult?.monthGrid ?? []).flat().map(cell => (
+                      {(visiblePlanResult?.monthGrid ?? []).flat().map(cell => (
                         <div
                           key={cell.date}
                           className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
@@ -1870,605 +1645,115 @@ function App() {
 
   function renderGrades() {
     return (
-      <section className="screen grades-screen">
-        <div className="grades-header-wrapper">
-          <div className="grades-hero">
-            <div className="metrics-row">
-              <div className="metric-card"><div className="metric-label">{t('grades.avg')}</div><div className="metric-value">{gradesSummary.avg}</div></div>
-              <div className="metric-card"><div className="metric-label">{t('grades.ectsSem')}</div><div className="metric-value">{gradesSummary.ects}</div></div>
-              <div className="metric-card"><div className="metric-label">{t('grades.ectsTotal')}</div><div className="metric-value">{fmtDec(totalEctsAll, 1)}</div></div>
-            </div>
-          </div>
-
-          <div className="grades-filters-container">
-            <div className="grades-filters">
-              {studies.length > 0 && (
-                <label className="field-label">
-                  {t('grades.studyField')}
-                  <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-                    {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-                  </select>
-                </label>
-              )}
-              {semesters.length > 0 && (
-                <label className="field-label">
-                  {t('grades.semLabel')}
-                  <select value={selSemId} onChange={e => setSelSemId(e.target.value)}>
-                    {semesters.map(s => (
-                      <option key={s.listaSemestrowId} value={s.listaSemestrowId}>
-                        {t('grades.semOption')} {s.nrSemestru} ({t(`period.${s.pora.toLowerCase()}`) || s.pora}) {s.rokAkademicki}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="grades-surface">
-          {gradesLoading && <Spinner text={t('grades.loading')} />}
-          {!gradesLoading && grades.length === 0 && (
-            <div className="empty-state"><div className="empty-state-icon">🎓</div><p>{t('grades.noGrades')}</p></div>
-          )}
-
-          <div className="list-stack">
-            {settings.gradesGrouping ? (
-              groupedGrades.map(({ subject, items, finalGrade, ects }) => {
-                const isOpen = !!expandedGradeSubjects[subject];
-                return (
-                  <div key={subject} className="grade-group">
-                    <button
-                      type="button"
-                      className="grade-group-head"
-                      onClick={() => setExpandedGradeSubjects(prev => ({ ...prev, [subject]: !prev[subject] }))}
-                      aria-expanded={isOpen}
-                    >
-                      <div className="grade-group-icon"><Ic n="grade" /></div>
-                      <div className="grade-group-name-wrap">
-                        <div className="grade-group-name">{subject}</div>
-                        <div className="grade-group-sub">
-                          {t('grades.finalGrade')}{ects > 0 ? ` · ${fmtDec(ects, 1)} ECTS` : ''}
-                        </div>
-                      </div>
-                      <div className={`grade-group-pill ${gradeTone(finalGrade)}`}>{finalGrade || '–'}</div>
-                      <div className={`grade-group-chevron ${isOpen ? 'open' : ''}`}><Ic n="chevR" /></div>
-                    </button>
-
-                    {isOpen && (
-                      <div className="grade-group-items">
-                        {items.map((g, i) => (
-                          <div key={`${subject}-${i}`} className="grade-row">
-                            <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
-                            <div className="grade-info">
-                              <div className="grade-type-chip">{isFinalGradeType(g.type) ? t('grades.finalGrade') : (g.type || t('grades.component'))}</div>
-                              <div className="grade-date-teacher">
-                                {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
-                              </div>
-                            </div>
-                            <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="grade-group">
-                {grades.map((g, i) => (
-                  <div key={`flat-${i}-${g.subjectName}`} className="grade-row">
-                    <span className={`grade-pill ${gradeTone(g.grade)}`}>{g.grade || '–'}</span>
-                    <div className="grade-info">
-                      <div>{g.subjectName || t('grades.subject')}</div>
-                      <div className="grade-date-teacher">
-                        {g.date || '–'}{g.teacher ? ` · ${g.teacher}` : ''}
-                      </div>
-                    </div>
-                    <div className="grade-ects">{g.weight > 0 ? `${fmtDec(g.weight, 1)} ECTS` : '–'}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      <GradesScreen
+        t={t}
+        gradesSummary={gradesSummary}
+        totalEctsAll={totalEctsAll}
+        studies={studies}
+        activeStudyId={activeStudyId}
+        updateActiveStudy={updateActiveStudy}
+        semesters={semesters}
+        selSemId={selSemId}
+        setSelSemId={setSelSemId}
+        gradesLoading={gradesLoading}
+        grades={grades}
+        settings={settings}
+        groupedGrades={groupedGrades}
+        expandedGradeSubjects={expandedGradeSubjects}
+        setExpandedGradeSubjects={setExpandedGradeSubjects}
+      />
     );
   }
 
   function renderInfo() {
-    const hasSideColumn = !!session || studies.length > 0;
-
     return (
-      <section className={`screen info-screen${hasSideColumn ? '' : ' info-screen-full'}`}>
-        {hasSideColumn && (
-          <aside className="info-side">
-            {session && (
-              <div className="info-profile-card">
-                {studentPhotoBlobUrl && !studentPhotoError ? (
-                  <img
-                    src={studentPhotoBlobUrl}
-                    alt={t('info.photoAlt')}
-                    className="info-profile-photo"
-                  />
-                ) : (
-                  <div className="info-profile-fallback">{initials(session.username || 'S')}</div>
-                )}
-                <div className="info-profile-meta">
-                  <div className="info-profile-name">{session.username || t('info.studentNameFallback')}</div>
-                  <div className="info-profile-id">{t('info.userId')}: {session.userId || '-'}</div>
-                </div>
-              </div>
-            )}
-
-            {studies.length > 0 && (
-              <label className="field-label info-study-select">
-                {t('info.studyField')}
-                <select value={activeStudyId ?? ''} onChange={e => updateActiveStudy(e.target.value || null)}>
-                  {studies.map(s => <option key={s.przynaleznoscId} value={s.przynaleznoscId}>{s.label}</option>)}
-                </select>
-              </label>
-            )}
-          </aside>
-        )}
-
-        <div className="info-main">
-          {infoLoading && <Spinner text={t('info.loading')} />}
-          {details && (
-            <div className="info-card">
-              {([
-                { l: t('info.detailAlbum'), v: details.album },
-                { l: t('info.detailFaculty'), v: details.wydzial },
-                { l: t('info.detailField'), v: details.kierunek },
-                { l: t('info.detailForm'), v: details.forma },
-                { l: t('info.detailLevel'), v: details.poziom },
-                { l: t('info.detailSpecialty'), v: details.specjalnosc },
-                { l: t('info.detailSpecialization'), v: details.specjalizacja },
-                { l: t('info.detailStatus'), v: details.status },
-                { l: t('info.detailYear'), v: details.rokAkademicki },
-                { l: t('info.detailSem'), v: details.semestrLabel },
-              ].filter(r => r.v)).map(r => (
-                <div key={r.l} className="info-row">
-                  <div className="info-row-label">{r.l}</div>
-                  <div className="info-row-value">{r.v}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {history.length > 0 && (
-            <div className="info-card info-history-card">
-              <div className="info-card-head">{t('info.studyHistory')}</div>
-              {history.map((h, i) => (
-                <div key={i} className="history-row">
-                  <span className="history-label">{h.label}</span>
-                  <span className="history-status">{h.status}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {els && (
-            <div className="info-card">
-              <div className="info-card-head">Legitymacja Elektroniczna (ELS)</div>
-              <div className="info-row">
-                <div className="info-row-label">Status</div>
-                <div className="info-row-value">
-                  <span className={`grade-pill ${els.isActive ? 'ok' : 'bad'}`} style={{ padding: '4px 8px', fontSize: '13px' }}>
-                    {els.isActive ? 'Aktywna' : 'Nieaktywna'}
-                  </span>
-                </div>
-              </div>
-              <div className="info-row">
-                <div className="info-row-label">Ważna do</div>
-                <div className="info-row-value">{els.expirationDate}</div>
-              </div>
-            </div>
-          )}
-
-          {calendarEvents && calendarEvents.length > 0 && (
-            <div className="info-card">
-              <div className="info-card-head">Kalendarz Akademicki (30 dni)</div>
-              {calendarEvents.map((ev, i) => (
-                <div key={i} className="history-row" style={{ alignItems: 'flex-start', padding: '12px 16px' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div className="history-label">{ev.name}</div>
-                    <div className="history-status" style={{ fontSize: '12px', opacity: 0.8, textAlign: 'left' }}>
-                      {ev.startDate === ev.endDate ? ev.startDate : `${ev.startDate} – ${ev.endDate}`}
-                    </div>
-                  </div>
-                  {ev.isDayOff && (
-                    <span className="grade-pill ok" style={{ padding: '2px 6px', fontSize: '11px', alignSelf: 'center' }}>
-                      Dzień wolny
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {!infoLoading && !details && (
-            <div className="empty-state"><div className="empty-state-icon">👤</div><p>{t('info.empty')}</p></div>
-          )}
-        </div>
-      </section>
+      <InfoScreen
+        session={session}
+        studies={studies}
+        activeStudyId={activeStudyId}
+        updateActiveStudy={updateActiveStudy}
+        studentPhotoBlobUrl={studentPhotoBlobUrl}
+        studentPhotoError={studentPhotoError}
+        t={t}
+        infoLoading={infoLoading}
+        details={details}
+        history={history}
+        els={els}
+        calendarEvents={calendarEvents}
+      />
     );
   }
   function renderNews() {
     return (
-      <section className="screen news-screen">
-        {newsLoading && <Spinner text={t('news.loading')} />}
-        {!newsLoading && news.length === 0 && (
-          <div className="empty-state"><div className="empty-state-icon">📰</div><p>{t('news.empty')}</p></div>
-        )}
-        <div className="list-stack">
-          {news.map(item => (
-            <button key={item.id} type="button" className="news-card" onClick={() => nav.push('news-detail', { item } as unknown as NewsDetailParams)}>
-              {item.thumbUrl ? (
-                <img src={item.thumbUrl} alt="" className="news-thumb" loading="lazy" onError={e => { (e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement('div'), { className: 'news-thumb-placeholder', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H4a2 2 0 00-2 2v16a2 2 0 002 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path fill="currentColor" d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>' })); }} />
-              ) : (
-                <div className="news-thumb-placeholder"><Ic n="news" /></div>
-              )}
-              <div className="news-content">
-                <div className="news-title">{item.title}</div>
-                <div className="news-date">{item.date}</div>
-                <div className="news-snippet">{item.snippet}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+      <NewsScreen
+        newsLoading={newsLoading}
+        news={news}
+        t={t}
+        onOpenDetail={(item) => nav.push('news-detail', { item } as unknown as NewsDetailParams)}
+      />
     );
   }
 
   function renderNewsDetail() {
     const p = (nav.current.params ?? {}) as NewsDetailParams;
-    const item = p.item;
-    if (!item) return <section className="screen news-detail-screen"><div className="empty-state"><p>{t('newsDetail.noContent')}</p></div></section>;
-    const fullHtml = item.contentHtml || item.descriptionHtml;
-
-    return (
-      <section className="screen news-detail-screen">
-        <div className="card">
-          <div className="news-detail-title">{item.title}</div>
-          <div className="news-detail-date">{item.date}</div>
-          {item.thumbUrl && <img src={item.thumbUrl} alt="" className="news-detail-img" loading="lazy" decoding="async" crossOrigin="anonymous" />}
-          {fullHtml ? (
-            <div className="news-detail-body" dangerouslySetInnerHTML={{ __html: fullHtml }} />
-          ) : (
-            <div className="news-detail-body">{item.descriptionText || item.snippet}</div>
-          )}
-        </div>
-        {item.link && (
-          <a href={item.link} target="_blank" rel="noreferrer" className="news-source-btn">
-            {t('newsDetail.openBrowser')} ↗
-          </a>
-        )}
-      </section>
-    );
+    return <NewsDetailScreen item={p.item} t={t} />;
   }
 
   function renderLinks() {
-    const globals = links.filter(l => l.scope === 'GLOBAL');
-    const faculties = links.filter(l => l.scope === 'FACULTY');
-    return (
-      <section className="screen links-screen">
-        {faculties.length > 0 && <div className="link-category">{t('links.faculty')}</div>}
-        {faculties.map(l => (
-          <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
-            <div className="link-card-title">{l.title}</div>
-            <div className="link-card-desc">{l.description}</div>
-          </a>
-        ))}
-        <div className="link-category">{t('links.university')}</div>
-        {globals.map(l => (
-          <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="link-card">
-            <div className="link-card-title">{l.title}</div>
-            <div className="link-card-desc">{l.description}</div>
-          </a>
-        ))}
-      </section>
-    );
+    return <LinksScreen links={links} t={t} />;
   }
 
   function renderSettings() {
-    return (
-      <section className="screen settings-screen">
-        <div className="settings-card">
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">{t('settings.language')}</div>
-              <div className="settings-row-sub">{t('settings.languageSub')}</div>
-            </div>
-            <select value={settings.language} onChange={e => setSettings(p => ({ ...p, language: e.target.value as 'pl' | 'en' }))}>
-              <option value="pl">Polski</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">{t('settings.refresh')}</div>
-              <div className="settings-row-sub">{t('settings.refreshSub')}</div>
-            </div>
-            <select value={settings.refreshMinutes} onChange={e => setSettings(p => ({ ...p, refreshMinutes: Number(e.target.value) as 30 | 60 | 120 }))}>
-              <option value={30}>30 min</option>
-              <option value={60}>60 min</option>
-              <option value={120}>120 min</option>
-            </select>
-          </div>
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">{t('settings.compactPlan')}</div>
-              <div className="settings-row-sub">{t('settings.compactPlanSub')}</div>
-            </div>
-            <Toggle checked={settings.compactPlan} onChange={v => setSettings(p => ({ ...p, compactPlan: v }))} />
-          </div>
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">{t('settings.gradeGroup')}</div>
-              <div className="settings-row-sub">{t('settings.gradeGroupSub')}</div>
-            </div>
-            <Toggle checked={settings.gradesGrouping} onChange={v => setSettings(p => ({ ...p, gradesGrouping: v }))} />
-          </div>
-        </div>
-      </section>
-    );
+    return <SettingsScreen settings={settings} setSettings={setSettings} t={t} />;
   }
 
   function renderAbout() {
-    return (
-      <section className="screen about-screen">
-        <div className="about-hero card">
-          <img src={LOGO_SRC} alt="Logo mZUT v2" className="about-logo-img" />
-          <div className="about-app-name">mZUT v2</div>
-          <div className="about-version">v1.2.0 (PWA)</div>
-          <div className="about-note">{t('about.pwaNote')}</div>
-        </div>
-
-        {canOfferInstall && (
-          <button type="button" className="about-action-card about-install-card" onClick={() => void handleInstallPwa()}>
-            <div className="about-action-icon" style={{ background: '#1976d2', color: '#fff' }}>📲</div>
-            <div className="about-action-content">
-              <div className="about-action-title">{t('about.installApp')}</div>
-              <div className="about-action-desc">
-                {isIosSafari ? t('about.installIos') : t('about.installAndroid')}
-              </div>
-            </div>
-            <div className="about-action-arrow">→</div>
-          </button>
-        )}
-
-        <div className="about-actions">
-          <a href="https://play.google.com/store/apps/details?id=pl.kejlo.mzutv2" target="_blank" rel="noreferrer" className="about-action-card">
-            <div className="about-action-icon" style={{ background: '#26FFA000' }}>⭐</div>
-            <div className="about-action-content">
-              <div className="about-action-title">{t('about.rateApp')}</div>
-              <div className="about-action-desc">{t('about.rateDesc')}</div>
-            </div>
-            <div className="about-action-arrow">→</div>
-          </a>
-
-          <a href="https://github.com/Kejlo523/mzut-v2" target="_blank" rel="noreferrer" className="about-action-card">
-            <div className="about-action-icon" style={{ background: 'var(--mz-border-soft)', color: 'var(--mz-text)' }}>📝</div>
-            <div className="about-action-content">
-              <div className="about-action-title">{t('about.sourceCode')}</div>
-              <div className="about-action-desc">{t('about.sourceDesc')}</div>
-            </div>
-            <div className="about-action-arrow">→</div>
-          </a>
-        </div>
-
-        <div className="about-links">
-          <a href="https://mzut.endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
-            <span className="about-link-icon">ℹ️</span>
-            <span className="about-link-text">{t('about.projectSite')}</span>
-            <span className="about-link-arrow">→</span>
-          </a>
-
-          <a href="https://endozero.pl" target="_blank" rel="noreferrer" className="about-link-item">
-            <span className="about-link-icon">👤</span>
-            <span className="about-link-text">{t('about.authorSite')}</span>
-            <span className="about-link-arrow">→</span>
-          </a>
-
-          <a href="https://mzut.endozero.pl/privacy_policy.html" target="_blank" rel="noreferrer" className="about-link-item">
-            <span className="about-link-icon">🔒</span>
-            <span className="about-link-text">{t('about.privacyPolicy')}</span>
-            <span className="about-link-arrow">→</span>
-          </a>
-
-          <a href="mailto:kejlo@endozero.pl" className="about-link-item">
-            <span className="about-link-icon">📧</span>
-            <span className="about-link-text">E-mail: kejlo@endozero.pl</span>
-            <span className="about-link-arrow">→</span>
-          </a>
-        </div>
-
-        <div className="about-description">
-          <p>{t('about.description')}</p>
-          <p style={{ marginTop: '12px', opacity: 0.8, fontSize: '12px' }}>Made with ❤️ by Kejlo</p>
-        </div>
-      </section>
-    );
+    return <AboutScreen canOfferInstall={canOfferInstall} handleInstallPwa={handleInstallPwa} isIosSafari={isIosSafari} t={t} />;
   }
 
   function renderPlanEventSheet() {
-    if (!selectedPlanEvent) return null;
-    const { date, event } = selectedPlanEvent;
-
+    if (screen !== 'plan') return null;
     return (
-      <div className="event-sheet-overlay" onClick={() => setSelectedPlanEvent(null)}>
-        <div className="event-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szczegóły zajęć">
-          <div className="event-sheet-handle" />
-          <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'Zajęcia'}</div>
-          <div className="event-sheet-title">{event.title}</div>
-          <div className="event-sheet-row">
-            <Ic n="clock" />
-            <span>{fmtDateLabel(date, settings.language)} · {event.startStr} - {event.endStr}</span>
-          </div>
-          {!!event.room && (
-            <div className="event-sheet-row">
-              <Ic n="location" />
-              <span>Sala: {event.room}</span>
-            </div>
-          )}
-          {!!event.group && (
-            <div className="event-sheet-row">
-              <Ic n="group" />
-              <span>Grupa: {event.group}</span>
-            </div>
-          )}
-          {!!event.teacher && (
-            <div className="event-sheet-row">
-              <Ic n="user" />
-              <span>{event.teacher}</span>
-            </div>
-          )}
-          <button type="button" className="event-sheet-close" onClick={() => setSelectedPlanEvent(null)}>
-            Zamknij
-          </button>
-        </div>
-      </div>
+      <PlanEventSheet
+        selectedPlanEvent={selectedPlanEvent}
+        onClose={() => setSelectedPlanEvent(null)}
+        language={settings.language}
+      />
     );
   }
 
   function renderPlanSearchSheet() {
-    if (!planSearchOpen) return null;
-
-    const handleQueryChange = (value: string) => {
-      setPlanSearchQ(value);
-
-      // Clear existing debounce timer
-      if (planSearchDebounceRef.current) {
-        clearTimeout(planSearchDebounceRef.current);
-      }
-
-      // For album category, don't fetch suggestions
-      if (planSearchCat === 'album') {
-        setPlanSearchSuggestions([]);
-        return;
-      }
-
-      // Debounce suggestion fetching (300ms)
-      planSearchDebounceRef.current = setTimeout(() => {
-        if (value.trim()) {
-          void fetchPlanSearchSuggestions(planSearchCat, value.trim());
-        } else {
-          setPlanSearchSuggestions([]);
-        }
-      }, 300);
-    };
-
-    const handleCategoryChange = (newCat: string) => {
-      setPlanSearchCat(newCat);
-      setPlanSearchSuggestions([]);
-      if (planSearchQ.trim() && newCat !== 'album') {
-        if (planSearchDebounceRef.current) {
-          clearTimeout(planSearchDebounceRef.current);
-        }
-        planSearchDebounceRef.current = setTimeout(() => {
-          void fetchPlanSearchSuggestions(newCat, planSearchQ.trim());
-        }, 300);
-      }
-    };
-
-    const handleSuggestionClick = (suggestion: string) => {
-      setPlanSearchQ(suggestion);
-      setPlanSearchSuggestions([]);
-    };
-
-    const handleSearch = () => {
-      if (planSearchQ.trim()) {
-        void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() });
-        setPlanSearchOpen(false);
-      }
-    };
-
-    const handleClear = () => {
-      setPlanSearchQ('');
-      setPlanSearchSuggestions([]);
-      void loadPlanData();
-      setPlanSearchOpen(false);
-    };
-
+    if (screen !== 'plan') return null;
     return (
-      <div className="event-sheet-overlay" onClick={() => setPlanSearchOpen(false)}>
-        <div className="event-sheet search-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szukaj w planie">
-          <div className="event-sheet-handle" />
-          <div className="search-container">
-            <h2 className="search-title">Szukaj w planie</h2>
+      <PlanSearchSheet
+        planSearchOpen={planSearchOpen}
+        planSearchCat={planSearchCat}
+        setPlanSearchCat={setPlanSearchCat}
+        planSearchQ={planSearchQ}
+        setPlanSearchQ={setPlanSearchQ}
+        planSearchSuggestions={planSearchSuggestions}
+        setPlanSearchSuggestions={setPlanSearchSuggestions}
+        planSearchLoading={planSearchLoading}
+        planSearchDebounceRef={planSearchDebounceRef}
+        fetchPlanSearchSuggestions={fetchPlanSearchSuggestions}
+        loadPlanData={loadPlanData}
+        setPlanSearchOpen={setPlanSearchOpen}
+        t={t}
+      />
+    );
+  }
 
-            {/* Category row */}
-            <div className="search-field-group">
-              <label className="search-label">{t('search.category')}</label>
-              <select
-                value={planSearchCat}
-                onChange={e => handleCategoryChange(e.target.value)}
-                className="search-select"
-              >
-                <option value="album">{t('search.catAlbum')}</option>
-                <option value="teacher">{t('search.catTeacher')}</option>
-                <option value="group">{t('search.catGroup')}</option>
-                <option value="room">{t('search.catRoom')}</option>
-                <option value="subject">{t('search.catSubject')}</option>
-              </select>
-            </div>
-
-            {/* Query row with spinner */}
-            <div className="search-field-group">
-              <label className="search-label">{t('search.queryLabel')}</label>
-              <div className="search-input-wrapper">
-                <input
-                  type="text"
-                  value={planSearchQ}
-                  onChange={e => handleQueryChange(e.target.value)}
-                  placeholder={t('search.queryPlaceholder')}
-                  className="search-input"
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
-                {planSearchLoading && <span className="search-spinner-inline" />}
-              </div>
-            </div>
-
-            {/* Suggestions list */}
-            {(planSearchSuggestions.length > 0 || (!planSearchQ.trim() && planSearchCat !== 'album')) && (
-              <div className="search-suggestions-container">
-                {planSearchSuggestions.length > 0 ? (
-                  planSearchSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      className="search-suggestion-item"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      {suggestion}
-                    </button>
-                  ))
-                ) : planSearchCat !== 'album' && !planSearchQ.trim() ? (
-                  <div className="search-placeholder">{t('search.placeholderSearch')}</div>
-                ) : null}
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="search-actions">
-              <button
-                type="button"
-                className="search-btn-primary"
-                onClick={handleSearch}
-                disabled={!planSearchQ.trim()}
-              >
-                Szukaj
-              </button>
-              <button
-                type="button"
-                className="search-btn-secondary"
-                onClick={handleClear}
-              >
-                Wyczyść
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+  function renderPlanFiltersSheet() {
+    if (screen !== 'plan') return null;
+    return (
+      <PlanFiltersSheet
+        open={planFiltersOpen}
+        options={planSubjectFilters}
+        hiddenKeys={hiddenPlanSubjectKeys}
+        onToggle={togglePlanSubjectFilter}
+        onReset={() => setHiddenPlanSubjectKeys([])}
+        onClose={() => setPlanFiltersOpen(false)}
+      />
     );
   }
 
@@ -2510,7 +1795,27 @@ function App() {
         },
         active: planDate === todayYmd() && !planSearchQ?.trim(),
       });
-      actions.push({ key: 'search', icon: 'search', label: t('plan.search'), onClick: () => setPlanSearchOpen(p => !p), active: planSearchOpen });
+      actions.push({
+        key: 'search',
+        icon: 'search',
+        label: t('plan.search'),
+        onClick: () => {
+          setPlanFiltersOpen(false);
+          setPlanSearchOpen((p) => !p);
+        },
+        active: planSearchOpen,
+      });
+      actions.push({
+        key: 'filters',
+        icon: 'layers',
+        label: 'Filtry przedmiotów',
+        onClick: () => {
+          setPlanSearchOpen(false);
+          setPlanFiltersOpen((p) => !p);
+        },
+        active: planFiltersOpen || hiddenPlanSubjectKeys.length > 0,
+      });
+      actions.push({ key: 'export', icon: 'download', label: 'Eksportuj plan', onClick: handlePlanExport, active: false });
       actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadPlanData(undefined, true), active: false });
     } else if (screen === 'home' && canOfferInstall) {
       actions.push({ key: 'install', icon: 'download', label: t('install.now'), onClick: () => void handleInstallPwa(), active: false });
@@ -2645,6 +1950,7 @@ function App() {
 
       {renderPlanEventSheet()}
       {renderPlanSearchSheet()}
+      {renderPlanFiltersSheet()}
 
       {/* Navigation Drawer */}
       {screen !== 'login' && (

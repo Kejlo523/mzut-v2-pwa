@@ -13,6 +13,7 @@ export interface SessionData {
   tokenJpg?: string;
   activeStudyId: string | null;
   usos?: UsosSessionData;
+  persistedAt?: number;
 }
 
 export interface UsosGrade {
@@ -121,6 +122,12 @@ export interface PlanMonthCell {
   inCurrentMonth: boolean;
 }
 
+export interface PlanSubjectFilter {
+  key: string;
+  label: string;
+  count: number;
+}
+
 export interface SessionPeriod {
   key: string;  // e.g. 'sesja_zimowa', 'przerwa_dydaktyczna_letnia'
   start: string; // YYYY-MM-DD
@@ -135,6 +142,7 @@ export interface PlanResult {
   dayColumns: PlanDayColumn[];
   hasAnyEventsInRange: boolean;
   monthGrid: PlanMonthCell[][];
+  subjectFilters: PlanSubjectFilter[];
   prevDate: string;
   nextDate: string;
   todayDate: string;

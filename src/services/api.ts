@@ -13,6 +13,7 @@ import type {
   UsosSessionData,
   ViewMode,
 } from '../types';
+import { getPlanEventFilterKey, getPlanEventFilterLabel } from '../planFilters';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? '/api' : `${import.meta.env.BASE_URL}api`);
 const CARR = [...'23456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'];
@@ -327,13 +328,6 @@ export async function loginWithUsos(verifier: string, token: string, secret: str
 export async function validateSession(session: SessionData): Promise<void> {
   const checks: Promise<unknown>[] = [];
 
-  if (session.authKey) {
-    checks.push(proxyMzut<Record<string, unknown>>('getMenuStudent', {
-      login: session.userId,
-      token: session.authKey,
-    }));
-  }
-
   if (session.usos) {
     checks.push(proxyUsos<{ id?: string }>(session, 'services/users/user', {
       fields: 'id',
@@ -341,7 +335,10 @@ export async function validateSession(session: SessionData): Promise<void> {
   }
 
   if (!checks.length) {
-    throw new SessionExpiredError();
+    if (!session.authKey) {
+      throw new SessionExpiredError();
+    }
+    return;
   }
 
   await Promise.all(checks);
@@ -993,6 +990,7 @@ export async function fetchPlan(
         dayColumns: [],
         hasAnyEventsInRange: false,
         monthGrid: [],
+        subjectFilters: [],
         prevDate: formatYmd(prev),
         nextDate: formatYmd(next),
         todayDate: formatYmd(startOfDay(new Date())),
@@ -1050,42 +1048,39 @@ export async function fetchPlan(
 
   const dayColumns: PlanResult['dayColumns'] = [];
   let hasAnyEventsInRange = false;
+  for (let day = new Date(rangeStart); day <= rangeEnd; day = addDays(day, 1)) {
+    const key = formatYmd(day);
+    const dayEventsBase = (grouped.get(key) ?? []).map((event) => {
+      const start = parseEventDate(event.start) as Date;
+      const end = parseEventDate(event.end) as Date;
+      const startMin = minutesFromMidnight(start);
+      const endMin = Math.max(startMin + 15, minutesFromMidnight(end));
+      const typeClass = eventTypeClass(event);
 
-  if (viewMode !== 'month') {
-    for (let day = new Date(rangeStart); day <= rangeEnd; day = addDays(day, 1)) {
-      const key = formatYmd(day);
-      const dayEventsBase = (grouped.get(key) ?? []).map((event) => {
-        const start = parseEventDate(event.start) as Date;
-        const end = parseEventDate(event.end) as Date;
-        const startMin = minutesFromMidnight(start);
-        const endMin = Math.max(startMin + 15, minutesFromMidnight(end));
-        const typeClass = eventTypeClass(event);
+      return {
+        startMin,
+        endMin,
+        topPx: Math.max(0, (startMin - 360) * 0.8),
+        heightPx: Math.max(36, (endMin - startMin) * 0.8),
+        leftPct: 0,
+        widthPct: 100,
+        title: firstNonEmpty(event.subject, event.title),
+        room: firstNonEmpty(event.room, '-'),
+        group: firstNonEmpty(event.groupName, event.tokName),
+        startStr: formatHm(start),
+        endStr: formatHm(end),
+        tooltip: firstNonEmpty(event.description, event.subject, event.title),
+        typeClass,
+        typeLabel: eventTypeLabel(typeClass, event),
+        subjectKey: firstNonEmpty(event.subject, event.title),
+        teacher: firstNonEmpty(event.workerTitle, event.worker),
+      };
+    }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.title.localeCompare(b.title, 'pl'));
 
-        return {
-          startMin,
-          endMin,
-          topPx: Math.max(0, (startMin - 360) * 0.8),
-          heightPx: Math.max(36, (endMin - startMin) * 0.8),
-          leftPct: 0,
-          widthPct: 100,
-          title: firstNonEmpty(event.subject, event.title),
-          room: firstNonEmpty(event.room, '-'),
-          group: firstNonEmpty(event.groupName, event.tokName),
-          startStr: formatHm(start),
-          endStr: formatHm(end),
-          tooltip: firstNonEmpty(event.description, event.subject, event.title),
-          typeClass,
-          typeLabel: eventTypeLabel(typeClass, event),
-          subjectKey: firstNonEmpty(event.subject, event.title),
-          teacher: firstNonEmpty(event.workerTitle, event.worker),
-        };
-      }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.title.localeCompare(b.title, 'pl'));
+    const dayEvents = layoutDayEvents(dayEventsBase);
 
-      const dayEvents = layoutDayEvents(dayEventsBase);
-
-      if (dayEvents.length > 0) hasAnyEventsInRange = true;
-      dayColumns.push({ date: key, events: dayEvents });
-    }
+    if (dayEvents.length > 0) hasAnyEventsInRange = true;
+    dayColumns.push({ date: key, events: dayEvents });
   }
 
   const monthGrid: PlanResult['monthGrid'] = [];
@@ -1109,6 +1104,22 @@ export async function fetchPlan(
     }
   }
 
+  const subjectFilterMap = new Map<string, { key: string; label: string; count: number }>();
+  for (const column of dayColumns) {
+    for (const event of column.events) {
+      const key = getPlanEventFilterKey(event);
+      if (!key) continue;
+      const label = getPlanEventFilterLabel(event);
+      const existing = subjectFilterMap.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        subjectFilterMap.set(key, { key, label, count: 1 });
+      }
+    }
+  }
+  const subjectFilters = [...subjectFilterMap.values()].sort((a, b) => a.label.localeCompare(b.label, 'pl'));
+
   return {
     viewMode,
     currentDate: formatYmd(current),
@@ -1117,6 +1128,7 @@ export async function fetchPlan(
     dayColumns,
     hasAnyEventsInRange,
     monthGrid,
+    subjectFilters,
     prevDate: formatYmd(prev),
     nextDate: formatYmd(next),
     todayDate: formatYmd(startOfDay(new Date())),

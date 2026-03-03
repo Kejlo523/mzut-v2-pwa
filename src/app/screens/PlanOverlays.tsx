@@ -1,0 +1,291 @@
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+
+import type { PlanSubjectFilter } from '../../types';
+import type { SelectedPlanEvent, TranslateFn } from '../viewTypes';
+import { fmtDateLabel } from '../helpers';
+import { Ic } from '../ui';
+
+interface PlanEventSheetProps {
+  selectedPlanEvent: SelectedPlanEvent | null;
+  onClose: () => void;
+  language: 'pl' | 'en';
+}
+
+export function PlanEventSheet({ selectedPlanEvent, onClose, language }: PlanEventSheetProps) {
+  if (!selectedPlanEvent) return null;
+
+  const { date, event } = selectedPlanEvent;
+
+  return (
+    <div className="event-sheet-overlay" onClick={onClose}>
+      <div className="event-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szczegóły zajęć">
+        <div className="event-sheet-handle" />
+        <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'Zajęcia'}</div>
+        <div className="event-sheet-title">{event.title}</div>
+        <div className="event-sheet-row">
+          <Ic n="clock" />
+          <span>{fmtDateLabel(date, language)} · {event.startStr} - {event.endStr}</span>
+        </div>
+        {!!event.room && (
+          <div className="event-sheet-row">
+            <Ic n="location" />
+            <span>Sala: {event.room}</span>
+          </div>
+        )}
+        {!!event.group && (
+          <div className="event-sheet-row">
+            <Ic n="group" />
+            <span>Grupa: {event.group}</span>
+          </div>
+        )}
+        {!!event.teacher && (
+          <div className="event-sheet-row">
+            <Ic n="user" />
+            <span>{event.teacher}</span>
+          </div>
+        )}
+        <button type="button" className="event-sheet-close" onClick={onClose}>
+          Zamknij
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface PlanSearchSheetProps {
+  planSearchOpen: boolean;
+  planSearchCat: string;
+  setPlanSearchCat: Dispatch<SetStateAction<string>>;
+  planSearchQ: string;
+  setPlanSearchQ: Dispatch<SetStateAction<string>>;
+  planSearchSuggestions: string[];
+  setPlanSearchSuggestions: Dispatch<SetStateAction<string[]>>;
+  planSearchLoading: boolean;
+  planSearchDebounceRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  fetchPlanSearchSuggestions: (kind: string, query: string) => Promise<void>;
+  loadPlanData: (search?: { category: string; query: string }, forceRefresh?: boolean, newDate?: string) => Promise<void>;
+  setPlanSearchOpen: Dispatch<SetStateAction<boolean>>;
+  t: TranslateFn;
+}
+
+export function PlanSearchSheet({
+  planSearchOpen,
+  planSearchCat,
+  setPlanSearchCat,
+  planSearchQ,
+  setPlanSearchQ,
+  planSearchSuggestions,
+  setPlanSearchSuggestions,
+  planSearchLoading,
+  planSearchDebounceRef,
+  fetchPlanSearchSuggestions,
+  loadPlanData,
+  setPlanSearchOpen,
+  t,
+}: PlanSearchSheetProps) {
+  if (!planSearchOpen) return null;
+
+  const handleQueryChange = (value: string) => {
+    setPlanSearchQ(value);
+
+    if (planSearchDebounceRef.current) {
+      clearTimeout(planSearchDebounceRef.current);
+    }
+
+    if (planSearchCat === 'album') {
+      setPlanSearchSuggestions([]);
+      return;
+    }
+
+    planSearchDebounceRef.current = setTimeout(() => {
+      if (value.trim()) {
+        void fetchPlanSearchSuggestions(planSearchCat, value.trim());
+      } else {
+        setPlanSearchSuggestions([]);
+      }
+    }, 300);
+  };
+
+  const handleCategoryChange = (newCat: string) => {
+    setPlanSearchCat(newCat);
+    setPlanSearchSuggestions([]);
+    if (planSearchQ.trim() && newCat !== 'album') {
+      if (planSearchDebounceRef.current) {
+        clearTimeout(planSearchDebounceRef.current);
+      }
+      planSearchDebounceRef.current = setTimeout(() => {
+        void fetchPlanSearchSuggestions(newCat, planSearchQ.trim());
+      }, 300);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setPlanSearchQ(suggestion);
+    setPlanSearchSuggestions([]);
+  };
+
+  const handleSearch = () => {
+    if (planSearchQ.trim()) {
+      void loadPlanData({ category: planSearchCat, query: planSearchQ.trim() });
+      setPlanSearchOpen(false);
+    }
+  };
+
+  const handleClear = () => {
+    setPlanSearchQ('');
+    setPlanSearchSuggestions([]);
+    void loadPlanData();
+    setPlanSearchOpen(false);
+  };
+
+  return (
+    <div className="event-sheet-overlay" onClick={() => setPlanSearchOpen(false)}>
+      <div className="event-sheet search-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szukaj w planie">
+        <div className="event-sheet-handle" />
+        <div className="search-container">
+          <h2 className="search-title">Szukaj w planie</h2>
+
+          <div className="search-field-group">
+            <label className="search-label">{t('search.category')}</label>
+            <select
+              value={planSearchCat}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="search-select"
+            >
+              <option value="album">{t('search.catAlbum')}</option>
+              <option value="teacher">{t('search.catTeacher')}</option>
+              <option value="group">{t('search.catGroup')}</option>
+              <option value="room">{t('search.catRoom')}</option>
+              <option value="subject">{t('search.catSubject')}</option>
+            </select>
+          </div>
+
+          <div className="search-field-group">
+            <label className="search-label">{t('search.queryLabel')}</label>
+            <div className="search-input-wrapper">
+              <input
+                type="text"
+                value={planSearchQ}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                placeholder={t('search.queryPlaceholder')}
+                className="search-input"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+              {planSearchLoading && <span className="search-spinner-inline" />}
+            </div>
+          </div>
+
+          {(planSearchSuggestions.length > 0 || (!planSearchQ.trim() && planSearchCat !== 'album')) && (
+            <div className="search-suggestions-container">
+              {planSearchSuggestions.length > 0 ? (
+                planSearchSuggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="search-suggestion-item"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                ))
+              ) : planSearchCat !== 'album' && !planSearchQ.trim() ? (
+                <div className="search-placeholder">{t('search.placeholderSearch')}</div>
+              ) : null}
+            </div>
+          )}
+
+          <div className="search-actions">
+            <button
+              type="button"
+              className="search-btn-primary"
+              onClick={handleSearch}
+              disabled={!planSearchQ.trim()}
+            >
+              Szukaj
+            </button>
+            <button
+              type="button"
+              className="search-btn-secondary"
+              onClick={handleClear}
+            >
+              Wyczyść
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface PlanFiltersSheetProps {
+  open: boolean;
+  options: PlanSubjectFilter[];
+  hiddenKeys: string[];
+  onToggle: (key: string) => void;
+  onReset: () => void;
+  onClose: () => void;
+}
+
+export function PlanFiltersSheet({
+  open,
+  options,
+  hiddenKeys,
+  onToggle,
+  onReset,
+  onClose,
+}: PlanFiltersSheetProps) {
+  if (!open) return null;
+
+  return (
+    <div className="event-sheet-overlay" onClick={onClose}>
+      <div className="event-sheet search-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Filtruj przedmioty">
+        <div className="event-sheet-handle" />
+        <div className="search-container">
+          <h2 className="search-title">Filtruj przedmioty</h2>
+
+          {options.length === 0 ? (
+            <div className="search-placeholder">Brak dostępnych przedmiotów w aktualnym zakresie.</div>
+          ) : (
+            <div className="plan-filter-list">
+              {options.map((option) => {
+                const visible = !hiddenKeys.includes(option.key);
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    className={`plan-filter-item${visible ? ' is-visible' : ''}`}
+                    onClick={() => onToggle(option.key)}
+                  >
+                    <span className="plan-filter-label">{option.label}</span>
+                    <span className="plan-filter-meta">
+                      <span className="plan-filter-count">{option.count}</span>
+                      <span className={`plan-filter-check${visible ? ' checked' : ''}`} aria-hidden>{visible ? '✓' : ''}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="search-actions">
+            <button
+              type="button"
+              className="search-btn-secondary"
+              onClick={onReset}
+              disabled={hiddenKeys.length === 0}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="search-btn-primary"
+              onClick={onClose}
+            >
+              Zamknij
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
