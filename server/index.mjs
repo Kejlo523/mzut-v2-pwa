@@ -26,9 +26,27 @@ const PLAN_STUDENT_BASE = 'https://plan.zut.edu.pl/schedule_student.php';
 const PLAN_SUGGEST_BASE = 'https://plan.zut.edu.pl/schedule.php';
 const RSS_URL = 'https://www.zut.edu.pl/rssfeed-studenci';
 const REQUEST_TIMEOUT_MS = 20_000;
+const APP_BASE_PATH = (() => {
+  const raw = String(process.env.VITE_APP_BASE || '/v2').trim();
+  if (!raw) return '/v2';
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return normalized.replace(/\/+$/, '') || '/';
+})();
+const STATS_ROUTE_PATH = APP_BASE_PATH === '/' ? '/stats' : `${APP_BASE_PATH}/stats`;
+const STATS_STORE_PATH = path.join(__dirname, 'data', 'usage-stats.json');
+const STATS_BASIC_USER = process.env.STATS_USER || 'Kejlo';
+const STATS_BASIC_PASS = process.env.STATS_PASS || 'hx875875';
 
 const unsafeAgent = new Agent({
   connect: { rejectUnauthorized: false },
+});
+const statsAccessLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (req, res) => res.statusCode < 400 && getStatsAuthState(req) === 'valid',
 });
 
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -50,6 +68,614 @@ function sanitizeParams(value) {
     out[key] = String(raw ?? '');
   }
   return out;
+}
+
+function formatDayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeRequestAddress(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  const first = trimmed.split(',')[0].trim();
+  const withoutPort = first.startsWith('[')
+    ? first.replace(/^\[|\]$/g, '')
+    : first.replace(/:\d+$/, '');
+  return withoutPort.split('%')[0];
+}
+
+function extractRequestAddresses(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '')
+    .split(',')
+    .map((item) => normalizeRequestAddress(item))
+    .filter(Boolean);
+  const direct = [
+    normalizeRequestAddress(req.ip),
+    normalizeRequestAddress(req.socket?.remoteAddress),
+  ].filter(Boolean);
+  return [...new Set([...forwarded, ...direct])];
+}
+
+function safeTextEqual(left, right) {
+  const a = Buffer.from(String(left));
+  const b = Buffer.from(String(right));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function getStatsAuthState(req) {
+  const authHeader = String(req.headers.authorization || '');
+  if (!authHeader.startsWith('Basic ')) {
+    return 'missing';
+  }
+
+  let decoded = '';
+  try {
+    decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+  } catch {
+    return 'invalid';
+  }
+
+  const separatorIndex = decoded.indexOf(':');
+  if (separatorIndex < 0) {
+    return 'invalid';
+  }
+
+  const username = decoded.slice(0, separatorIndex);
+  const password = decoded.slice(separatorIndex + 1);
+
+  return safeTextEqual(username, STATS_BASIC_USER) && safeTextEqual(password, STATS_BASIC_PASS)
+    ? 'valid'
+    : 'invalid';
+}
+
+function sendStatsBasicAuthPrompt(res) {
+  res.set('WWW-Authenticate', 'Basic realm="mZUT v2 stats", charset="UTF-8"');
+  return res.status(401).type('text/plain').send('Authentication required');
+}
+
+function redirectToAppHome(res) {
+  const destination = APP_BASE_PATH === '/' ? '/' : `${APP_BASE_PATH}/`;
+  return res.redirect(destination);
+}
+
+function createEmptyStatsStore() {
+  return {
+    version: 1,
+    devices: {},
+    dailyActive: {},
+    successfulLoginsTotal: 0,
+    successfulLoginsByDay: {},
+  };
+}
+
+function normalizeStatsStore(value) {
+  if (!value || typeof value !== 'object') {
+    return createEmptyStatsStore();
+  }
+
+  const payload = value;
+  const devices = payload.devices && typeof payload.devices === 'object' ? payload.devices : {};
+  const dailyActive = payload.dailyActive && typeof payload.dailyActive === 'object' ? payload.dailyActive : {};
+  const successfulLoginsByDay = payload.successfulLoginsByDay && typeof payload.successfulLoginsByDay === 'object'
+    ? payload.successfulLoginsByDay
+    : {};
+
+  const normalizedDailyActive = {};
+  for (const [day, rawDevices] of Object.entries(dailyActive)) {
+    if (!Array.isArray(rawDevices)) continue;
+    normalizedDailyActive[day] = [...new Set(rawDevices.map((item) => String(item || '').trim()).filter(Boolean))];
+  }
+
+  const normalizedLoginsByDay = {};
+  for (const [day, rawCount] of Object.entries(successfulLoginsByDay)) {
+    const count = Number(rawCount);
+    if (Number.isFinite(count) && count > 0) {
+      normalizedLoginsByDay[day] = Math.round(count);
+    }
+  }
+
+  return {
+    version: 1,
+    devices,
+    dailyActive: normalizedDailyActive,
+    successfulLoginsTotal: Number.isFinite(Number(payload.successfulLoginsTotal))
+      ? Math.max(0, Math.round(Number(payload.successfulLoginsTotal)))
+      : 0,
+    successfulLoginsByDay: normalizedLoginsByDay,
+  };
+}
+
+function loadStatsStore() {
+  try {
+    if (!existsSync(STATS_STORE_PATH)) {
+      return createEmptyStatsStore();
+    }
+
+    const raw = readFileSync(STATS_STORE_PATH, 'utf8');
+    if (!raw.trim()) {
+      return createEmptyStatsStore();
+    }
+
+    return normalizeStatsStore(JSON.parse(raw));
+  } catch {
+    return createEmptyStatsStore();
+  }
+}
+
+let statsStore = loadStatsStore();
+let statsPersistTimer = null;
+
+function persistStatsStore() {
+  try {
+    mkdirSync(path.dirname(STATS_STORE_PATH), { recursive: true });
+    writeFileSync(STATS_STORE_PATH, JSON.stringify(statsStore, null, 2));
+  } catch (error) {
+    console.warn('Failed to persist local stats store', error);
+  }
+}
+
+function scheduleStatsPersist() {
+  if (statsPersistTimer) return;
+
+  statsPersistTimer = setTimeout(() => {
+    statsPersistTimer = null;
+    persistStatsStore();
+  }, 600);
+
+  if (typeof statsPersistTimer.unref === 'function') {
+    statsPersistTimer.unref();
+  }
+}
+
+function pruneStatsBuckets() {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 180);
+  const cutoffKey = formatDayKey(cutoff);
+
+  for (const day of Object.keys(statsStore.dailyActive)) {
+    if (day < cutoffKey) {
+      delete statsStore.dailyActive[day];
+    }
+  }
+
+  for (const day of Object.keys(statsStore.successfulLoginsByDay)) {
+    if (day < cutoffKey) {
+      delete statsStore.successfulLoginsByDay[day];
+    }
+  }
+}
+
+function getRequestDeviceKey(req) {
+  const explicitDeviceId = String(req.headers['x-mzut-device-id'] || '').trim();
+  if (explicitDeviceId) {
+    return `device:${crypto.createHash('sha1').update(explicitDeviceId).digest('hex')}`;
+  }
+
+  const address = extractRequestAddresses(req)[0] || 'unknown';
+  const userAgent = String(req.headers['user-agent'] || 'unknown');
+  return `legacy:${crypto.createHash('sha1').update(`${address}|${userAgent}`).digest('hex')}`;
+}
+
+function ensureTrackedDevice(req, nowIso = new Date().toISOString()) {
+  const deviceKey = getRequestDeviceKey(req);
+  if (!deviceKey) {
+    return { deviceKey: '', record: null };
+  }
+
+  const current = statsStore.devices[deviceKey];
+  const next = current && typeof current === 'object' ? { ...current } : {};
+  next.firstSeenAt = typeof next.firstSeenAt === 'string' && next.firstSeenAt ? next.firstSeenAt : nowIso;
+  next.lastSeenAt = nowIso;
+  next.hitCount = Number.isFinite(Number(next.hitCount)) ? Number(next.hitCount) : 0;
+  next.successfulLogins = Number.isFinite(Number(next.successfulLogins)) ? Number(next.successfulLogins) : 0;
+  next.lastUserAgent = String(req.headers['user-agent'] || '').slice(0, 240);
+  next.lastAddress = (extractRequestAddresses(req)[0] || '').slice(0, 120);
+  statsStore.devices[deviceKey] = next;
+
+  return { deviceKey, record: next };
+}
+
+function recordDeviceActivity(req) {
+  pruneStatsBuckets();
+  const dayKey = formatDayKey();
+  const { deviceKey, record } = ensureTrackedDevice(req);
+  if (!deviceKey || !record) return;
+
+  record.hitCount += 1;
+  const bucket = statsStore.dailyActive[dayKey] ?? [];
+  if (!bucket.includes(deviceKey)) {
+    bucket.push(deviceKey);
+    statsStore.dailyActive[dayKey] = bucket;
+  }
+
+  scheduleStatsPersist();
+}
+
+function recordSuccessfulLogin(req, method) {
+  pruneStatsBuckets();
+  const dayKey = formatDayKey();
+  const nowIso = new Date().toISOString();
+  const { record } = ensureTrackedDevice(req, nowIso);
+
+  if (record) {
+    record.successfulLogins += 1;
+    record.lastSuccessfulLoginAt = nowIso;
+    record.lastSuccessfulLoginMethod = method;
+  }
+
+  statsStore.successfulLoginsTotal += 1;
+  statsStore.successfulLoginsByDay[dayKey] = (statsStore.successfulLoginsByDay[dayKey] || 0) + 1;
+  scheduleStatsPersist();
+}
+
+function getStatsSnapshot() {
+  pruneStatsBuckets();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = formatDayKey(today);
+  const chartDays = [];
+
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const key = formatDayKey(date);
+    chartDays.push({
+      key,
+      label: `${key.slice(8, 10)}.${key.slice(5, 7)}`,
+      activeDevices: (statsStore.dailyActive[key] || []).length,
+    });
+  }
+
+  return {
+    todayActiveDevices: (statsStore.dailyActive[todayKey] || []).length,
+    totalDevices: Object.keys(statsStore.devices).length,
+    successfulLoginsTotal: statsStore.successfulLoginsTotal,
+    successfulLoginsToday: statsStore.successfulLoginsByDay[todayKey] || 0,
+    chartDays,
+    chartMax: Math.max(1, ...chartDays.map((day) => day.activeDevices)),
+    updatedAt: new Intl.DateTimeFormat('pl-PL', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date()),
+  };
+}
+
+function renderStatsPage() {
+  const snapshot = getStatsSnapshot();
+  const appHomePath = APP_BASE_PATH === '/' ? '/' : `${APP_BASE_PATH}/`;
+  const chartHtml = snapshot.chartDays.map((day, index) => {
+    const height = day.activeDevices <= 0
+      ? 6
+      : Math.max(10, Math.round((day.activeDevices / snapshot.chartMax) * 100));
+    const isToday = index === snapshot.chartDays.length - 1;
+
+    return `
+      <div class="stats-bar-col">
+        <div class="stats-bar-track">
+          <div class="stats-bar${isToday ? ' is-today' : ''}" style="height:${height}%"></div>
+        </div>
+        <div class="stats-bar-value">${day.activeDevices}</div>
+        <div class="stats-bar-label">${escapeHtml(day.label)}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>mZUT v2 • Statystyki</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f12;
+      --panel: #15181c;
+      --panel-soft: #1a1e23;
+      --border: #252a31;
+      --text: #f3f4f6;
+      --muted: #a1a7b0;
+      --accent: #7ab8ff;
+      --accent-soft: rgba(122, 184, 255, 0.14);
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI Variable", "Aptos", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px 16px 36px;
+    }
+
+    .shell {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero {
+      padding: 20px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 14px 0 6px;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .hero-actions {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn,
+    .btn:visited {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      padding: 20px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .kpi-value {
+      margin-top: 8px;
+      font-size: clamp(30px, 4vw, 42px);
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .kpi-note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .chart-card {
+      padding: 20px;
+    }
+
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-end;
+      margin-bottom: 14px;
+    }
+
+    .chart-title {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 28px);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .chart-subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .chart-meta {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .stats-chart {
+      display: grid;
+      grid-template-columns: repeat(14, minmax(0, 1fr));
+      gap: 8px;
+      min-height: 220px;
+      align-items: end;
+    }
+
+    .stats-bar-col {
+      display: grid;
+      gap: 6px;
+      align-items: end;
+      justify-items: center;
+    }
+
+    .stats-bar-value {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      min-height: 14px;
+    }
+
+    .stats-bar-track {
+      width: 100%;
+      height: 160px;
+      border-radius: 999px;
+      background: #101318;
+      display: flex;
+      align-items: flex-end;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    .stats-bar {
+      width: 100%;
+      border-radius: 999px;
+      background: #4f8fdd;
+    }
+
+    .stats-bar.is-today {
+      background: #7ab8ff;
+    }
+
+    .stats-bar-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 0 2px;
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 16px; }
+      .grid { grid-template-columns: 1fr; }
+      .chart-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .chart-meta { text-align: left; }
+      .stats-chart {
+        gap: 6px;
+        min-height: 200px;
+      }
+      .stats-bar-track {
+        height: 130px;
+        padding: 4px;
+      }
+      .hero,
+      .card {
+        border-radius: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">Stats</div>
+      <h1>Statystyki mZUT v2</h1>
+      <p class="hero-copy">
+        Prosty podgląd aktywnych urządzeń, łącznej liczby urządzeń i poprawnych logowań.
+        Dostęp jest chroniony przeglądarkowym oknem logowania.
+      </p>
+      <div class="hero-actions">
+        <button type="button" class="btn" onclick="window.location.reload()">Odśwież</button>
+        <a class="btn" href="${escapeHtml(appHomePath)}">Powrót do aplikacji</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="kpi-label">Aktywne urządzenia dziś</div>
+        <div class="kpi-value">${snapshot.todayActiveDevices}</div>
+        <div class="kpi-note">Unikalne urządzenia widziane dzisiaj przez API.</div>
+      </article>
+
+      <article class="card">
+        <div class="kpi-label">Łączna liczba urządzeń</div>
+        <div class="kpi-value">${snapshot.totalDevices}</div>
+        <div class="kpi-note">Wszystkie zapisane urządzenia od startu zbierania danych.</div>
+      </article>
+
+      <article class="card">
+        <div class="kpi-label">Poprawne logowania</div>
+        <div class="kpi-value">${snapshot.successfulLoginsTotal}</div>
+        <div class="kpi-note">Dziś: ${snapshot.successfulLoginsToday}</div>
+      </article>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <h2 class="chart-title">Aktywne urządzenia z ostatnich 14 dni</h2>
+          <p class="chart-subtitle">Ostatni słupek oznacza bieżący dzień.</p>
+        </div>
+        <div class="chart-meta">
+          Ostatnia aktualizacja<br />
+          <strong>${escapeHtml(snapshot.updatedAt)}</strong>
+        </div>
+      </div>
+      <div class="stats-chart">${chartHtml}</div>
+    </section>
+
+    <div class="footnote">
+      Dane są zapisywane lokalnie na serwerze w pliku JSON.
+    </div>
+  </main>
+</body>
+</html>`;
 }
 
 async function fetchWithTimeout(url, options = {}) {
@@ -538,6 +1164,19 @@ app.get('/api/proxy/rss', async (_req, res) => {
   } catch (error) {
     return res.status(502).json({ error: `Proxy RSS error: ${error.message}` });
   }
+});
+
+app.get([STATS_ROUTE_PATH, `${STATS_ROUTE_PATH}/`], (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  const authState = getStatsAuthState(req);
+  if (authState === 'missing') {
+    return sendStatsBasicAuthPrompt(res);
+  }
+  if (authState === 'invalid') {
+    return redirectToAppHome(res);
+  }
+
+  return res.type('html').send(renderStatsPage());
 });
 
 const distPath = path.resolve(process.cwd(), 'dist');
