@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Try loading from several locations: root, current dir
@@ -54,6 +54,12 @@ app.use(cors({ origin: true, credentials: true }));
 app.set('trust proxy', 1);
 app.use(rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false }));
 app.use(express.json({ limit: '1mb' }));
+app.use((req, _res, next) => {
+  if (req.path.startsWith('/api/') && req.path !== '/api/health') {
+    recordDeviceActivity(req);
+  }
+  next();
+});
 
 function sanitizeFunctionName(value) {
   const fn = String(value || '').trim();
@@ -789,6 +795,10 @@ app.post('/api/proxy/mzut', async (req, res) => {
     }
 
     const data = await passthroughJson(response);
+    const status = String(data?.logInStatus || data?.loginInStatus || '').trim().toUpperCase();
+    if (fn === 'getAuthorization' && status === 'OK') {
+      recordSuccessfulLogin(req, 'mzut');
+    }
     return res.json({ data });
   } catch (error) {
     return res.status(502).json({ error: `Proxy mZUT error: ${error.message}` });
@@ -945,6 +955,7 @@ app.get('/api/usos/request-token', async (req, res) => {
     }
 
     const result = Object.fromEntries(new URLSearchParams(text));
+    recordSuccessfulLogin(req, 'usos');
     return res.json(result);
   } catch (error) {
     return res.status(500).json({ error: error.message });

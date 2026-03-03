@@ -3,6 +3,7 @@ import type { CalendarEvent, ElsCard, Grade, NewsItem, PlanResult, Semester, Ses
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
 const PLAN_FILTERS_KEY = 'mzutv2_pwa_plan_hidden_subjects';
+const DEVICE_ID_KEY = 'mzutv2_pwa_device_id';
 
 export interface AppSettings {
   language: 'pl' | 'en';
@@ -107,6 +108,24 @@ export function savePlanHiddenSubjects(keys: string[]): void {
       .filter(Boolean),
   )];
   window.localStorage.setItem(PLAN_FILTERS_KEY, JSON.stringify(normalized));
+}
+
+export function loadOrCreateDeviceId(): string {
+  try {
+    const existing = window.localStorage.getItem(DEVICE_ID_KEY)?.trim();
+    if (existing) {
+      return existing;
+    }
+
+    const next = typeof window.crypto?.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : `mzutv2-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+    window.localStorage.setItem(DEVICE_ID_KEY, next);
+    return next;
+  } catch {
+    return `mzutv2-volatile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
 }
 
 // ── API cache with TTL ────────────────────────────────────────────────────────
