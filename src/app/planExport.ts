@@ -23,6 +23,15 @@ function timestampUtc(date: Date): string {
 }
 
 function buildFileName(planResult: PlanResult): string {
+  const rangeDays = Math.round(
+    (new Date(`${planResult.rangeEnd}T00:00:00`).getTime() - new Date(`${planResult.rangeStart}T00:00:00`).getTime())
+    / 86_400_000,
+  ) + 1;
+
+  if (rangeDays > 45) {
+    return `mzut-plan-semestr-${planResult.rangeStart}-${planResult.rangeEnd}.ics`;
+  }
+
   const suffix = planResult.viewMode === 'day'
     ? 'dzien'
     : planResult.viewMode === 'month'

@@ -22,6 +22,7 @@ import {
   fetchInfo,
   fetchNews,
   fetchPlan,
+  fetchPlanSemesterExport,
   fetchPlanSuggestions,
   fetchUsosRequestToken,
   isSessionExpiredError,
@@ -142,6 +143,7 @@ function App() {
   const [planLoading, setPlanLoading] = useState(false);
   const [planSearchOpen, setPlanSearchOpen] = useState(false);
   const [planFiltersOpen, setPlanFiltersOpen] = useState(false);
+  const [planMoreMenuOpen, setPlanMoreMenuOpen] = useState(false);
   const [planSearchCat, setPlanSearchCat] = useState('album');
   const [planSearchQ, setPlanSearchQ] = useState('');
   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
@@ -149,6 +151,7 @@ function App() {
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const [hiddenPlanSubjectKeys, setHiddenPlanSubjectKeys] = useState<string[]>(() => loadPlanHiddenSubjects());
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const planMoreMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Plan carousel swipe (direct DOM animation — no React state per frame)
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -316,10 +319,38 @@ function App() {
   useEffect(() => {
     setDrawerOpen(false);
     if (screen !== 'plan') {
+      setPlanFiltersOpen(false);
+      setPlanMoreMenuOpen(false);
       setPlanSearchOpen(false);
       setSelectedPlanEvent(null);
     }
   }, [screen]);
+
+  useEffect(() => {
+    if (!planMoreMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!planMoreMenuRef.current || !(target instanceof Node)) return;
+      if (!planMoreMenuRef.current.contains(target)) {
+        setPlanMoreMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPlanMoreMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [planMoreMenuOpen]);
 
   // ── i18n ───────────────────────────────────────────────────────────────────
   const t = useMemo(() => createT(settings.language), [settings.language]);
@@ -344,6 +375,7 @@ function App() {
     if (!nextSession) {
       setHiddenPlanSubjectKeys([]);
       setPlanFiltersOpen(false);
+      setPlanMoreMenuOpen(false);
       setPlanSearchOpen(false);
 
       // Clear storage
@@ -604,7 +636,7 @@ function App() {
     try {
       const suggestions = await fetchPlanSuggestions(category, query);
       setPlanSearchSuggestions(suggestions);
-    } catch (e) {
+    } catch {
       setPlanSearchSuggestions([]);
     } finally {
       setPlanSearchLoading(false);
@@ -1015,12 +1047,59 @@ function App() {
   }, []);
 
   const handlePlanExport = useCallback(() => {
-    if (!visiblePlanResult || !exportPlanToIcs(visiblePlanResult)) {
-      setGlobalError('Brak zajęć do eksportu w aktualnym widoku.');
-      return;
-    }
-    showToast('Wyeksportowano plan do pliku ICS');
-  }, [visiblePlanResult, showToast]);
+    if (!session) return;
+
+    const run = async () => {
+      setPlanMoreMenuOpen(false);
+      setGlobalError('');
+      setGlobalLoad(true);
+
+      try {
+        const semesterPlan = await fetchPlanSemesterExport(session, {
+          currentDate: planDate,
+          studyId: activeStudyId,
+          search: { category: planSearchCat, query: planSearchQ.trim() },
+        });
+
+        const exportPlan = hiddenPlanSubjectKeys.length
+          ? {
+            ...semesterPlan,
+            dayColumns: semesterPlan.dayColumns.map((column) => ({
+              ...column,
+              events: column.events.filter((event) => !hiddenPlanSubjectKeys.includes(getPlanEventFilterKey(event))),
+            })),
+            hasAnyEventsInRange: semesterPlan.dayColumns.some((column) => (
+              column.events.some((event) => !hiddenPlanSubjectKeys.includes(getPlanEventFilterKey(event)))
+            )),
+          }
+          : semesterPlan;
+
+        if (!exportPlanToIcs(exportPlan)) {
+          setGlobalError('Brak zajęć do eksportu w całym semestrze.');
+          return;
+        }
+
+        showToast('Wyeksportowano cały semestr do pliku ICS');
+      } catch (error) {
+        if (!handleSessionError(error)) {
+          setGlobalError(error instanceof Error ? error.message : 'Nie udało się wyeksportować planu.');
+        }
+      } finally {
+        setGlobalLoad(false);
+      }
+    };
+
+    void run();
+  }, [
+    activeStudyId,
+    handleSessionError,
+    hiddenPlanSubjectKeys,
+    planDate,
+    planSearchCat,
+    planSearchQ,
+    session,
+    showToast,
+  ]);
 
   // ── Login ─────────────────────────────────────────────────────────────────
   const [loginVal, setLoginVal] = useState('');
@@ -1329,7 +1408,7 @@ function App() {
     const today = todayYmd();
     const activeFilter = [
       planSearchQ.trim(),
-      hiddenPlanSubjectKeys.length > 0 ? `ukryto: ${hiddenPlanSubjectKeys.length}` : '',
+      hiddenPlanSubjectKeys.length > 0 ? `wykluczono: ${hiddenPlanSubjectKeys.length}` : '',
     ].filter(Boolean).join(' · ');
 
     // Build week grid template with separator columns
@@ -1777,46 +1856,90 @@ function App() {
   function renderAppBarActions() {
     if (screen === 'login') return null;
     const actions: Array<{ key: string; icon: string; label: string; onClick: () => void; active: boolean }> = [];
+    const planMenuActions: Array<{ key: string; icon: string; label: string; note: string; onClick: () => void; active: boolean }> = [];
 
     if (screen === 'plan') {
-      actions.push({
-        key: 'today',
-        icon: 'calendar',
-        label: t('plan.today'),
-        onClick: () => {
-          const td = todayYmd();
-          if (planDate !== td || planSearchQ?.trim()) {
-            commitPlanNavigate(td, planDate > td);
-            if (planSearchQ?.trim()) {
-              setPlanSearchQ('');
-              setPlanSearchCat('album');
-            }
-          }
-        },
-        active: planDate === todayYmd() && !planSearchQ?.trim(),
-      });
+      const isTodayActive = planDate === todayYmd() && !planSearchQ?.trim();
+      const hasExcludedSubjects = hiddenPlanSubjectKeys.length > 0;
+      const activeSearchQuery = planSearchQ.trim();
+
       actions.push({
         key: 'search',
         icon: 'search',
         label: t('plan.search'),
         onClick: () => {
+          setPlanMoreMenuOpen(false);
           setPlanFiltersOpen(false);
           setPlanSearchOpen((p) => !p);
         },
         active: planSearchOpen,
       });
       actions.push({
+        key: 'refresh',
+        icon: 'refresh',
+        label: t('plan.refresh'),
+        onClick: () => {
+          setPlanMoreMenuOpen(false);
+          void loadPlanData(
+            activeSearchQuery ? { category: planSearchCat, query: activeSearchQuery } : undefined,
+            true,
+          );
+        },
+        active: false,
+      });
+
+      planMenuActions.push({
+        key: 'today',
+        icon: 'calendar',
+        label: t('plan.today'),
+        note: planSearchQ.trim()
+          ? 'Wraca do bieżącej daty i czyści wyszukiwanie'
+          : isTodayActive
+            ? 'Jesteś już na dzisiejszym planie'
+            : 'Skok do bieżącego dnia',
+        onClick: () => {
+          const td = todayYmd();
+          setPlanSearchOpen(false);
+          if (activeSearchQuery) {
+            setPlanSearchQ('');
+            setPlanSearchCat('album');
+            if (planDate !== td) {
+              setPlanDate(td);
+            } else {
+              void loadPlanData();
+            }
+            return;
+          }
+
+          if (planDate !== td) {
+            commitPlanNavigate(td, planDate > td);
+          }
+        },
+        active: isTodayActive,
+      });
+      planMenuActions.push({
         key: 'filters',
         icon: 'layers',
-        label: 'Filtry przedmiotów',
+        label: 'Wyklucz przedmioty',
+        note: hasExcludedSubjects
+          ? `Wykluczono: ${hiddenPlanSubjectKeys.length}`
+          : 'Ukryj wybrane pozycje z widoku planu',
         onClick: () => {
           setPlanSearchOpen(false);
           setPlanFiltersOpen((p) => !p);
         },
-        active: planFiltersOpen || hiddenPlanSubjectKeys.length > 0,
+        active: planFiltersOpen || hasExcludedSubjects,
       });
-      actions.push({ key: 'export', icon: 'download', label: 'Eksportuj plan', onClick: handlePlanExport, active: false });
-      actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadPlanData(undefined, true), active: false });
+      planMenuActions.push({
+        key: 'export',
+        icon: 'download',
+        label: 'Eksport semestru',
+        note: 'Pobiera cały semestr do pliku ICS',
+        onClick: () => {
+          handlePlanExport();
+        },
+        active: false,
+      });
     } else if (screen === 'home' && canOfferInstall) {
       actions.push({ key: 'install', icon: 'download', label: t('install.now'), onClick: () => void handleInstallPwa(), active: false });
     } else if (screen === 'grades') {
@@ -1828,7 +1951,7 @@ function App() {
     }
 
     return (
-      <div className="appbar-actions">
+      <div className={`appbar-actions${screen === 'plan' ? ' plan-appbar-actions' : ''}`}>
         {screen === 'grades' && (
           <div className="grades-grouping-toggle">
             <button
@@ -1847,6 +1970,45 @@ function App() {
             <Ic n={a.icon} />
           </button>
         ))}
+        {screen === 'plan' && (
+          <div className="plan-menu-anchor" ref={planMoreMenuRef}>
+            <button
+              type="button"
+              className={`icon-btn ${planMoreMenuOpen || hiddenPlanSubjectKeys.length > 0 ? 'active' : ''}`}
+              onClick={() => setPlanMoreMenuOpen((prev) => !prev)}
+              aria-label="Więcej opcji planu"
+              title="Więcej opcji planu"
+              aria-haspopup="menu"
+              aria-expanded={planMoreMenuOpen}
+            >
+              <Ic n="more" />
+            </button>
+            {planMoreMenuOpen && (
+              <div className="plan-overflow-menu" role="menu" aria-label="Więcej opcji planu">
+                {planMenuActions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    className={`plan-overflow-item${action.active ? ' active' : ''}`}
+                    onClick={() => {
+                      setPlanMoreMenuOpen(false);
+                      action.onClick();
+                    }}
+                    role="menuitem"
+                  >
+                    <span className="plan-overflow-icon" aria-hidden>
+                      <Ic n={action.icon} />
+                    </span>
+                    <span className="plan-overflow-copy">
+                      <span className="plan-overflow-label">{action.label}</span>
+                      <span className="plan-overflow-note">{action.note}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
