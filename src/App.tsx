@@ -24,8 +24,10 @@ import {
   fetchPlan,
   fetchPlanSuggestions,
   fetchUsosRequestToken,
+  isSessionExpiredError,
   login,
   loginWithUsos,
+  validateSession,
 } from './services/api';
 import {
   cache,
@@ -115,6 +117,16 @@ function isFinalGradeType(type: string, subjectName?: string): boolean {
     );
   }
   return false;
+}
+
+function getSessionSignature(session: SessionData | null): string {
+  if (!session) return '';
+  return [
+    session.userId,
+    session.authKey,
+    session.usos?.accessToken ?? '',
+    session.usos?.accessTokenSecret ?? '',
+  ].join('|');
 }
 
 // screenTitle now uses t() – defined inside App, but we keep a static fallback
@@ -256,6 +268,11 @@ function App() {
   const [globalLoading, setGlobalLoad] = useState(false);
   const [globalError, setGlobalError] = useState('');
   const [toast, setToast] = useState('');
+  const sessionKey = getSessionSignature(session);
+  const sessionExpiryHandledRef = useRef(false);
+  const sessionCheckInFlightRef = useRef<Promise<boolean> | null>(null);
+  const lastSessionCheckRef = useRef<{ key: string; ts: number }>({ key: '', ts: 0 });
+  const activeSessionKeyRef = useRef(sessionKey);
 
   const nav = useAppNavigation<ScreenKey>(session ? 'home' : 'login');
   const screen = nav.current.key;
@@ -462,6 +479,22 @@ function App() {
     if (session && screen === 'login') nav.reset('home', undefined);
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    activeSessionKeyRef.current = sessionKey;
+    sessionExpiryHandledRef.current = false;
+
+    if (!sessionKey) {
+      sessionCheckInFlightRef.current = null;
+      lastSessionCheckRef.current = { key: '', ts: 0 };
+      return;
+    }
+
+    if (lastSessionCheckRef.current.key !== sessionKey) {
+      sessionCheckInFlightRef.current = null;
+      lastSessionCheckRef.current = { key: '', ts: 0 };
+    }
+  }, [sessionKey]);
+
   // ── Close drawer on screen change ────────────────────────────────────────
   useEffect(() => {
     setDrawerOpen(false);
@@ -515,6 +548,83 @@ function App() {
     }
   }, []);
 
+  const handleExpiredSession = useCallback(() => {
+    if (!activeSessionKeyRef.current || sessionExpiryHandledRef.current) return;
+    sessionExpiryHandledRef.current = true;
+    const message = t('general.sessionExpired');
+    setGlobalError(message);
+    showToast(message);
+    applySession(null);
+  }, [applySession, showToast, t]);
+
+  const handleSessionError = useCallback((error: unknown): boolean => {
+    if (!isSessionExpiredError(error)) return false;
+    handleExpiredSession();
+    return true;
+  }, [handleExpiredSession]);
+
+  const ensureSessionStillValid = useCallback(async (sess: SessionData, force = false): Promise<boolean> => {
+    if (!navigator.onLine) return true;
+
+    const key = getSessionSignature(sess);
+    const recentCheck = lastSessionCheckRef.current;
+    if (!force && recentCheck.key === key && Date.now() - recentCheck.ts < 60_000) {
+      return true;
+    }
+
+    if (sessionCheckInFlightRef.current) {
+      return sessionCheckInFlightRef.current;
+    }
+
+    const checkPromise = (async () => {
+      try {
+        await validateSession(sess);
+        if (activeSessionKeyRef.current === key) {
+          lastSessionCheckRef.current = { key, ts: Date.now() };
+        }
+        return true;
+      } catch (error) {
+        if (activeSessionKeyRef.current === key && isSessionExpiredError(error)) {
+          handleExpiredSession();
+          return false;
+        }
+        return true;
+      }
+    })();
+
+    sessionCheckInFlightRef.current = checkPromise;
+    checkPromise.finally(() => {
+      if (sessionCheckInFlightRef.current === checkPromise) {
+        sessionCheckInFlightRef.current = null;
+      }
+    });
+    return checkPromise;
+  }, [handleExpiredSession]);
+
+  useEffect(() => {
+    if (!session) return;
+    void ensureSessionStillValid(session);
+
+    const revalidate = () => {
+      void ensureSessionStillValid(session, true);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        revalidate();
+      }
+    };
+
+    window.addEventListener('focus', revalidate);
+    window.addEventListener('online', revalidate);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', revalidate);
+      window.removeEventListener('online', revalidate);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [session, ensureSessionStillValid]);
+
   // ── USOS OAuth Callback Handling ──────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -550,6 +660,8 @@ function App() {
   // ── Data loading with cache-first strategy ────────────────────────────────
 
   const loadStudiesData = useCallback(async (sess: SessionData) => {
+    if (!(await ensureSessionStillValid(sess))) return;
+
     // Show cached first
     const cached = cache.loadStudiesForce() ?? [];
     if (cached.length) {
@@ -570,12 +682,13 @@ function App() {
           updateActiveStudy(fresh[0].przynaleznoscId);
         }
       } catch (e) {
+        if (handleSessionError(e)) return;
         if (!cached.length) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać kierunków.');
       } finally {
         setGlobalLoad(false);
       }
     }
-  }, [updateActiveStudy]);
+  }, [ensureSessionStillValid, handleSessionError, updateActiveStudy]);
 
   useEffect(() => {
     if (!session) { setStudies([]); return; }
@@ -592,6 +705,13 @@ function App() {
     // Create unique request ID to cancel old requests
     const requestId = Math.random().toString(36).substr(2, 9);
     planRequestIdRef.current = requestId;
+
+    if (!(await ensureSessionStillValid(session))) {
+      if (planRequestIdRef.current === requestId) {
+        setPlanLoading(false);
+      }
+      return;
+    }
 
     // Show cached immediately without spinner (but not if forcing refresh)
     let hasCached = false;
@@ -637,12 +757,9 @@ function App() {
       if (!isSearch && result.currentDate && !newDate) setPlanDate(result.currentDate);
     } catch (e) {
       if (planRequestIdRef.current === requestId) {
+        if (handleSessionError(e)) return;
         const errorMsg = e instanceof Error ? e.message : 'Nie można pobrać planu.';
-        // Check if session expired (401 Unauthorized)
-        if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
-          applySession(null);
-          showToast(t('general.sessionExpired'));
-        } else if (!planResult) {
+        if (!planResult) {
           setGlobalError(errorMsg);
         }
       }
@@ -651,7 +768,7 @@ function App() {
         setPlanLoading(false);
       }
     }
-  }, [session, planViewMode, planDate, activeStudyId, planResult, t]);
+  }, [session, planViewMode, planDate, activeStudyId, planResult, ensureSessionStillValid, handleSessionError]);
 
   // Fetch plan search suggestions with debouncing (300ms)
   const fetchPlanSearchSuggestions = useCallback(async (category: string, query: string) => {
@@ -680,6 +797,8 @@ function App() {
       setTotalEctsAll(0);
       return;
     }
+
+    if (!(await ensureSessionStillValid(session))) return;
 
     const cachedSem = cache.loadSemestersForce(activeStudyId) ?? [];
     if (cachedSem.length && !forceRefresh) setSemesters(cachedSem);
@@ -753,21 +872,19 @@ function App() {
         // noop
       }
     } catch (e) {
+      if (handleSessionError(e)) return;
       const errorMsg = e instanceof Error ? e.message : 'Nie można pobrać ocen.';
-      // Check if session expired (401 Unauthorized)
-      if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
-        applySession(null);
-        showToast('Sesja wygasła, zaloguj się ponownie');
-      } else if (!grades.length) {
+      if (!grades.length) {
         setGlobalError(errorMsg);
       }
     } finally {
       setGradesLoad(false);
     }
-  }, [session, activeStudyId, selSemId, grades.length]);
+  }, [session, activeStudyId, selSemId, grades.length, ensureSessionStillValid, handleSessionError]);
 
   const loadInfoData = useCallback(async (forceRefresh = false) => {
     if (!session || !activeStudyId) return;
+    if (!(await ensureSessionStillValid(session))) return;
     const forceCached = cache.loadInfoForce(activeStudyId);
     if (forceCached && !forceRefresh) {
       setDetails(forceCached.details);
@@ -786,11 +903,12 @@ function App() {
       setEls(payload.els ?? null);
       setCalendarEvents(payload.calendarEvents ?? []);
     } catch (e) {
+      if (handleSessionError(e)) return;
       if (!forceCached) setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać danych.');
     } finally {
       setInfoLoading(false);
     }
-  }, [session, activeStudyId]);
+  }, [session, activeStudyId, ensureSessionStillValid, handleSessionError]);
 
   const loadNewsData = useCallback(async (forceRefresh = false) => {
     const forced = cache.loadNewsForce() ?? [];
@@ -861,16 +979,24 @@ function App() {
       selSemPrev.current = selSemId;
       if (!cache.loadGrades(selSemId)) {
         setGradesLoad(true);
-        fetchCombinedGrades(session, selSemId)
-          .then(g => { cache.saveGrades(selSemId, g); setGrades(g); })
-          .catch(() => {/* use cached */ })
-          .finally(() => setGradesLoad(false));
+        (async () => {
+          try {
+            if (!(await ensureSessionStillValid(session))) return;
+            const g = await fetchCombinedGrades(session, selSemId);
+            cache.saveGrades(selSemId, g);
+            setGrades(g);
+          } catch (e) {
+            handleSessionError(e);
+          } finally {
+            setGradesLoad(false);
+          }
+        })();
       } else {
         const cached = cache.loadGradesForce(selSemId);
         if (cached) setGrades(cached);
       }
     }
-  }, [selSemId, screen, session]);
+  }, [selSemId, screen, session, ensureSessionStillValid, handleSessionError]);
 
   // ── Computed values ───────────────────────────────────────────────────────
 

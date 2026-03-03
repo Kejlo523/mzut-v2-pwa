@@ -28,6 +28,46 @@ function firstNonEmpty(...values: unknown[]): string {
   return '';
 }
 
+const SESSION_EXPIRED_MESSAGE = 'Sesja wygasła, zaloguj się ponownie';
+
+export class SessionExpiredError extends Error {
+  constructor(message = SESSION_EXPIRED_MESSAGE) {
+    super(message);
+    this.name = 'SessionExpiredError';
+  }
+}
+
+export function isSessionExpiredError(error: unknown): error is SessionExpiredError {
+  return error instanceof SessionExpiredError;
+}
+
+function rethrowIfSessionExpired(error: unknown): void {
+  if (isSessionExpiredError(error)) {
+    throw error;
+  }
+}
+
+function getMzutStatus(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const payload = value as Record<string, unknown>;
+  return firstNonEmpty(payload.logInStatus, payload.loginInStatus).toUpperCase();
+}
+
+function hasMzutSessionExpired(value: unknown): boolean {
+  const status = getMzutStatus(value);
+  if (!status || status === 'OK') return false;
+  return status.includes('TOKEN') || status.includes('UNAUTHORIZED') || status.includes('AUTH');
+}
+
+function hasHttpAuthError(status: number, message: string): boolean {
+  if (status === 401 || status === 403) return true;
+  const normalized = message.toLowerCase();
+  return normalized.includes('unauthorized')
+    || normalized.includes('forbidden')
+    || normalized.includes('oauth_problem=token_rejected')
+    || normalized.includes('token rejected');
+}
+
 function ensureArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
   if (value === null || value === undefined) return [];
@@ -95,8 +135,15 @@ async function proxyMzut<T = Record<string, unknown>>(fn: string, params: Record
   });
 
   const body = (await response.json().catch(() => ({}))) as { data: T; error: string };
+  const errorMessage = body.error || `mZUT proxy HTTP ${response.status}`;
   if (!response.ok) {
-    throw new Error(body.error || `mZUT proxy HTTP ${response.status}`);
+    if (hasHttpAuthError(response.status, errorMessage)) {
+      throw new SessionExpiredError();
+    }
+    throw new Error(errorMessage);
+  }
+  if (hasMzutSessionExpired(body.data)) {
+    throw new SessionExpiredError();
   }
   return body.data ?? ({} as T);
 }
@@ -144,7 +191,11 @@ async function proxyUsos<T = unknown>(
 
   const body = (await response.json().catch(() => ({}))) as { error: string } & T;
   if (!response.ok) {
-    throw new Error(body.error || `USOS API error: ${response.status}`);
+    const errorMessage = body.error || `USOS API error: ${response.status}`;
+    if (hasHttpAuthError(response.status, errorMessage)) {
+      throw new SessionExpiredError();
+    }
+    throw new Error(errorMessage);
   }
   return body as T;
 }
@@ -271,6 +322,29 @@ export async function loginWithUsos(verifier: string, token: string, secret: str
     username: `${user.first_name} ${user.last_name}`.trim(),
     imageUrl: rawPhoto ? `${API_BASE}/usos/image?url=${encodeURIComponent(rawPhoto)}` : '',
   };
+}
+
+export async function validateSession(session: SessionData): Promise<void> {
+  const checks: Promise<unknown>[] = [];
+
+  if (session.authKey) {
+    checks.push(proxyMzut<Record<string, unknown>>('getMenuStudent', {
+      login: session.userId,
+      token: session.authKey,
+    }));
+  }
+
+  if (session.usos) {
+    checks.push(proxyUsos<{ id?: string }>(session, 'services/users/user', {
+      fields: 'id',
+    }));
+  }
+
+  if (!checks.length) {
+    throw new SessionExpiredError();
+  }
+
+  await Promise.all(checks);
 }
 
 export async function fetchStudies(session: SessionData): Promise<Study[]> {
@@ -494,6 +568,7 @@ export async function fetchInfo(
             facultyIdStr = String(facultyObj.faculty.id || '');
           }
         } catch (e) {
+          rethrowIfSessionExpired(e);
           // Ignore faculty fetch errors
         }
 
@@ -528,7 +603,9 @@ export async function fetchInfo(
             details.rokAkademicki = tid.replace(/[ZL]$/, '');
           }
         }
-      } catch (e) { }
+      } catch (e) {
+        rethrowIfSessionExpired(e);
+      }
 
       // Fetch history terms
       let historyItems: StudyHistoryItem[] = [];
@@ -548,7 +625,9 @@ export async function fetchInfo(
           }
           historyItems.sort((a, b) => b.label.localeCompare(a.label));
         }
-      } catch (e) { }
+      } catch (e) {
+        rethrowIfSessionExpired(e);
+      }
       // Fetch ELS cards
       let els: ElsCard | null = null;
       try {
@@ -564,6 +643,7 @@ export async function fetchInfo(
           };
         }
       } catch (e) {
+        rethrowIfSessionExpired(e);
         console.warn("Failed to fetch cards:", e);
       }
 
@@ -595,11 +675,13 @@ export async function fetchInfo(
           }));
         }
       } catch (e) {
+        rethrowIfSessionExpired(e);
         console.warn("Failed to fetch calendar:", e);
       }
 
       return { details, history: historyItems, els, calendarEvents };
     } catch (e) {
+      rethrowIfSessionExpired(e);
       console.warn("Failed to fetch info from USOS", e);
       return { details: null, history: [], els: null, calendarEvents: [] };
     }
@@ -936,6 +1018,7 @@ export async function fetchPlan(
         });
         album = firstNonEmpty(study.album);
       } catch (e) {
+        rethrowIfSessionExpired(e);
         console.warn('Failed to fetch album from getStudy', e);
       }
     }
