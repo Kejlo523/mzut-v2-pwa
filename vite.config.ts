@@ -10,6 +10,7 @@ const appBase = (() => {
 })();
 
 const appBaseNoSlash = appBase === '/' ? '' : appBase.slice(0, -1);
+const statsPath = appBase === '/' ? '/stats' : `${appBaseNoSlash}/stats`;
 
 function withBase(pathname: string): string {
   return `${appBase}${pathname.replace(/^\/+/, '')}`;
@@ -127,6 +128,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      [statsPath]: {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8787',
         changeOrigin: true,
