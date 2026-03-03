@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "devices": {
+    "device:7c60254d5c278b54ea4b92520575fcd9ee3d5d42": {
+      "firstSeenAt": "2026-03-03T20:55:17.833Z",
+      "lastSeenAt": "2026-03-03T20:58:27.212Z",
+      "hitCount": 48,
+      "successfulLogins": 0,
+      "lastUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+      "lastAddress": ":"
+    }
+  },
+  "dailyActive": {
+    "2026-03-03": [
+      "device:7c60254d5c278b54ea4b92520575fcd9ee3d5d42"
+    ]
+  },
+  "successfulLoginsTotal": 0,
+  "successfulLoginsByDay": {}
+}

@@ -14,10 +14,12 @@ import type {
   ViewMode,
 } from '../types';
 import { getPlanEventFilterKey, getPlanEventFilterLabel } from '../planFilters';
+import { loadOrCreateDeviceId } from './storage';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? '/api' : `${import.meta.env.BASE_URL}api`);
 const CARR = [...'23456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'];
 const CARR2 = [...'vwxyz23456789ABCDEFGHJKkmnopqrstuvwxyzabcdefghijWXYZLMNPQRSTUV'];
+const DEVICE_ID = loadOrCreateDeviceId();
 
 function firstNonEmpty(...values: unknown[]): string {
   for (const value of values) {
@@ -100,6 +102,16 @@ function randomString(length: number, alphabet: string[]): string {
   return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
 }
 
+function createApiRequestInit(init: RequestInit = {}): RequestInit {
+  const headers = new Headers(init.headers ?? {});
+  headers.set('X-mZUT-Device-Id', DEVICE_ID);
+  return { ...init, headers };
+}
+
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, createApiRequestInit(init));
+}
+
 function generateToken(login: string, password: string): string {
   const base = randomString(32, CARR);
   if (!password) return base;
@@ -129,7 +141,7 @@ function generateToken(login: string, password: string): string {
 }
 
 async function proxyMzut<T = Record<string, unknown>>(fn: string, params: Record<string, string>): Promise<T> {
-  const response = await fetch(`${API_BASE}/proxy/mzut`, {
+  const response = await apiFetch(`${API_BASE}/proxy/mzut`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fn, params }),
@@ -155,7 +167,7 @@ async function proxyPlanStudent(query: Record<string, string>): Promise<Record<s
     url.searchParams.set(key, value);
   }
 
-  const response = await fetch(`${url.pathname}${url.search}`);
+  const response = await apiFetch(`${url.pathname}${url.search}`);
   const body = (await response.json().catch(() => ({}))) as { data: Record<string, unknown>[]; error: string };
   if (!response.ok) {
     throw new Error(body.error || `Plan proxy HTTP ${response.status}`);
@@ -164,7 +176,7 @@ async function proxyPlanStudent(query: Record<string, string>): Promise<Record<s
 }
 
 async function proxyRssXml(): Promise<string> {
-  const response = await fetch(`${API_BASE}/proxy/rss`);
+  const response = await apiFetch(`${API_BASE}/proxy/rss`);
   const body = (await response.json().catch(() => ({}))) as { xml: string; error: string };
   if (!response.ok) {
     throw new Error(body.error || `RSS proxy HTTP ${response.status}`);
@@ -179,7 +191,7 @@ async function proxyUsos<T = unknown>(
 ): Promise<T> {
   if (!session.usos) throw new Error('Brak aktywnej sesji USOS.');
 
-  const response = await fetch(`${API_BASE}/usos/proxy`, {
+  const response = await apiFetch(`${API_BASE}/usos/proxy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -275,14 +287,14 @@ export async function login(loginValue: string, password: string): Promise<Sessi
 
 export async function fetchUsosRequestToken(callbackUrl: string): Promise<{ oauth_token: string; oauth_token_secret: string }> {
   const scopes = 'studies|grades|personal|photo|email|mobile_numbers|payments|cards';
-  const response = await fetch(`${API_BASE}/usos/request-token?callbackUrl=${encodeURIComponent(callbackUrl)}&scopes=${scopes}`);
+  const response = await apiFetch(`${API_BASE}/usos/request-token?callbackUrl=${encodeURIComponent(callbackUrl)}&scopes=${scopes}`);
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || 'Błąd pobierania tokenu USOS.');
   return body;
 }
 
 export async function loginWithUsos(verifier: string, token: string, secret: string): Promise<SessionData> {
-  const response = await fetch(`${API_BASE}/usos/access-token`, {
+  const response = await apiFetch(`${API_BASE}/usos/access-token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1122,7 +1134,7 @@ function resolveSemesterRange(currentDateText: string, sessionPeriods: SessionPe
 
 export async function fetchSessionPeriods(): Promise<SessionPeriod[]> {
   try {
-    const response = await fetch(`${API_BASE}/proxy/calendar`);
+    const response = await apiFetch(`${API_BASE}/proxy/calendar`);
     if (!response.ok) return [];
     const body = (await response.json()) as { periods?: SessionPeriod[] };
     return Array.isArray(body.periods) ? body.periods : [];
@@ -1300,7 +1312,7 @@ export async function fetchPlanSemesterExport(
 }
 
 export async function fetchPlanSuggestions(kind: string, query: string): Promise<string[]> {
-  const response = await fetch(`${API_BASE}/proxy/plan-suggest?kind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
+  const response = await apiFetch(`${API_BASE}/proxy/plan-suggest?kind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
   const body = (await response.json().catch(() => ({}))) as { data: Array<{ item: string }> };
   const rows = ensureArray<{ item: string }>(body.data);
   return rows.map((row) => firstNonEmpty(row.item)).filter(Boolean);
