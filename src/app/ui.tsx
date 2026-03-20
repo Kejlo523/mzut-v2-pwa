@@ -1,4 +1,4 @@
-import type { ChangeEventHandler } from 'react';
+import type { CSSProperties, ChangeEventHandler } from 'react';
 
 const SV = {
   fill: 'none',
@@ -47,6 +47,10 @@ export function Spinner({ text }: { text: string }) {
       {text && <span>{text}</span>}
     </div>
   );
+}
+
+export function Skeleton({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <span aria-hidden className={`skeleton-block ${className}`.trim()} style={style} />;
 }
 
 export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {

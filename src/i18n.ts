@@ -75,6 +75,13 @@ const pl: Record<string, string> = {
     'settings.gradeGroupSub': 'Widok ocen pogrupowany po przedmiocie',
     'settings.language': 'Język',
     'settings.languageSub': 'Język interfejsu',
+    'settings.desktopEyebrow': 'Personalizacja',
+    'settings.desktopTitle': 'Ustaw aplikację pod swój rytm',
+    'settings.desktopCopy': 'Zmiany zapisują się od razu. Po lewej masz szybki podgląd aktywnych ustawień, po prawej dokładne opcje.',
+    'settings.sectionInterface': 'Interfejs i synchronizacja',
+    'settings.sectionViews': 'Plan i oceny',
+    'settings.stateOn': 'Włączone',
+    'settings.stateOff': 'Wyłączone',
 
     // General
     'general.loading': 'Ładowanie danych…',
@@ -303,6 +310,13 @@ const en: Record<string, string> = {
     'settings.gradeGroupSub': 'Group grades by subject',
     'settings.language': 'Language',
     'settings.languageSub': 'Interface language',
+    'settings.desktopEyebrow': 'Personalization',
+    'settings.desktopTitle': 'Tune the app to your workflow',
+    'settings.desktopCopy': 'Changes are saved instantly. The left side gives a quick overview, the right side holds the full controls.',
+    'settings.sectionInterface': 'Interface and sync',
+    'settings.sectionViews': 'Schedule and grades',
+    'settings.stateOn': 'Enabled',
+    'settings.stateOff': 'Disabled',
 
     // General
     'general.loading': 'Loading data…',
