@@ -13,8 +13,8 @@
     },
     "device:ae8f251961287aba308972b5cd6f20d836dd5210": {
       "firstSeenAt": "2026-03-20T20:26:32.548Z",
-      "lastSeenAt": "2026-03-20T20:33:14.778Z",
-      "hitCount": 35,
+      "lastSeenAt": "2026-03-20T21:01:22.071Z",
+      "hitCount": 244,
       "successfulLogins": 1,
       "lastUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
       "lastAddress": ":",
@@ -30,6 +30,26 @@
       "lastAddress": ":",
       "lastSuccessfulLoginAt": "",
       "lastSuccessfulLoginMethod": "other"
+    },
+    "legacy:e584f919520422581439f536e2499e5a6877b3dc": {
+      "firstSeenAt": "2026-03-20T20:39:56.003Z",
+      "lastSeenAt": "2026-03-20T20:39:56.003Z",
+      "hitCount": 1,
+      "successfulLogins": 0,
+      "lastUserAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
+      "lastAddress": ":",
+      "lastSuccessfulLoginAt": "",
+      "lastSuccessfulLoginMethod": "other"
+    },
+    "device:0c241d31cfebc4d997721e88f3c499ef9dd96593": {
+      "firstSeenAt": "2026-03-20T20:39:56.005Z",
+      "lastSeenAt": "2026-03-20T20:49:57.352Z",
+      "hitCount": 76,
+      "successfulLogins": 0,
+      "lastUserAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
+      "lastAddress": ":",
+      "lastSuccessfulLoginAt": "",
+      "lastSuccessfulLoginMethod": "other"
     }
   },
   "dailyActive": {
@@ -38,7 +58,9 @@
     ],
     "2026-03-20": [
       "device:ae8f251961287aba308972b5cd6f20d836dd5210",
-      "legacy:005f250352c05d5e86db8066c03d0d1442eaa16f"
+      "legacy:005f250352c05d5e86db8066c03d0d1442eaa16f",
+      "legacy:e584f919520422581439f536e2499e5a6877b3dc",
+      "device:0c241d31cfebc4d997721e88f3c499ef9dd96593"
     ]
   },
   "successfulLoginsTotal": 1,

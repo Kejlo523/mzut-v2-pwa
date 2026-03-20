@@ -50,6 +50,58 @@ function normalizeMatch(value: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+const PLAN_TEACHER_TITLE_TOKENS = new Set([
+  'prof',
+  'profesor',
+  'dr',
+  'doktor',
+  'hab',
+  'habilitowany',
+  'inz',
+  'inż',
+  'mgr',
+  'magister',
+  'lic',
+  'licencjat',
+  'doc',
+  'docent',
+  'lek',
+  'med',
+]);
+
+function normalizeTeacherToken(token: string): string {
+  return normalizeMatch(token).replace(/[^a-z-]/g, '');
+}
+
+export function toPlanTeacherSearchQuery(value: string): string {
+  const tokens = String(value || '')
+    .replace(/[(),]/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) return '';
+
+  const filtered = tokens.filter((token) => {
+    const normalized = normalizeTeacherToken(token);
+    return normalized && !PLAN_TEACHER_TITLE_TOKENS.has(normalized);
+  });
+
+  if (filtered.length === 0) return '';
+
+  const uppercaseNameTokens = filtered.filter((token) => {
+    const cleaned = token.replace(/[.,]/g, '');
+    return cleaned.length > 0 && cleaned === cleaned.toUpperCase();
+  });
+
+  const source = uppercaseNameTokens.length >= 2
+    ? uppercaseNameTokens.map((token) => token.replace(/[.,]/g, ''))
+    : filtered.map((token) => token.replace(/[.,]/g, '').toUpperCase());
+
+  if (source.length < 2) return source.join(' ');
+  return [...source.slice(1), source[0]].join(' ');
+}
+
 export function isFinalGradeType(type: string, subjectName?: string): boolean {
   const t = normalizeMatch(type);
   if (

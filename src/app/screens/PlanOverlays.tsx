@@ -2,19 +2,58 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import type { PlanSubjectFilter } from '../../types';
 import type { SelectedPlanEvent, TranslateFn } from '../viewTypes';
-import { fmtDateLabel } from '../helpers';
+import { fmtDateLabel, toPlanTeacherSearchQuery } from '../helpers';
 import { Ic } from '../ui';
 
 interface PlanEventSheetProps {
   selectedPlanEvent: SelectedPlanEvent | null;
   onClose: () => void;
   language: 'pl' | 'en';
+  onQuickSearch: (category: string, query: string) => void;
 }
 
-export function PlanEventSheet({ selectedPlanEvent, onClose, language }: PlanEventSheetProps) {
+export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSearch }: PlanEventSheetProps) {
   if (!selectedPlanEvent) return null;
 
   const { date, event } = selectedPlanEvent;
+  const room = event.room && event.room !== '-' ? event.room : '';
+  const group = event.group && event.group !== '-' ? event.group : '';
+  const teacherSearchQuery = toPlanTeacherSearchQuery(event.teacher);
+
+  const renderSearchRow = (
+    icon: string,
+    label: string,
+    value: string,
+    category: string,
+    query: string,
+  ) => {
+    if (!value) return null;
+    const trimmedQuery = query.trim();
+    const isSearchable = !!trimmedQuery;
+
+    return (
+      <div className="event-sheet-row">
+        <Ic n={icon} />
+        <div className="event-sheet-row-copy">
+          <span className="event-sheet-row-label">{label}</span>
+          {isSearchable ? (
+            <button
+              type="button"
+              className="event-sheet-link"
+              onClick={() => onQuickSearch(category, trimmedQuery)}
+            >
+              <span className="event-sheet-link-text">{value}</span>
+              <span className="event-sheet-link-icon" aria-hidden>
+                <Ic n="search" />
+              </span>
+            </button>
+          ) : (
+            <span className="event-sheet-row-value">{value}</span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="event-sheet-overlay" onClick={onClose}>
@@ -26,24 +65,9 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language }: PlanEve
           <Ic n="clock" />
           <span>{fmtDateLabel(date, language)} · {event.startStr} - {event.endStr}</span>
         </div>
-        {!!event.room && (
-          <div className="event-sheet-row">
-            <Ic n="location" />
-            <span>Sala: {event.room}</span>
-          </div>
-        )}
-        {!!event.group && (
-          <div className="event-sheet-row">
-            <Ic n="group" />
-            <span>Grupa: {event.group}</span>
-          </div>
-        )}
-        {!!event.teacher && (
-          <div className="event-sheet-row">
-            <Ic n="user" />
-            <span>{event.teacher}</span>
-          </div>
-        )}
+        {renderSearchRow('location', 'Sala', room, 'room', room)}
+        {renderSearchRow('group', 'Grupa', group, 'group', group)}
+        {renderSearchRow('user', 'Prowadzący', event.teacher, 'teacher', teacherSearchQuery)}
         <button type="button" className="event-sheet-close" onClick={onClose}>
           Zamknij
         </button>
