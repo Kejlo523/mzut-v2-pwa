@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-server/data/usage-stats.json
+server/data/
 
 # Editor directories and files
 .vscode/*
