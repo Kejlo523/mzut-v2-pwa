@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 
 export interface ScreenEntry<TScreen extends string = string, TParams = unknown> {
   key: TScreen;
@@ -9,7 +9,14 @@ export interface ScreenEntry<TScreen extends string = string, TParams = unknown>
 const EXIT_EVENT = 'mzutv2-exit-attempt';
 const LAST_SCREEN_KEY = 'mzutv2_last_screen';
 
-export function useAppNavigation<TScreen extends string>(initialScreen: TScreen) {
+interface UseAppNavigationOptions {
+  onRootBackAttemptRef?: MutableRefObject<(() => boolean) | null>;
+}
+
+export function useAppNavigation<TScreen extends string>(
+  initialScreen: TScreen,
+  options?: UseAppNavigationOptions,
+) {
   const idRef = useRef(1);
 
   // Try to load the last screen strictly if it wasn't a manual reset during boot
@@ -38,13 +45,18 @@ export function useAppNavigation<TScreen extends string>(initialScreen: TScreen)
         return;
       }
 
+      if (options?.onRootBackAttemptRef?.current?.()) {
+        window.history.pushState({ mzutv2: true, ts: Date.now() }, '', window.location.href);
+        return;
+      }
+
       window.dispatchEvent(new CustomEvent(EXIT_EVENT));
       window.history.pushState({ mzutv2: true, ts: Date.now() }, '', window.location.href);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [options?.onRootBackAttemptRef]);
 
   const push = useCallback((key: TScreen, params?: unknown) => {
     idRef.current += 1;

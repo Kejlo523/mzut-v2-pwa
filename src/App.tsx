@@ -85,8 +85,11 @@ function App() {
   const sessionCheckInFlightRef = useRef<Promise<boolean> | null>(null);
   const lastSessionCheckRef = useRef<{ key: string; ts: number }>({ key: '', ts: 0 });
   const activeSessionKeyRef = useRef(sessionKey);
+  const rootBackAttemptRef = useRef<(() => boolean) | null>(null);
 
-  const nav = useAppNavigation<ScreenKey>(session ? 'home' : 'login');
+  const nav = useAppNavigation<ScreenKey>(session ? 'home' : 'login', {
+    onRootBackAttemptRef: rootBackAttemptRef,
+  });
   const screen = nav.current.key;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -360,8 +363,12 @@ function App() {
 
   // ── Swipe gestures ────────────────────────────────────────────────────────
   const swipe = useSwipeGestures({
-    canGoBack: false,
-    onBack: () => { },
+    canGoBack: screen === 'plan' && (planSearchOpen || !!planSearchQ.trim()),
+    onBack: () => {
+      if (screen === 'plan' && (planSearchOpen || !!planSearchQ.trim())) {
+        resetPlanSearch();
+      }
+    },
     canOpenDrawer: !drawerOpen && screen !== 'login' && screen !== 'plan',
     onOpenDrawer: () => setDrawerOpen(true),
     canCloseDrawer: drawerOpen,
@@ -642,6 +649,59 @@ function App() {
       setPlanSearchLoading(false);
     }
   }, []);
+
+  const applyPlanSearch = useCallback((category: string, query: string) => {
+    const resolvedCategory = category.trim();
+    const resolvedQuery = query.trim();
+    if (!resolvedCategory || !resolvedQuery) return;
+
+    if (planSearchDebounceRef.current) {
+      clearTimeout(planSearchDebounceRef.current);
+      planSearchDebounceRef.current = null;
+    }
+
+    setPlanSearchCat(resolvedCategory);
+    setPlanSearchQ(resolvedQuery);
+    setPlanSearchSuggestions([]);
+    setPlanSearchLoading(false);
+    setPlanSearchOpen(false);
+    setPlanMoreMenuOpen(false);
+    setPlanFiltersOpen(false);
+    setSelectedPlanEvent(null);
+    void loadPlanData({ category: resolvedCategory, query: resolvedQuery });
+  }, [loadPlanData]);
+
+  const resetPlanSearch = useCallback(() => {
+    const shouldReloadPlan = planSearchOpen || !!planSearchQ.trim();
+
+    if (planSearchDebounceRef.current) {
+      clearTimeout(planSearchDebounceRef.current);
+      planSearchDebounceRef.current = null;
+    }
+
+    setPlanSearchQ('');
+    setPlanSearchSuggestions([]);
+    setPlanSearchLoading(false);
+    setPlanSearchOpen(false);
+
+    if (shouldReloadPlan) {
+      void loadPlanData();
+    }
+  }, [loadPlanData, planSearchOpen, planSearchQ]);
+
+  useEffect(() => {
+    rootBackAttemptRef.current = () => {
+      if (screen !== 'plan') return false;
+      if (!planSearchOpen && !planSearchQ.trim()) return false;
+
+      resetPlanSearch();
+      return true;
+    };
+
+    return () => {
+      rootBackAttemptRef.current = null;
+    };
+  }, [screen, planSearchOpen, planSearchQ, resetPlanSearch]);
 
   const loadGradesData = useCallback(async (resetSemId = false, forceRefresh = false) => {
     if (!session || !activeStudyId) {
@@ -1413,8 +1473,8 @@ function App() {
 
     // Build week grid template with separator columns
     const buildWeekGridTemplate = (numCols: number) => {
-      if (numCols === 0) return '44px';
-      const parts: string[] = ['44px'];
+      if (numCols === 0) return 'var(--plan-time-col-w, 44px)';
+      const parts: string[] = ['var(--plan-time-col-w, 44px)'];
       for (let i = 0; i < numCols; i++) {
         parts.push('1fr');
         if (i < numCols - 1) {
@@ -1797,6 +1857,7 @@ function App() {
         selectedPlanEvent={selectedPlanEvent}
         onClose={() => setSelectedPlanEvent(null)}
         language={settings.language}
+        onQuickSearch={applyPlanSearch}
       />
     );
   }
