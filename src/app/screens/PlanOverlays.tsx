@@ -1,9 +1,11 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 
 import type { PlanSubjectFilter } from '../../types';
 import type { SelectedPlanEvent, TranslateFn } from '../viewTypes';
 import { fmtDateLabel, toPlanTeacherSearchQuery } from '../helpers';
 import { Ic } from '../ui';
+
+const PLAN_EVENT_SHEET_TRANSITION_MS = 240;
 
 interface PlanEventSheetProps {
   selectedPlanEvent: SelectedPlanEvent | null;
@@ -13,9 +15,74 @@ interface PlanEventSheetProps {
 }
 
 export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSearch }: PlanEventSheetProps) {
-  if (!selectedPlanEvent) return null;
+  const [renderedPlanEvent, setRenderedPlanEvent] = useState<SelectedPlanEvent | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+  const enterFrameRef = useRef<number | null>(null);
+  const enterFrameNestedRef = useRef<number | null>(null);
+  const shouldAnimateOpenRef = useRef(false);
 
-  const { date, event } = selectedPlanEvent;
+  const clearEnterFrames = () => {
+    if (enterFrameRef.current !== null) {
+      window.cancelAnimationFrame(enterFrameRef.current);
+      enterFrameRef.current = null;
+    }
+    if (enterFrameNestedRef.current !== null) {
+      window.cancelAnimationFrame(enterFrameNestedRef.current);
+      enterFrameNestedRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+      clearEnterFrames();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedPlanEvent) {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+
+      clearEnterFrames();
+      shouldAnimateOpenRef.current = !renderedPlanEvent || !isOpen;
+      if (shouldAnimateOpenRef.current) setIsOpen(false);
+      setRenderedPlanEvent(selectedPlanEvent);
+      return;
+    }
+
+    if (!renderedPlanEvent) return;
+
+    clearEnterFrames();
+    shouldAnimateOpenRef.current = false;
+    setIsOpen(false);
+    closeTimerRef.current = window.setTimeout(() => {
+      setRenderedPlanEvent(null);
+      closeTimerRef.current = null;
+    }, PLAN_EVENT_SHEET_TRANSITION_MS);
+  }, [isOpen, renderedPlanEvent, selectedPlanEvent]);
+
+  useEffect(() => {
+    if (!renderedPlanEvent || !shouldAnimateOpenRef.current) return;
+
+    shouldAnimateOpenRef.current = false;
+    enterFrameRef.current = window.requestAnimationFrame(() => {
+      enterFrameNestedRef.current = window.requestAnimationFrame(() => {
+        setIsOpen(true);
+        enterFrameRef.current = null;
+        enterFrameNestedRef.current = null;
+      });
+    });
+  }, [renderedPlanEvent]);
+
+  if (!renderedPlanEvent) return null;
+
+  const { date, event } = renderedPlanEvent;
   const room = event.room && event.room !== '-' ? event.room : '';
   const group = event.group && event.group !== '-' ? event.group : '';
   const teacherSearchQuery = toPlanTeacherSearchQuery(event.teacher);
@@ -56,8 +123,8 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSe
   };
 
   return (
-    <div className="event-sheet-overlay" onClick={onClose}>
-      <div className="event-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szczegóły zajęć">
+    <div className={`event-sheet-overlay plan-event-sheet-overlay${isOpen ? ' is-open' : ''}`} onClick={onClose}>
+      <div className="event-sheet plan-event-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Szczegóły zajęć">
         <div className="event-sheet-handle" />
         <div className={`event-sheet-type-badge ev-${event.typeClass}`}>{event.typeLabel || 'Zajęcia'}</div>
         <div className="event-sheet-title">{event.title}</div>

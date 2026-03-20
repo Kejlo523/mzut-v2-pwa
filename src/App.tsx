@@ -63,7 +63,7 @@ import {
   sumUniqueEcts,
   todayYmd,
 } from './app/helpers';
-import { Ic } from './app/ui';
+import { Ic, Skeleton } from './app/ui';
 import type { DrawerScreenKey, NewsDetailParams, SelectedPlanEvent } from './app/viewTypes';
 import { HomeScreen, LoginScreen } from './app/screens/AuthScreens';
 import { AboutScreen, LinksScreen, NewsDetailScreen, NewsScreen, SettingsScreen } from './app/screens/ContentScreens';
@@ -1489,6 +1489,126 @@ function App() {
     };
 
     const weekGridTemplate = buildWeekGridTemplate(weekCols.length);
+    const showPlanFrameSkeleton = planLoading && !visiblePlanResult;
+    const monthCells = (visiblePlanResult?.monthGrid ?? []).flat();
+    const showMonthSkeleton = planLoading && monthCells.length === 0;
+    const weekSkeletonColumnCount = Math.max(weekCols.length, 5);
+
+    const renderPlanEventSkeletons = (scope: 'day' | 'week', key: string) => {
+      const items = scope === 'day'
+        ? [
+          { top: 84, height: 88, left: '8px', width: 'calc(100% - 16px)', titleWidth: '68%', metaWidth: '54%', extraWidth: '38%' },
+          { top: 238, height: 104, left: '8px', width: 'calc(78% - 12px)', titleWidth: '74%', metaWidth: '52%', extraWidth: '34%' },
+          { top: 372, height: 76, left: 'calc(44% + 4px)', width: 'calc(56% - 12px)', titleWidth: '64%', metaWidth: '48%', extraWidth: '30%' },
+        ]
+        : [
+          { top: 88, height: 72, left: '3px', width: 'calc(100% - 6px)', titleWidth: '76%', metaWidth: '58%', extraWidth: '' },
+          { top: 228, height: 94, left: '3px', width: 'calc(100% - 6px)', titleWidth: '66%', metaWidth: '54%', extraWidth: '' },
+        ];
+
+      return items.map((item, idx) => (
+        <div
+          key={`sk-${scope}-${key}-${idx}`}
+          className={`plan-skeleton-event plan-skeleton-event-${scope}`}
+          style={{ top: item.top, height: item.height, left: item.left, width: item.width }}
+        >
+          <Skeleton className="skeleton-line skeleton-line-sm plan-skeleton-event-line plan-skeleton-event-line-title" style={{ width: item.titleWidth }} />
+          <Skeleton className="skeleton-line skeleton-line-xs plan-skeleton-event-line" style={{ width: item.metaWidth }} />
+          {item.extraWidth && (
+            <Skeleton className="skeleton-line skeleton-line-xs plan-skeleton-event-line plan-skeleton-event-line-muted" style={{ width: item.extraWidth }} />
+          )}
+        </div>
+      ));
+    };
+
+    const renderPlanDaySkeleton = () => (
+      <div className="list-stack">
+        <div className="card day-tl-card plan-loading-card">
+          <div className="day-tl-head">
+            <Skeleton className="skeleton-line skeleton-line-sm plan-skeleton-headline" style={{ width: '156px' }} />
+            <div className="day-tl-head-right">
+              <Skeleton className="skeleton-pill plan-skeleton-chip" style={{ width: '78px' }} />
+            </div>
+          </div>
+          <div className="day-tl-body">
+            <div className="day-time-col">
+              {weekLayout.slots.map((m) => (
+                <div key={`sk-day-time-${m}`} className="day-time-cell day-time-cell-skeleton" style={{ height: weekLayout.hourHeight }}>
+                  {fmtHour(m)}
+                </div>
+              ))}
+            </div>
+
+            <div className="day-events-col" style={{ height: weekTrackH }}>
+              {weekLayout.slots.map((m, idx) => (
+                <div key={`sk-day-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+              ))}
+              {renderPlanEventSkeletons('day', planDate)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    const renderPlanWeekSkeleton = () => {
+      const skeletonWeekGridTemplate = buildWeekGridTemplate(weekSkeletonColumnCount);
+
+      return (
+        <div className="card week-card plan-loading-card">
+          <div className="week-grid week-head-row" style={{ gridTemplateColumns: skeletonWeekGridTemplate }}>
+            <div className="week-head-time">{t('plan.hour')}</div>
+            {Array.from({ length: weekSkeletonColumnCount }).map((_, ci) => (
+              <React.Fragment key={`sk-week-head-${ci}`}>
+                <div className="week-head-day plan-skeleton-week-head">
+                  <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '54px' }} />
+                  <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '38px' }} />
+                </div>
+                {ci < weekSkeletonColumnCount - 1 && <div style={{ width: 0 }} />}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="week-grid" style={{ gridTemplateColumns: skeletonWeekGridTemplate }}>
+            <div className="week-time-col">
+              {weekLayout.slots.map((m) => (
+                <div key={`sk-week-time-${m}`} className="week-time-cell week-time-cell-skeleton" style={{ height: weekLayout.hourHeight }}>
+                  {fmtHour(m)}
+                </div>
+              ))}
+            </div>
+
+            {Array.from({ length: weekSkeletonColumnCount }).map((_, ci) => (
+              <React.Fragment key={`sk-week-col-${ci}`}>
+                <div className="week-day-col" style={{ height: weekTrackH }}>
+                  {weekLayout.slots.map((m, idx) => (
+                    <div key={`sk-week-line-${ci}-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                  ))}
+                  {renderPlanEventSkeletons('week', `${ci}`)}
+                </div>
+                {ci < weekSkeletonColumnCount - 1 && <div style={{ width: 0 }} />}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const renderPlanMonthSkeleton = () => (
+      <div className="month-shell plan-loading-card">
+        <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map((k) => <span key={k}>{t(k)}</span>)}</div>
+        <div className="month-grid month-grid-skeleton">
+          {Array.from({ length: 35 }).map((_, idx) => (
+            <div key={`sk-month-${idx}`} className="month-cell month-cell-skeleton" aria-hidden>
+              <Skeleton className="skeleton-line skeleton-line-xs month-skeleton-num" style={{ width: idx % 7 === 0 ? '34%' : '26%' }} />
+              <div className="month-skeleton-dots">
+                <Skeleton className="skeleton-dot" />
+                {idx % 3 === 0 && <Skeleton className="skeleton-dot skeleton-dot-soft" />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
 
     return (
       <section className="screen plan-screen">
@@ -1538,239 +1658,230 @@ function App() {
                 {/* Loader removed since skeleton acts as loader over timeline grid */}
 
                 {planViewMode === 'day' && (
-                  <div className="list-stack">
-                    {cols.map((col, ci) => {
-                      const periods = visiblePlanResult?.sessionPeriods ?? [];
-                      const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
-                      const activeMarkers = getActivePeriods(col.date, periods);
-                      return (
-                        <div key={col.date}>
-                          {renderPeriodBanner(transMarkers)}
-                          <div className="card day-tl-card">
-                            <div className="day-tl-head">
-                              <div className="day-tl-head-date">{fmtDateLabel(col.date, settings.language)}</div>
-                              <div className="day-tl-head-right">
-                                {col.date === today && <span className="day-tl-today-badge">{t('plan.today')}</span>}
-                                {activeMarkers.map((m, i) => (
-                                  <span key={i} className={`day-period-chip day-period-chip-${m.kind}`}>{m.label}</span>
-                                ))}
+                  showPlanFrameSkeleton ? (
+                    renderPlanDaySkeleton()
+                  ) : (
+                    <div className="list-stack">
+                      {cols.map((col, ci) => {
+                        const periods = visiblePlanResult?.sessionPeriods ?? [];
+                        const transMarkers = getPeriodTransitionMarkers(col.date, cols[ci - 1]?.date ?? null, periods);
+                        const activeMarkers = getActivePeriods(col.date, periods);
+                        return (
+                          <div key={col.date}>
+                            {renderPeriodBanner(transMarkers)}
+                            <div className="card day-tl-card">
+                              <div className="day-tl-head">
+                                <div className="day-tl-head-date">{fmtDateLabel(col.date, settings.language)}</div>
+                                <div className="day-tl-head-right">
+                                  {col.date === today && <span className="day-tl-today-badge">{t('plan.today')}</span>}
+                                  {activeMarkers.map((m, i) => (
+                                    <span key={i} className={`day-period-chip day-period-chip-${m.kind}`}>{m.label}</span>
+                                  ))}
+                                </div>
                               </div>
+
+                              {col.events.length === 0 && !planLoading ? (
+                                <div className="day-empty">{t('plan.emptyDay')}</div>
+                              ) : (
+                                <div className="day-tl-body">
+                                  <div className="day-time-col">
+                                    {weekLayout.slots.map(m => (
+                                      <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
+                                        {fmtHour(m)}
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="day-events-col" style={{ height: weekTrackH }}>
+                                    {weekLayout.slots.map((m, idx) => (
+                                      <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                                    ))}
+                                    {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                                      <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                                    )}
+                                    {planLoading ? (
+                                      renderPlanEventSkeletons('day', col.date)
+                                    ) : (
+                                      col.events.map(ev => {
+                                        const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                        const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
+                                        const left = `calc(${ev.leftPct}% + 2px)`;
+                                        const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                        const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                        return (
+                                          <div
+                                            key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                            className={`day-event ev-${ev.typeClass}`}
+                                            style={{ top, height: h, left, width }}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={open}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                open();
+                                              }
+                                            }}
+                                            title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                          >
+                                            <div className="day-event-title">{ev.title}</div>
+                                            <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-
-                            {col.events.length === 0 ? (
-                              <div className="day-empty">{t('plan.emptyDay')}</div>
-                            ) : (
-                              <div className="day-tl-body">
-                                <div className="day-time-col">
-                                  {weekLayout.slots.map(m => (
-                                    <div key={`${col.date}-${m}`} className="day-time-cell" style={{ height: weekLayout.hourHeight }}>
-                                      {fmtHour(m)}
-                                    </div>
-                                  ))}
-                                </div>
-
-                                <div className="day-events-col" style={{ height: weekTrackH }}>
-                                  {weekLayout.slots.map((m, idx) => (
-                                    <div key={`${col.date}-line-${m}`} className="day-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
-                                  ))}
-                                  {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
-                                    <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
-                                  )}
-                                  {planLoading ? (
-                                    [0, 1].map(idx => {
-                                      const rTop = idx === 0 ? 120 : 340;
-                                      const rH = idx === 0 ? 90 : 120;
-                                      return (
-                                        <div
-                                          key={`sk-day-${col.date}-${idx}`}
-                                          className="skeleton-event day-event"
-                                          style={{ top: rTop, height: rH, left: '8px', width: 'calc(100% - 16px)' }}
-                                        />
-                                      );
-                                    })
-                                  ) : (
-                                    col.events.map(ev => {
-                                      const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                                      const h = Math.max(32, (ev.endMin - ev.startMin) * min2px);
-                                      const left = `calc(${ev.leftPct}% + 2px)`;
-                                      const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                                      const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                                      return (
-                                        <div
-                                          key={`${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                          className={`day-event ev-${ev.typeClass}`}
-                                          style={{ top, height: h, left, width }}
-                                          role="button"
-                                          tabIndex={0}
-                                          onClick={open}
-                                          onKeyDown={e => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                              e.preventDefault();
-                                              open();
-                                            }
-                                          }}
-                                          title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                        >
-                                          <div className="day-event-title">{ev.title}</div>
-                                          <div className="day-event-meta">{ev.startStr}-{ev.endStr} · {ev.room}{ev.group ? ` · ${ev.group}` : ''}</div>
-                                        </div>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                              </div>
-                            )}
                           </div>
+                        );
+                      })}
+                      {cols.length === 0 && (
+                        <div className="empty-state">
+                          <div className="empty-icon">📅</div>
+                          <p>{t('plan.emptyDayLong')}</p>
                         </div>
-                      );
-                    })}
-                    {cols.length === 0 && (
-                      <div className="empty-state">
-                        <div className="empty-icon">📅</div>
-                        <p>{t('plan.emptyDayLong')}</p>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {planViewMode === 'week' && (
-                  <div className="card week-card">
-                    {weekCols.length > 0 ? (
-                      <>
-                        <div className="week-grid week-head-row" style={{ gridTemplateColumns: weekGridTemplate }}>
-                          <div className="week-head-time">{t('plan.hour')}</div>
-                          {weekCols.map((col, ci) => {
-                            const wActive = getActivePeriods(col.date, visiblePlanResult?.sessionPeriods ?? []);
-                            const topPeriod = wActive.sort((a, b) => {
-                              const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
-                              return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
-                            })[0] ?? null;
+                  showPlanFrameSkeleton ? (
+                    renderPlanWeekSkeleton()
+                  ) : (
+                    <div className="card week-card">
+                      {weekCols.length > 0 ? (
+                        <>
+                          <div className="week-grid week-head-row" style={{ gridTemplateColumns: weekGridTemplate }}>
+                            <div className="week-head-time">{t('plan.hour')}</div>
+                            {weekCols.map((col, ci) => {
+                              const wActive = getActivePeriods(col.date, visiblePlanResult?.sessionPeriods ?? []);
+                              const topPeriod = wActive.sort((a, b) => {
+                                const p: Record<string, number> = { session: 3, break: 2, holiday: 1 };
+                                return (p[b.kind] ?? 0) - (p[a.kind] ?? 0);
+                              })[0] ?? null;
 
-                            // Separator between this col and next
-                            const sep = ci < weekCols.length - 1
-                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
-                              : null;
+                              const sep = ci < weekCols.length - 1
+                                ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
+                                : null;
 
-                            return (
-                              <React.Fragment key={`h-${col.date}`}>
-                                <div className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
-                                  <strong>{fmtWeekdayShort(col.date, settings.language)}</strong>
-                                  <span>{fmtDayMonth(col.date, settings.language)}</span>
-                                </div>
-                                {sep && <div className={`week-head-separator week-head-separator-${sep.kind}`} title={sep.label} />}
-                                {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-
-                        <div className="week-grid" style={{ gridTemplateColumns: weekGridTemplate }}>
-                          <div className="week-time-col">
-                            {weekLayout.slots.map(m => (
-                              <div key={`w-time-${m}`} className="week-time-cell" style={{ height: weekLayout.hourHeight }}>
-                                {fmtHour(m)}
-                              </div>
-                            ))}
+                              return (
+                                <React.Fragment key={`h-${col.date}`}>
+                                  <div className={`week-head-day ${col.date === today ? 'today' : ''} ${topPeriod ? `has-period-${topPeriod.kind}` : ''}`}>
+                                    <strong>{fmtWeekdayShort(col.date, settings.language)}</strong>
+                                    <span>{fmtDayMonth(col.date, settings.language)}</span>
+                                  </div>
+                                  {sep && <div className={`week-head-separator week-head-separator-${sep.kind}`} title={sep.label} />}
+                                  {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
+                                </React.Fragment>
+                              );
+                            })}
                           </div>
 
-                          {weekCols.map((col, ci) => {
-                            const sep = ci < weekCols.length - 1
-                              ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
-                              : null;
-                            return (
-                              <React.Fragment key={`w-col-${col.date}`}>
-                                <div className="week-day-col" style={{ height: weekTrackH }}>
-                                  {weekLayout.slots.map((m, idx) => (
-                                    <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
-                                  ))}
-                                  {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
-                                    <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
-                                  )}
-                                  {planLoading ? (
-                                    [0, 1].map(idx => {
-                                      const rTop = idx === 0 ? 120 : 340;
-                                      const rH = idx === 0 ? 90 : 120;
-                                      return (
-                                        <div
-                                          key={`sk-week-${col.date}-${idx}`}
-                                          className="skeleton-event week-event"
-                                          style={{ top: rTop, height: rH, left: '3px', width: 'calc(100% - 6px)' }}
-                                        />
-                                      );
-                                    })
-                                  ) : (
-                                    col.events.map(ev => {
-                                      const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
-                                      const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
-                                      const left = `calc(${ev.leftPct}% + 2px)`;
-                                      const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
-                                      const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
-                                      return (
-                                        <div
-                                          key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
-                                          className={`week-event ev-${ev.typeClass}`}
-                                          style={{ top, height: h, left, width }}
-                                          role="button"
-                                          tabIndex={0}
-                                          onClick={open}
-                                          onKeyDown={e => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                              e.preventDefault();
-                                              open();
-                                            }
-                                          }}
-                                          title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
-                                        >
-                                          <div className="week-event-time">
-                                            {ev.startStr}-{ev.endStr}{ev.room && ev.room !== '-' ? ` - ${ev.room}` : ''}
-                                          </div>
-                                          <div className="week-event-title">{ev.title}</div>
-                                        </div>
-                                      );
-                                    })
-                                  )}
+                          <div className="week-grid" style={{ gridTemplateColumns: weekGridTemplate }}>
+                            <div className="week-time-col">
+                              {weekLayout.slots.map(m => (
+                                <div key={`w-time-${m}`} className="week-time-cell" style={{ height: weekLayout.hourHeight }}>
+                                  {fmtHour(m)}
                                 </div>
-                                {sep && <div className={`week-separator-col week-separator-${sep.kind}`} />}
-                                {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="day-empty">{t('plan.emptyWeek')}</div>
-                    )}
-                  </div>
+                              ))}
+                            </div>
+
+                            {weekCols.map((col, ci) => {
+                              const sep = ci < weekCols.length - 1
+                                ? getWeekSeparatorPeriod(col.date, weekCols[ci + 1].date, visiblePlanResult?.sessionPeriods ?? [])
+                                : null;
+                              return (
+                                <React.Fragment key={`w-col-${col.date}`}>
+                                  <div className="week-day-col" style={{ height: weekTrackH }}>
+                                    {weekLayout.slots.map((m, idx) => (
+                                      <div key={`${col.date}-week-line-${m}`} className="week-hour-line" style={{ top: idx * weekLayout.hourHeight }} />
+                                    ))}
+                                    {col.date === today && nowMinute >= weekLayout.startMin && nowMinute <= weekLayout.endMin && (
+                                      <div className="now-line" style={{ top: (nowMinute - weekLayout.startMin) * min2px }} />
+                                    )}
+                                    {planLoading ? (
+                                      renderPlanEventSkeletons('week', col.date)
+                                    ) : (
+                                      col.events.map(ev => {
+                                        const top = Math.max(0, (ev.startMin - weekLayout.startMin) * min2px);
+                                        const h = Math.max(26, (ev.endMin - ev.startMin) * min2px);
+                                        const left = `calc(${ev.leftPct}% + 2px)`;
+                                        const width = `max(calc(${ev.widthPct}% - 4px), 8px)`;
+                                        const open = () => setSelectedPlanEvent({ date: col.date, event: ev });
+                                        return (
+                                          <div
+                                            key={`w-${col.date}-${ev.startMin}-${ev.endMin}-${ev.title}`}
+                                            className={`week-event ev-${ev.typeClass}`}
+                                            style={{ top, height: h, left, width }}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={open}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                open();
+                                              }
+                                            }}
+                                            title={`${ev.startStr} - ${ev.endStr} ${ev.title}`}
+                                          >
+                                            <div className="week-event-time">
+                                              {ev.startStr}-{ev.endStr}{ev.room && ev.room !== '-' ? ` - ${ev.room}` : ''}
+                                            </div>
+                                            <div className="week-event-title">{ev.title}</div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                  {sep && <div className={`week-separator-col week-separator-${sep.kind}`} />}
+                                  {ci < weekCols.length - 1 && !sep && <div style={{ width: 0 }} />}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="day-empty">{t('plan.emptyWeek')}</div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {planViewMode === 'month' && (
-                  <div className="month-shell">
-                    <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map(k => <span key={k}>{t(k)}</span>)}</div>
-                    <div className="month-grid">
-                      {(visiblePlanResult?.monthGrid ?? []).flat().map(cell => (
-                        <div
-                          key={cell.date}
-                          className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
-                          onClick={() => {
-                            setPlanDate(cell.date);
-                            setPlanViewMode('day');
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
+                  showMonthSkeleton ? (
+                    renderPlanMonthSkeleton()
+                  ) : (
+                    <div className="month-shell">
+                      <div className="month-weekdays">{MONTH_WEEKDAY_KEYS.map(k => <span key={k}>{t(k)}</span>)}</div>
+                      <div className="month-grid">
+                        {monthCells.map(cell => (
+                          <div
+                            key={cell.date}
+                            className={`month-cell ${cell.inCurrentMonth ? '' : 'out'} ${cell.hasPlan ? 'has' : ''} ${cell.date === today ? 'today' : ''}`}
+                            onClick={() => {
                               setPlanDate(cell.date);
                               setPlanViewMode('day');
-                            }
-                          }}
-                        >
-                          <span className="month-cell-num">{cell.date.slice(-2)}</span>
-                          {cell.hasPlan && <span className="month-dot" />}
-                        </div>
-                      ))}
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setPlanDate(cell.date);
+                                setPlanViewMode('day');
+                              }
+                            }}
+                          >
+                            <span className="month-cell-num">{cell.date.slice(-2)}</span>
+                            {cell.hasPlan && <span className="month-dot" />}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
             </div>
@@ -2095,17 +2206,27 @@ function App() {
       )}
 
       {/* Global loading / error banners */}
-      {globalLoading && (
-        <div className="banner">
-          <div className="banner-spinner" />
-          {t('banner.loading')}
-        </div>
-      )}
-      {globalError && (
-        <div className="banner error">
-          <span className="banner-icon">⚠</span>
-          <span style={{ flex: 1 }}>{globalError}</span>
-          <button type="button" className="banner-retry" onClick={() => setGlobalError('')}>OK</button>
+      {(globalLoading || globalError) && (
+        <div className={`notification-rail${screen === 'login' ? ' is-login' : ''}`} aria-live="polite" aria-atomic="true">
+          <div className="notification-stack">
+            {globalLoading && (
+              <div className="banner banner-loading" role="status">
+                <div className="banner-spinner" />
+                <div className="banner-copy">
+                  <span className="banner-title">{t('banner.loading')}</span>
+                </div>
+              </div>
+            )}
+            {globalError && (
+              <div className="banner error" role="alert">
+                <span className="banner-icon">!</span>
+                <div className="banner-copy">
+                  <span className="banner-title">{globalError}</span>
+                </div>
+                <button type="button" className="banner-retry" onClick={() => setGlobalError('')}>OK</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
