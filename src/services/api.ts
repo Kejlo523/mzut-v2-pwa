@@ -175,6 +175,46 @@ async function proxyPlanStudent(query: Record<string, string>): Promise<Record<s
   return Array.isArray(body.data) ? body.data : [];
 }
 
+function normalizePlanHiddenSubjectKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )];
+}
+
+export async function fetchPlanHiddenSubjects(album: string): Promise<string[]> {
+  const normalizedAlbum = firstNonEmpty(album);
+  if (!normalizedAlbum) return [];
+
+  const response = await apiFetch(`${API_BASE}/plan-hidden-subjects/${encodeURIComponent(normalizedAlbum)}`);
+  const body = (await response.json().catch(() => ({}))) as { hiddenSubjectKeys?: unknown; error?: string };
+  if (!response.ok) {
+    throw new Error(body.error || `Plan filters HTTP ${response.status}`);
+  }
+
+  return normalizePlanHiddenSubjectKeys(body.hiddenSubjectKeys);
+}
+
+export async function savePlanHiddenSubjects(album: string, hiddenSubjectKeys: string[]): Promise<string[]> {
+  const normalizedAlbum = firstNonEmpty(album);
+  if (!normalizedAlbum) return [];
+
+  const response = await apiFetch(`${API_BASE}/plan-hidden-subjects/${encodeURIComponent(normalizedAlbum)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hiddenSubjectKeys: normalizePlanHiddenSubjectKeys(hiddenSubjectKeys) }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { hiddenSubjectKeys?: unknown; error?: string };
+  if (!response.ok) {
+    throw new Error(body.error || `Plan filters HTTP ${response.status}`);
+  }
+
+  return normalizePlanHiddenSubjectKeys(body.hiddenSubjectKeys);
+}
+
 async function proxyRssXml(): Promise<string> {
   const response = await apiFetch(`${API_BASE}/proxy/rss`);
   const body = (await response.json().catch(() => ({}))) as { xml: string; error: string };
@@ -777,6 +817,10 @@ function mapSearchCategory(category: string): string {
   return 'number';
 }
 
+function resolveSearchAlbum(category: string, query: string): string {
+  return mapSearchCategory(category) === 'number' ? firstNonEmpty(query) : '';
+}
+
 function resolveViewRange(viewMode: ViewMode, currentDateText: string): { current: Date; rangeStart: Date; rangeEnd: Date; prev: Date; next: Date } {
   const current = parseYmdOrToday(currentDateText);
   if (viewMode === 'day') {
@@ -1162,6 +1206,7 @@ export async function fetchPlan(
   }
 
   if (firstNonEmpty(payload.search.query)) {
+    album = resolveSearchAlbum(payload.search.category, payload.search.query);
     urlParams = {
       [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
       start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
@@ -1265,6 +1310,7 @@ export async function fetchPlanSemesterExport(
   let urlParams: Record<string, string>;
 
   if (firstNonEmpty(payload.search.query)) {
+    album = resolveSearchAlbum(payload.search.category, payload.search.query);
     urlParams = {
       [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
       start: toOffsetIso(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate(), 0, 0, 0)),
