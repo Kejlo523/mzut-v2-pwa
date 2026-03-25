@@ -22,20 +22,22 @@ import {
   fetchInfo,
   fetchNews,
   fetchPlan,
+  fetchPlanHiddenSubjects,
   fetchPlanSemesterExport,
   fetchPlanSuggestions,
   fetchUsosRequestToken,
   isSessionExpiredError,
   login,
   loginWithUsos,
+  savePlanHiddenSubjects as savePlanHiddenSubjectsByAlbum,
   validateSession,
 } from './services/api';
 import {
+  clearLegacyPlanHiddenSubjects,
   cache,
-  loadPlanHiddenSubjects,
+  loadLegacyPlanHiddenSubjects,
   loadSession,
   loadSettings,
-  savePlanHiddenSubjects,
   saveSession,
   saveSettings,
   type AppSettings,
@@ -71,6 +73,19 @@ import { PlanEventSheet, PlanFiltersSheet, PlanSearchSheet } from './app/screens
 import { GradesScreen, InfoScreen } from './app/screens/StudyScreens';
 
 const SESSION_VALIDATE_INTERVAL_MS = 30 * 24 * 60 * 60_000;
+
+function normalizePlanHiddenSubjectKeys(keys: string[]): string[] {
+  return [...new Set(
+    keys
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
+}
+
+function arePlanHiddenSubjectListsEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
 
 function App() {
   const [session, setSession] = useState<SessionData | null>(() => loadSession());
@@ -152,7 +167,8 @@ function App() {
   const [planSearchSuggestions, setPlanSearchSuggestions] = useState<string[]>([]);
   const [planSearchLoading, setPlanSearchLoading] = useState(false);
   const [selectedPlanEvent, setSelectedPlanEvent] = useState<SelectedPlanEvent | null>(null);
-  const [hiddenPlanSubjectKeys, setHiddenPlanSubjectKeys] = useState<string[]>(() => loadPlanHiddenSubjects());
+  const [planHiddenSubjectKeysByAlbum, setPlanHiddenSubjectKeysByAlbum] = useState<Record<string, string[]>>({});
+  const planHiddenSubjectKeysByAlbumRef = useRef<Record<string, string[]>>({});
   const planSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const planMoreMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -189,6 +205,14 @@ function App() {
   const [newsLoading, setNewsLoading] = useState(false);
 
   const activeStudyId = session?.activeStudyId ?? studies[0]?.przynaleznoscId ?? null;
+  const currentPlanAlbum = useMemo(() => (planResult?.debug.album || '').trim(), [planResult?.debug.album]);
+  const hiddenPlanSubjectKeys = useMemo(() => (
+    currentPlanAlbum ? (planHiddenSubjectKeysByAlbum[currentPlanAlbum] ?? []) : []
+  ), [currentPlanAlbum, planHiddenSubjectKeysByAlbum]);
+
+  useEffect(() => {
+    planHiddenSubjectKeysByAlbumRef.current = planHiddenSubjectKeysByAlbum;
+  }, [planHiddenSubjectKeysByAlbum]);
 
   // ── Online/offline tracking ──────────────────────────────────────────────
   useEffect(() => {
@@ -276,6 +300,61 @@ function App() {
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
+  const setPlanHiddenSubjectsForAlbum = useCallback((album: string, keys: string[]) => {
+    const normalizedAlbum = album.trim();
+    if (!normalizedAlbum) return;
+
+    const normalizedKeys = normalizePlanHiddenSubjectKeys(keys);
+    setPlanHiddenSubjectKeysByAlbum((prev) => {
+      const currentKeys = prev[normalizedAlbum] ?? [];
+      if (arePlanHiddenSubjectListsEqual(currentKeys, normalizedKeys)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [normalizedAlbum]: normalizedKeys,
+      };
+    });
+  }, []);
+
+  const loadPersistedPlanHiddenSubjects = useCallback(async (album: string): Promise<string[]> => {
+    const normalizedAlbum = album.trim();
+    if (!normalizedAlbum) return [];
+
+    try {
+      const legacyKeys = loadLegacyPlanHiddenSubjects();
+      let keys = await fetchPlanHiddenSubjects(normalizedAlbum);
+      if (!keys.length && legacyKeys.length) {
+        keys = await savePlanHiddenSubjectsByAlbum(normalizedAlbum, legacyKeys);
+      }
+      if (legacyKeys.length) {
+        clearLegacyPlanHiddenSubjects();
+      }
+      return normalizePlanHiddenSubjectKeys(keys);
+    } catch (error) {
+      console.warn(`Failed to load plan hidden subjects for album ${normalizedAlbum}`, error);
+      const existingKeys = planHiddenSubjectKeysByAlbumRef.current[normalizedAlbum];
+      if (existingKeys?.length) {
+        return existingKeys;
+      }
+      return normalizePlanHiddenSubjectKeys(loadLegacyPlanHiddenSubjects());
+    }
+  }, []);
+
+  const persistPlanHiddenSubjects = useCallback(async (album: string, keys: string[]) => {
+    const normalizedAlbum = album.trim();
+    if (!normalizedAlbum) return;
+
+    try {
+      const savedKeys = await savePlanHiddenSubjectsByAlbum(normalizedAlbum, keys);
+      setPlanHiddenSubjectsForAlbum(normalizedAlbum, savedKeys);
+    } catch (error) {
+      console.warn(`Failed to save plan hidden subjects for album ${normalizedAlbum}`, error);
+      showToast('Nie udało się zapisać wykluczeń przedmiotów');
+    }
+  }, [setPlanHiddenSubjectsForAlbum, showToast]);
+
   // ── Keyboard drawer close ─────────────────────────────────────────────────
   useEffect(() => {
     if (!drawerOpen) return;
@@ -293,7 +372,6 @@ function App() {
 
   // ── Sync settings ─────────────────────────────────────────────────────────
   useEffect(() => { saveSettings(settings); }, [settings]);
-  useEffect(() => { savePlanHiddenSubjects(hiddenPlanSubjectKeys); }, [hiddenPlanSubjectKeys]);
 
   // ── Session → navigation sync ─────────────────────────────────────────────
   useEffect(() => {
@@ -380,7 +458,7 @@ function App() {
     const nextSession = s ? { ...s, persistedAt: Date.now() } : null;
     setSession(nextSession);
     if (!nextSession) {
-      setHiddenPlanSubjectKeys([]);
+      setPlanHiddenSubjectKeysByAlbum({});
       setPlanFiltersOpen(false);
       setPlanMoreMenuOpen(false);
       setPlanSearchOpen(false);
@@ -579,8 +657,13 @@ function App() {
     if (!isSearch && !forceRefresh) {
       const cached = cache.loadPlanForce(cacheKey);
       if (cached) {
-        setPlanResult(cached);
         hasCached = true;
+        const cachedHiddenSubjectKeys = await loadPersistedPlanHiddenSubjects(cached.debug.album || '');
+        if (planRequestIdRef.current !== requestId) {
+          return;
+        }
+        setPlanHiddenSubjectsForAlbum(cached.debug.album || '', cachedHiddenSubjectKeys);
+        setPlanResult(cached);
       }
       // Task 7: Reuse week cache for day view
       if (!cached && planViewMode === 'day' && planResult && planResult.dayColumns) {
@@ -594,8 +677,13 @@ function App() {
             prevDate: addDaysYmd(dateToUse, -1),
             nextDate: addDaysYmd(dateToUse, 1),
           };
-          setPlanResult(syntheticResult);
           hasCached = true;
+          const syntheticHiddenSubjectKeys = await loadPersistedPlanHiddenSubjects(syntheticResult.debug.album || '');
+          if (planRequestIdRef.current !== requestId) {
+            return;
+          }
+          setPlanHiddenSubjectsForAlbum(syntheticResult.debug.album || '', syntheticHiddenSubjectKeys);
+          setPlanResult(syntheticResult);
         }
       }
     }
@@ -613,6 +701,12 @@ function App() {
         return; // Newer request is in progress, discard this result
       }
 
+      const resultHiddenSubjectKeys = await loadPersistedPlanHiddenSubjects(result.debug.album || '');
+      if (planRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setPlanHiddenSubjectsForAlbum(result.debug.album || '', resultHiddenSubjectKeys);
       if (!isSearch) cache.savePlan(cacheKey, result);
       setPlanResult(result);
       if (!isSearch && result.currentDate && !newDate) setPlanDate(result.currentDate);
@@ -629,7 +723,17 @@ function App() {
         setPlanLoading(false);
       }
     }
-  }, [session, planViewMode, planDate, activeStudyId, planResult, ensureSessionStillValid, handleSessionError]);
+  }, [
+    session,
+    planViewMode,
+    planDate,
+    activeStudyId,
+    planResult,
+    ensureSessionStillValid,
+    handleSessionError,
+    loadPersistedPlanHiddenSubjects,
+    setPlanHiddenSubjectsForAlbum,
+  ]);
 
   // Fetch plan search suggestions with debouncing (300ms)
   const fetchPlanSearchSuggestions = useCallback(async (category: string, query: string) => {
@@ -1099,12 +1203,23 @@ function App() {
   }, [nav, screen]);
 
   const togglePlanSubjectFilter = useCallback((key: string) => {
-    setHiddenPlanSubjectKeys((prev) => (
-      prev.includes(key)
-        ? prev.filter((item) => item !== key)
-        : [...prev, key]
-    ));
-  }, []);
+    if (!currentPlanAlbum) return;
+
+    const nextKeys = normalizePlanHiddenSubjectKeys(
+      hiddenPlanSubjectKeys.includes(key)
+        ? hiddenPlanSubjectKeys.filter((item) => item !== key)
+        : [...hiddenPlanSubjectKeys, key],
+    );
+
+    setPlanHiddenSubjectsForAlbum(currentPlanAlbum, nextKeys);
+    void persistPlanHiddenSubjects(currentPlanAlbum, nextKeys);
+  }, [currentPlanAlbum, hiddenPlanSubjectKeys, persistPlanHiddenSubjects, setPlanHiddenSubjectsForAlbum]);
+
+  const resetPlanSubjectFilters = useCallback(() => {
+    if (!currentPlanAlbum) return;
+    setPlanHiddenSubjectsForAlbum(currentPlanAlbum, []);
+    void persistPlanHiddenSubjects(currentPlanAlbum, []);
+  }, [currentPlanAlbum, persistPlanHiddenSubjects, setPlanHiddenSubjectsForAlbum]);
 
   const handlePlanExport = useCallback(() => {
     if (!session) return;
@@ -2002,7 +2117,7 @@ function App() {
         options={planSubjectFilters}
         hiddenKeys={hiddenPlanSubjectKeys}
         onToggle={togglePlanSubjectFilter}
-        onReset={() => setHiddenPlanSubjectKeys([])}
+        onReset={resetPlanSubjectFilters}
         onClose={() => setPlanFiltersOpen(false)}
       />
     );

@@ -2,7 +2,7 @@ import type { CalendarEvent, ElsCard, Grade, NewsItem, PlanResult, Semester, Ses
 
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
-const PLAN_FILTERS_KEY = 'mzutv2_pwa_plan_hidden_subjects';
+const LEGACY_PLAN_FILTERS_KEY = 'mzutv2_pwa_plan_hidden_subjects';
 const DEVICE_ID_KEY = 'mzutv2_pwa_device_id';
 
 export interface AppSettings {
@@ -85,9 +85,9 @@ export function saveSettings(settings: AppSettings): void {
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-export function loadPlanHiddenSubjects(): string[] {
+export function loadLegacyPlanHiddenSubjects(): string[] {
   try {
-    const raw = window.localStorage.getItem(PLAN_FILTERS_KEY);
+    const raw = window.localStorage.getItem(LEGACY_PLAN_FILTERS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -100,14 +100,8 @@ export function loadPlanHiddenSubjects(): string[] {
   }
 }
 
-export function savePlanHiddenSubjects(keys: string[]): void {
-  const normalized = [...new Set(
-    keys
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.trim())
-      .filter(Boolean),
-  )];
-  window.localStorage.setItem(PLAN_FILTERS_KEY, JSON.stringify(normalized));
+export function clearLegacyPlanHiddenSubjects(): void {
+  window.localStorage.removeItem(LEGACY_PLAN_FILTERS_KEY);
 }
 
 export function loadOrCreateDeviceId(): string {

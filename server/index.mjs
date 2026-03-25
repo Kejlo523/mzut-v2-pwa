@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Try loading from several locations: root, current dir
@@ -37,6 +37,7 @@ const APP_BASE_PATH = (() => {
 const APP_HOME_PATH = APP_BASE_PATH === '/' ? '/' : `${APP_BASE_PATH}/`;
 const STATS_ROUTE_PATH = APP_BASE_PATH === '/' ? '/stats' : `${APP_BASE_PATH}/stats`;
 const STATS_STORE_PATH = path.join(__dirname, 'data', 'usage-stats.json');
+const PLAN_FILTERS_STORE_PATH = path.join(__dirname, 'data', 'plan-hidden-subjects.json');
 const STATS_BASIC_USER = process.env.STATS_USER || 'Kejlo';
 const STATS_BASIC_PASS = process.env.STATS_PASS || 'hx875875';
 
@@ -78,6 +79,99 @@ function sanitizeParams(value) {
     out[key] = String(raw ?? '');
   }
   return out;
+}
+
+function normalizeAlbumKey(value) {
+  const album = String(value || '').trim();
+  return /^[a-zA-Z0-9_-]{3,32}$/.test(album) ? album : '';
+}
+
+function normalizePlanHiddenSubjectKeys(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item) => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )];
+}
+
+function createEmptyPlanFiltersStore() {
+  return {
+    version: 1,
+    albums: {},
+  };
+}
+
+function normalizePlanFiltersStore(value) {
+  if (!value || typeof value !== 'object') {
+    return createEmptyPlanFiltersStore();
+  }
+
+  const albums = {};
+  const rawAlbums = value.albums && typeof value.albums === 'object' ? value.albums : {};
+
+  for (const [rawAlbum, rawKeys] of Object.entries(rawAlbums)) {
+    const album = normalizeAlbumKey(rawAlbum);
+    if (!album) continue;
+
+    const hiddenSubjectKeys = normalizePlanHiddenSubjectKeys(rawKeys);
+    if (!hiddenSubjectKeys.length) continue;
+
+    albums[album] = hiddenSubjectKeys;
+  }
+
+  return {
+    version: 1,
+    albums,
+  };
+}
+
+function loadPlanFiltersStore(storePath) {
+  try {
+    if (!existsSync(storePath)) {
+      return createEmptyPlanFiltersStore();
+    }
+
+    const raw = readFileSync(storePath, 'utf8');
+    if (!raw.trim()) {
+      return createEmptyPlanFiltersStore();
+    }
+
+    return normalizePlanFiltersStore(JSON.parse(raw));
+  } catch {
+    return createEmptyPlanFiltersStore();
+  }
+}
+
+function savePlanFiltersStore(storePath, store) {
+  mkdirSync(path.dirname(storePath), { recursive: true });
+  writeFileSync(storePath, JSON.stringify(normalizePlanFiltersStore(store), null, 2));
+}
+
+function getPlanHiddenSubjects(album) {
+  const normalizedAlbum = normalizeAlbumKey(album);
+  if (!normalizedAlbum) return [];
+
+  const store = loadPlanFiltersStore(PLAN_FILTERS_STORE_PATH);
+  return store.albums[normalizedAlbum] || [];
+}
+
+function setPlanHiddenSubjects(album, hiddenSubjectKeys) {
+  const normalizedAlbum = normalizeAlbumKey(album);
+  if (!normalizedAlbum) return [];
+
+  const normalizedKeys = normalizePlanHiddenSubjectKeys(hiddenSubjectKeys);
+  const store = loadPlanFiltersStore(PLAN_FILTERS_STORE_PATH);
+
+  if (normalizedKeys.length) {
+    store.albums[normalizedAlbum] = normalizedKeys;
+  } else {
+    delete store.albums[normalizedAlbum];
+  }
+
+  savePlanFiltersStore(PLAN_FILTERS_STORE_PATH, store);
+  return normalizedKeys;
 }
 
 function safeTextEqual(left, right) {
@@ -202,6 +296,31 @@ function baseOAuthParams() {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, timestamp: Date.now() });
+});
+
+app.get('/api/plan-hidden-subjects/:album', (req, res) => {
+  const album = normalizeAlbumKey(req.params.album);
+  if (!album) {
+    return res.status(400).json({ error: 'Niepoprawny numer albumu.' });
+  }
+
+  return res.json({
+    album,
+    hiddenSubjectKeys: getPlanHiddenSubjects(album),
+  });
+});
+
+app.put('/api/plan-hidden-subjects/:album', (req, res) => {
+  const album = normalizeAlbumKey(req.params.album);
+  if (!album) {
+    return res.status(400).json({ error: 'Niepoprawny numer albumu.' });
+  }
+
+  const hiddenSubjectKeys = setPlanHiddenSubjects(album, req.body?.hiddenSubjectKeys);
+  return res.json({
+    album,
+    hiddenSubjectKeys,
+  });
 });
 
 app.post('/api/proxy/mzut', async (req, res) => {
