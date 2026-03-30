@@ -3,6 +3,7 @@ import './App.css';
 import type {
   CalendarEvent,
   ElsCard,
+  FinanceSnapshot,
   Grade,
   NewsItem,
   PlanResult,
@@ -19,6 +20,7 @@ import {
   fetchCombinedGrades,
   fetchCombinedSemesters,
   fetchCombinedStudies,
+  fetchFinance,
   fetchInfo,
   fetchNews,
   fetchPlan,
@@ -70,9 +72,10 @@ import type { DrawerScreenKey, NewsDetailParams, SelectedPlanEvent } from './app
 import { HomeScreen, LoginScreen } from './app/screens/AuthScreens';
 import { AboutScreen, LinksScreen, NewsDetailScreen, NewsScreen, SettingsScreen } from './app/screens/ContentScreens';
 import { PlanEventSheet, PlanFiltersSheet, PlanSearchSheet } from './app/screens/PlanOverlays';
-import { GradesScreen, InfoScreen } from './app/screens/StudyScreens';
+import { FinanceScreen, GradesScreen, InfoScreen } from './app/screens/StudyScreens';
 
 const SESSION_VALIDATE_INTERVAL_MS = 30 * 24 * 60 * 60_000;
+const EMPTY_FINANCE_SNAPSHOT: FinanceSnapshot = { records: [], fetchedAt: 0 };
 
 function normalizePlanHiddenSubjectKeys(keys: string[]): string[] {
   return [...new Set(
@@ -191,6 +194,10 @@ function App() {
   const [expandedGradeSubjects, setExpandedGradeSubjects] = useState<Record<string, boolean>>({});
   const selSemPrev = useRef('');
   const planRequestIdRef = useRef<string>('');
+
+  // Finance
+  const [financeSnapshot, setFinanceSnapshot] = useState<FinanceSnapshot>(EMPTY_FINANCE_SNAPSHOT);
+  const [financeLoading, setFinanceLoading] = useState(false);
 
   // Info
   const [details, setDetails] = useState<StudyDetails | null>(null);
@@ -900,6 +907,38 @@ function App() {
     }
   }, [session, activeStudyId, selSemId, grades.length, ensureSessionStillValid, handleSessionError]);
 
+  const loadFinanceData = useCallback(async (forceRefresh = false) => {
+    if (!session || !activeStudyId) {
+      setFinanceSnapshot({ ...EMPTY_FINANCE_SNAPSHOT });
+      return;
+    }
+
+    if (!(await ensureSessionStillValid(session))) return;
+
+    const forced = cache.loadFinanceForce(activeStudyId);
+    if (forced) {
+      setFinanceSnapshot(forced);
+    }
+
+    if (cache.loadFinance(activeStudyId) && !forceRefresh) return;
+
+    setFinanceLoading(true);
+    setGlobalError('');
+    try {
+      const records = await fetchFinance(session, activeStudyId);
+      const snapshot: FinanceSnapshot = { records, fetchedAt: Date.now() };
+      cache.saveFinance(activeStudyId, snapshot);
+      setFinanceSnapshot(snapshot);
+    } catch (e) {
+      if (handleSessionError(e)) return;
+      if (!forced) {
+        setGlobalError(e instanceof Error ? e.message : 'Nie można pobrać finansów.');
+      }
+    } finally {
+      setFinanceLoading(false);
+    }
+  }, [session, activeStudyId, ensureSessionStillValid, handleSessionError]);
+
   const loadInfoData = useCallback(async (forceRefresh = false) => {
     if (!session || !activeStudyId) return;
     if (!(await ensureSessionStillValid(session))) return;
@@ -952,6 +991,7 @@ function App() {
     prevScreen.current = screen;
     if (screen === 'plan') void loadPlanData();
     if (screen === 'grades') void loadGradesData();
+    if (screen === 'finance') void loadFinanceData();
     if (screen === 'info') void loadInfoData();
     if (screen === 'news') void loadNewsData();
   }, [screen, session]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -974,6 +1014,7 @@ function App() {
     setSemesters([]);
     setGrades([]);
     setTotalEctsAll(0);
+    setFinanceSnapshot({ ...EMPTY_FINANCE_SNAPSHOT });
     setDetails(null);
     setHistory([]);
     setEls(null);
@@ -983,8 +1024,9 @@ function App() {
 
     if (screen === 'plan') void loadPlanData();
     if (screen === 'grades') void loadGradesData(true);
+    if (screen === 'finance') void loadFinanceData();
     if (screen === 'info') void loadInfoData();
-  }, [session, activeStudyId, screen, loadPlanData, loadGradesData, loadInfoData]);
+  }, [session, activeStudyId, screen, loadPlanData, loadGradesData, loadFinanceData, loadInfoData]);
 
   // ── Refresh when plan date/view changes ──────────────────────────────────
   useEffect(() => {
@@ -1331,6 +1373,7 @@ function App() {
     { key: 'home', label: t('drawer.home'), icon: 'home' },
     { key: 'plan', label: t('drawer.plan'), icon: 'calendar' },
     { key: 'grades', label: t('drawer.grades'), icon: 'grade' },
+    { key: 'finance', label: t('drawer.finance'), icon: 'wallet' },
     { key: 'info', label: t('drawer.info'), icon: 'user' },
     { key: 'news', label: t('drawer.news'), icon: 'news' },
     { key: 'links', label: t('drawer.links'), icon: 'link' },
@@ -2030,6 +2073,22 @@ function App() {
     );
   }
 
+  function renderFinance() {
+    return (
+      <FinanceScreen
+        t={t}
+        studies={studies}
+        activeStudyId={activeStudyId}
+        updateActiveStudy={updateActiveStudy}
+        financeRecords={financeSnapshot.records}
+        financeLoading={financeLoading}
+        financeFetchedAt={financeSnapshot.fetchedAt}
+        onRefresh={() => void loadFinanceData(true)}
+        onToast={showToast}
+      />
+    );
+  }
+
   function renderInfo() {
     return (
       <InfoScreen
@@ -2129,6 +2188,7 @@ function App() {
       case 'home': return renderHome();
       case 'plan': return renderPlan();
       case 'grades': return renderGrades();
+      case 'finance': return renderFinance();
       case 'info': return renderInfo();
       case 'news': return renderNews();
       case 'news-detail': return renderNewsDetail();
@@ -2231,6 +2291,8 @@ function App() {
       actions.push({ key: 'install', icon: 'download', label: t('install.now'), onClick: () => void handleInstallPwa(), active: false });
     } else if (screen === 'grades') {
       actions.push({ key: 'refresh', icon: 'refresh', label: t('grades.refreshLabel'), onClick: () => void loadGradesData(false, true), active: false });
+    } else if (screen === 'finance') {
+      actions.push({ key: 'refresh', icon: 'refresh', label: t('finance.refresh'), onClick: () => void loadFinanceData(true), active: false });
     } else if (screen === 'info') {
       actions.push({ key: 'refresh', icon: 'refresh', label: t('plan.refresh'), onClick: () => void loadInfoData(true), active: false });
     } else if (screen === 'news') {

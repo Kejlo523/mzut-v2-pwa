@@ -46,6 +46,24 @@ export interface Grade {
   date: string;
 }
 
+export interface FinanceRecord {
+  title: string;
+  amountText: string | null;
+  paidText: string | null;
+  dueDateText: string | null;
+  paidDateText: string | null;
+  balanceText: string | null;
+  accountText: string | null;
+  amountValue: number;
+  paidValue: number;
+  balanceValue: number;
+}
+
+export interface FinanceSnapshot {
+  records: FinanceRecord[];
+  fetchedAt: number;
+}
+
 export interface ElsCard {
   id: string;
   expirationDate: string;
@@ -169,6 +187,7 @@ export type ScreenKey =
   | 'home'
   | 'plan'
   | 'grades'
+  | 'finance'
   | 'info'
   | 'news'
   | 'news-detail'

@@ -1,4 +1,16 @@
-import type { CalendarEvent, ElsCard, Grade, NewsItem, PlanResult, Semester, SessionData, Study, StudyDetails, StudyHistoryItem } from '../types';
+import type {
+  CalendarEvent,
+  ElsCard,
+  FinanceSnapshot,
+  Grade,
+  NewsItem,
+  PlanResult,
+  Semester,
+  SessionData,
+  Study,
+  StudyDetails,
+  StudyHistoryItem,
+} from '../types';
 
 const SESSION_KEY = 'mzutv2_pwa_session';
 const SETTINGS_KEY = 'mzutv2_pwa_settings';
@@ -133,6 +145,7 @@ const TTL_MS = {
   studies: 15 * 60_000,
   semesters: 15 * 60_000,
   grades: 10 * 60_000,
+  finance: 4 * 60 * 60_000,
   info: 15 * 60_000,
   plan: 5 * 60_000,
   news: 30 * 60_000,
@@ -187,6 +200,11 @@ export const cache = {
   saveGrades: (semId: string, data: Grade[]) => saveC(ck('grades', semId), data),
   loadGrades: (semId: string): Grade[] | null => loadC(ck('grades', semId), TTL_MS.grades),
   loadGradesForce: (semId: string): Grade[] | null => loadCForce(ck('grades', semId)),
+
+  // Finance per study
+  saveFinance: (studyId: string, data: FinanceSnapshot) => saveC(ck('finance', studyId), data),
+  loadFinance: (studyId: string): FinanceSnapshot | null => loadC(ck('finance', studyId), TTL_MS.finance),
+  loadFinanceForce: (studyId: string): FinanceSnapshot | null => loadCForce(ck('finance', studyId)),
 
   // Info per study
   saveInfo: (studyId: string, data: { details: StudyDetails | null; history: StudyHistoryItem[]; els?: ElsCard | null; calendarEvents?: CalendarEvent[] }) =>

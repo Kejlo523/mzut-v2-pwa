@@ -1,8 +1,9 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 import type {
   CalendarEvent,
   ElsCard,
+  FinanceRecord,
   Grade,
   Semester,
   SessionData,
@@ -82,6 +83,257 @@ function GradesLoadingSkeleton() {
       </div>
     </>
   );
+}
+
+type FinanceFilterKey = 'all' | 'due' | 'paid' | 'overpaid';
+type FinanceStatusKey = 'due' | 'paid' | 'overpaid' | 'unknown';
+
+function FinanceLoadingSkeleton() {
+  return (
+    <>
+      <div className="finance-header-wrapper">
+        <div className="finance-hero skeleton-panel">
+          <div className="finance-hero-head">
+            <div className="finance-hero-copy">
+              <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '94px' }} />
+              <Skeleton className="skeleton-line skeleton-line-md" style={{ width: '180px' }} />
+              <Skeleton className="skeleton-line skeleton-line-sm" style={{ width: '88%' }} />
+            </div>
+            <Skeleton className="skeleton-circle finance-refresh-skeleton" />
+          </div>
+          <div className="metrics-row">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="metric-card metric-card-skeleton">
+                <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '54%' }} />
+                <Skeleton className="skeleton-line skeleton-line-lg" style={{ width: idx % 2 === 0 ? '66%' : '52%' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="finance-filters-container skeleton-panel">
+          <div className="field-label skeleton-field">
+            <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '34%' }} />
+            <Skeleton className="skeleton-block skeleton-input" />
+          </div>
+          <div className="finance-filter-pills finance-filter-pills-skeleton">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <Skeleton key={idx} className="skeleton-pill finance-filter-pill-skeleton" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-surface">
+        <div className="list-stack finance-list">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="finance-record-card finance-record-card-skeleton">
+              <div className="finance-record-top">
+                <div className="finance-record-heading">
+                  <Skeleton className="skeleton-line skeleton-line-md" style={{ width: idx % 2 === 0 ? '72%' : '58%' }} />
+                  <Skeleton className="skeleton-pill finance-status-skeleton" />
+                </div>
+              </div>
+              <div className="finance-record-metrics">
+                {Array.from({ length: 2 }).map((__, metricIdx) => (
+                  <div key={metricIdx} className="metric-card metric-card-skeleton">
+                    <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '42%' }} />
+                    <Skeleton className="skeleton-line skeleton-line-lg" style={{ width: metricIdx === 0 ? '60%' : '48%' }} />
+                  </div>
+                ))}
+              </div>
+              <div className="finance-meta-card finance-meta-card-skeleton">
+                {Array.from({ length: 3 }).map((__, rowIdx) => (
+                  <div key={rowIdx} className="finance-meta-row">
+                    <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '28%' }} />
+                    <Skeleton className="skeleton-line skeleton-line-sm" style={{ width: rowIdx === 0 ? '32%' : '44%' }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function getFinanceStatus(record: FinanceRecord): FinanceStatusKey {
+  if (record.balanceValue < -0.0001) return 'due';
+  if (record.balanceValue > 0.0001) return 'overpaid';
+  if (Math.abs(record.balanceValue) <= 0.0001 && record.paidValue > 0.0001) return 'paid';
+  return 'unknown';
+}
+
+function financeStatusRank(status: FinanceStatusKey): number {
+  switch (status) {
+    case 'due': return 0;
+    case 'overpaid': return 1;
+    case 'paid': return 2;
+    default: return 3;
+  }
+}
+
+function parseFinanceDateSortKey(raw: string | null): number {
+  if (!raw) return Number.MAX_SAFE_INTEGER;
+
+  const normalized = raw.trim();
+  const dotted = normalized.match(/^(\d{2})[.-](\d{2})[.-](\d{2}|\d{4})$/);
+  if (dotted) {
+    const day = Number(dotted[1]);
+    const month = Number(dotted[2]);
+    const yearRaw = Number(dotted[3]);
+    const year = dotted[3].length === 2 ? 2000 + yearRaw : yearRaw;
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() === year
+      && parsed.getUTCMonth() === month - 1
+      && parsed.getUTCDate() === day
+    ) {
+      return parsed.getTime();
+    }
+  }
+
+  const parsed = new Date(normalized);
+  return Number.isFinite(parsed.getTime()) ? parsed.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function getFinanceRelevantDateSortKey(record: FinanceRecord): number {
+  const status = getFinanceStatus(record);
+  const preferredDate = status === 'paid'
+    ? record.paidDateText || record.dueDateText
+    : record.dueDateText || record.paidDateText;
+  return parseFinanceDateSortKey(preferredDate);
+}
+
+function sortFinanceRecords(records: FinanceRecord[]): FinanceRecord[] {
+  return [...records].sort((left, right) => {
+    const leftStatus = getFinanceStatus(left);
+    const rightStatus = getFinanceStatus(right);
+    const statusCompare = financeStatusRank(leftStatus) - financeStatusRank(rightStatus);
+    if (statusCompare !== 0) return statusCompare;
+
+    const leftDate = getFinanceRelevantDateSortKey(left);
+    const rightDate = getFinanceRelevantDateSortKey(right);
+    const dateCompare = leftStatus === 'paid'
+      ? rightDate - leftDate
+      : leftDate - rightDate;
+    if (dateCompare !== 0) return dateCompare;
+
+    return (left.title || '').localeCompare(right.title || '', 'pl', { sensitivity: 'base' });
+  });
+}
+
+function formatFinanceMoneyText(value: string | null): string {
+  if (!value) return '';
+
+  const normalized = value.trim();
+  const compact = normalized
+    .replace(/\s+/g, '')
+    .replace(/zl/gi, '')
+    .replace(/zł/gi, '')
+    .trim();
+
+  if (/^[-+]?\d+(?:[.,]\d+)?$/.test(compact)) {
+    return `${compact.replace('.', ',')} zł`;
+  }
+  if (/z[lł]/i.test(normalized)) {
+    return normalized.replace(/zl/gi, 'zł');
+  }
+  return normalized;
+}
+
+function formatFinanceValue(value: number): string {
+  const hasFraction = Math.abs(value - Math.round(value)) > 0.0001;
+  return `${new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(value)} zł`;
+}
+
+function formatFinanceNoticeDate(timestamp: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(new Date(timestamp));
+}
+
+function getFinanceStatusLabel(status: FinanceStatusKey, t: TranslateFn): string {
+  switch (status) {
+    case 'due': return t('finance.statusDue');
+    case 'paid': return t('finance.statusPaid');
+    case 'overpaid': return t('finance.statusOverpaid');
+    default: return t('finance.statusUnknown');
+  }
+}
+
+function matchesFinanceFilter(record: FinanceRecord, filter: FinanceFilterKey): boolean {
+  const status = getFinanceStatus(record);
+  if (filter === 'all') return true;
+  return status === filter;
+}
+
+function getFinanceCopyableAccount(accountText: string | null): string {
+  return accountText ? accountText.replace(/\s+/g, '') : '';
+}
+
+function formatFinanceAccount(accountText: string | null): string {
+  const raw = getFinanceCopyableAccount(accountText);
+  if (!raw) return '';
+
+  const parts: string[] = [];
+  const digitsOnly = /^\d+$/.test(raw);
+  const firstGroup = digitsOnly && raw.length >= 10 ? 2 : 4;
+
+  for (let cursor = 0; cursor < raw.length;) {
+    const size = cursor === 0 ? firstGroup : 4;
+    parts.push(raw.slice(cursor, cursor + size));
+    cursor += size;
+  }
+
+  return parts.join(' ');
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error('copy_failed');
+  }
+}
+
+function formatFinanceLine(template: string, value: string): string {
+  return template.replace('{{value}}', value);
+}
+
+function buildFinanceDetailsText(record: FinanceRecord, t: TranslateFn): string {
+  const lines = [record.title || t('finance.recordFallback')];
+
+  if (record.amountText) lines.push(formatFinanceLine(t('finance.lineAmount'), formatFinanceMoneyText(record.amountText)));
+  if (record.paidText) lines.push(formatFinanceLine(t('finance.linePaid'), formatFinanceMoneyText(record.paidText)));
+  if (record.dueDateText) lines.push(formatFinanceLine(t('finance.lineDueDate'), record.dueDateText));
+  if (record.paidDateText) lines.push(formatFinanceLine(t('finance.linePaidDate'), record.paidDateText));
+  if (record.balanceText) lines.push(formatFinanceLine(t('finance.lineBalance'), formatFinanceMoneyText(record.balanceText)));
+
+  const account = getFinanceCopyableAccount(record.accountText);
+  if (account) {
+    lines.push(formatFinanceLine(t('finance.lineAccount'), account));
+  }
+
+  return lines.filter(Boolean).join('\n');
 }
 
 function InfoMainLoadingSkeleton() {
@@ -296,6 +548,304 @@ export function GradesScreen({
                 </div>
               )}
             </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+interface FinanceScreenProps {
+  t: TranslateFn;
+  studies: Study[];
+  activeStudyId: string | null;
+  updateActiveStudy: (studyId: string | null) => void;
+  financeRecords: FinanceRecord[];
+  financeLoading: boolean;
+  financeFetchedAt: number;
+  onRefresh: () => void;
+  onToast: (message: string) => void;
+}
+
+export function FinanceScreen({
+  t,
+  studies,
+  activeStudyId,
+  updateActiveStudy,
+  financeRecords,
+  financeLoading,
+  financeFetchedAt,
+  onRefresh,
+  onToast,
+}: FinanceScreenProps) {
+  const [filter, setFilter] = useState<FinanceFilterKey>('all');
+  const [noticeOpen, setNoticeOpen] = useState(false);
+
+  const summary = useMemo(() => {
+    let dueTotal = 0;
+    let paidTotal = 0;
+    let overpaidTotal = 0;
+    let openItems = 0;
+
+    for (const record of financeRecords) {
+      paidTotal += Math.max(0, record.paidValue);
+
+      const status = getFinanceStatus(record);
+      if (status === 'due') {
+        dueTotal += Math.abs(record.balanceValue);
+        openItems += 1;
+      } else if (status === 'overpaid') {
+        overpaidTotal += record.balanceValue;
+      }
+    }
+
+    return { dueTotal, paidTotal, overpaidTotal, openItems };
+  }, [financeRecords]);
+
+  const filteredRecords = useMemo(() => (
+    sortFinanceRecords(financeRecords.filter((record) => matchesFinanceFilter(record, filter)))
+  ), [financeRecords, filter]);
+
+  const showSkeleton = financeLoading && financeRecords.length === 0;
+  const noticeDateText = financeFetchedAt > 0
+    ? formatFinanceNoticeDate(financeFetchedAt)
+    : t('finance.noticeLoading');
+  const noticeMain = t('finance.noticeMain').replace('{{date}}', noticeDateText);
+
+  const handleCopyAccount = async (record: FinanceRecord) => {
+    const account = getFinanceCopyableAccount(record.accountText);
+    if (!account) {
+      onToast(t('finance.copyAccountMissing'));
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(account);
+      onToast(t('finance.copyAccountSuccess'));
+    } catch {
+      onToast(t('finance.copyFailed'));
+    }
+  };
+
+  const handleCopyDetails = async (record: FinanceRecord) => {
+    try {
+      await copyTextToClipboard(buildFinanceDetailsText(record, t));
+      onToast(t('finance.copyDetailsSuccess'));
+    } catch {
+      onToast(t('finance.copyFailed'));
+    }
+  };
+
+  const emptyMessage = (() => {
+    switch (filter) {
+      case 'due': return t('finance.emptyDue');
+      case 'paid': return t('finance.emptyPaid');
+      case 'overpaid': return t('finance.emptyOverpaid');
+      default: return t('finance.emptyAll');
+    }
+  })();
+
+  return (
+    <section className="screen finance-screen">
+      {showSkeleton ? (
+        <FinanceLoadingSkeleton />
+      ) : (
+        <>
+          <div className="finance-header-wrapper">
+            <div className="finance-hero">
+              <div className="finance-hero-head">
+                <div className="finance-hero-copy">
+                  <div className="finance-eyebrow">{t('screen.finance')}</div>
+                  <div className="finance-hero-title">{t('finance.title')}</div>
+                  <div className="finance-hero-subtitle">{t('finance.subtitle')}</div>
+                </div>
+                <button
+                  type="button"
+                  className="finance-refresh-btn"
+                  onClick={onRefresh}
+                  aria-label={t('finance.refresh')}
+                  title={t('finance.refresh')}
+                  disabled={financeLoading}
+                >
+                  <Ic n="refresh" />
+                </button>
+              </div>
+
+              <div className="metrics-row finance-summary-grid">
+                <div className="metric-card">
+                  <div className="metric-label">{t('finance.summaryDue')}</div>
+                  <div className="metric-value">{formatFinanceValue(summary.dueTotal)}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">{t('finance.summaryPaid')}</div>
+                  <div className="metric-value">{formatFinanceValue(summary.paidTotal)}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">{t('finance.summaryOpen')}</div>
+                  <div className="metric-value">{summary.openItems}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">{t('finance.summaryOverpaid')}</div>
+                  <div className="metric-value">{formatFinanceValue(summary.overpaidTotal)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="finance-filters-container">
+              {studies.length > 0 && (
+                <label className="field-label">
+                  {t('finance.studyField')}
+                  <select value={activeStudyId ?? ''} onChange={(e) => updateActiveStudy(e.target.value || null)}>
+                    {studies.map((study) => (
+                      <option key={study.przynaleznoscId} value={study.przynaleznoscId}>
+                        {study.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="finance-filter-pills" role="tablist" aria-label={t('screen.finance')}>
+                {([
+                  { key: 'all', label: t('finance.filterAll') },
+                  { key: 'due', label: t('finance.filterDue') },
+                  { key: 'paid', label: t('finance.filterPaid') },
+                  { key: 'overpaid', label: t('finance.filterOverpaid') },
+                ] as Array<{ key: FinanceFilterKey; label: string }>).map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`finance-filter-pill ${filter === item.key ? 'active' : ''}`}
+                    onClick={() => setFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="finance-surface">
+            {financeRecords.length === 0 && !financeLoading ? (
+              <div className="empty-state"><div className="empty-state-icon">💸</div><p>{t('finance.emptyAll')}</p></div>
+            ) : filteredRecords.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-icon">💳</div><p>{emptyMessage}</p></div>
+            ) : (
+              <div className="list-stack finance-list">
+                {filteredRecords.map((record, index) => {
+                  const status = getFinanceStatus(record);
+                  const account = getFinanceCopyableAccount(record.accountText);
+                  const hasMeta = Boolean(record.paidText || record.dueDateText || record.paidDateText);
+
+                  return (
+                    <article
+                      key={`${record.title || 'finance'}-${record.dueDateText || record.paidDateText || index}`}
+                      className="finance-record-card"
+                    >
+                      <div className="finance-record-top">
+                        <div className="finance-record-heading">
+                          <div className="finance-record-title">{record.title || t('finance.recordFallback')}</div>
+                          <div className={`finance-status-chip ${status}`}>{getFinanceStatusLabel(status, t)}</div>
+                        </div>
+                      </div>
+
+                      <div className="finance-record-metrics">
+                        {record.amountText && (
+                          <div className="metric-card finance-record-metric">
+                            <div className="metric-label">{t('finance.labelAmount')}</div>
+                            <div className="metric-value">{formatFinanceMoneyText(record.amountText)}</div>
+                          </div>
+                        )}
+                        {record.balanceText && (
+                          <div className={`metric-card finance-record-metric finance-balance-card ${status}`}>
+                            <div className="metric-label">{t('finance.labelBalance')}</div>
+                            <div className="metric-value">{formatFinanceMoneyText(record.balanceText)}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {hasMeta && (
+                        <div className="finance-meta-card">
+                          {record.paidText && (
+                            <div className="finance-meta-row">
+                              <span>{t('finance.labelPaid')}</span>
+                              <strong>{formatFinanceMoneyText(record.paidText)}</strong>
+                            </div>
+                          )}
+                          {record.dueDateText && (
+                            <div className="finance-meta-row">
+                              <span>{t('finance.labelDueDate')}</span>
+                              <strong>{record.dueDateText}</strong>
+                            </div>
+                          )}
+                          {record.paidDateText && (
+                            <div className="finance-meta-row">
+                              <span>{t('finance.labelPaidDate')}</span>
+                              <strong>{record.paidDateText}</strong>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {account && (
+                        <button
+                          type="button"
+                          className="finance-account-card"
+                          onClick={() => void handleCopyAccount(record)}
+                        >
+                          <span className="finance-account-label">{t('finance.labelAccount')}</span>
+                          <span className="finance-account-value">{formatFinanceAccount(record.accountText)}</span>
+                        </button>
+                      )}
+
+                      <div className="finance-record-actions">
+                        <button
+                          type="button"
+                          className="finance-action-btn"
+                          onClick={() => void handleCopyAccount(record)}
+                          disabled={!account}
+                        >
+                          {t('finance.copyAccount')}
+                        </button>
+                        <button
+                          type="button"
+                          className="finance-action-btn"
+                          onClick={() => void handleCopyDetails(record)}
+                        >
+                          {t('finance.copyDetails')}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className={`finance-notice-card ${noticeOpen ? 'is-open' : ''}`}>
+            <button
+              type="button"
+              className="finance-notice-toggle"
+              onClick={() => setNoticeOpen((prev) => !prev)}
+              aria-expanded={noticeOpen}
+            >
+              <span className="finance-notice-icon">i</span>
+              <span className="finance-notice-copy">
+                <span className="finance-notice-title">{t('finance.noticeTitle')}</span>
+                <span className="finance-notice-date">{noticeDateText}</span>
+              </span>
+              <span className={`finance-notice-chevron ${noticeOpen ? 'open' : ''}`}><Ic n="chevR" /></span>
+            </button>
+
+            {noticeOpen && (
+              <div className="finance-notice-content">
+                <p>{noticeMain}</p>
+                <p>{t('finance.noticeOverpaid')}</p>
+                <p>{t('finance.noticeAssignments')}</p>
+                <p>{t('finance.noticeContact')}</p>
+                <p>{t('finance.copyAccountWarning')}</p>
+              </div>
+            )}
           </div>
         </>
       )}

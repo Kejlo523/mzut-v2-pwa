@@ -1,6 +1,7 @@
 import type {
   CalendarEvent,
   ElsCard,
+  FinanceRecord,
   Grade,
   NewsItem,
   PlanResult,
@@ -287,6 +288,48 @@ function parseEcts(row: Record<string, unknown>): number {
   return 0;
 }
 
+function normalizeOptionalText(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  const normalized = firstNonEmpty(value);
+  return normalized || null;
+}
+
+function normalizeLegacyFinanceTitle(value: unknown): string {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) return '';
+  const lowered = normalized.toLocaleLowerCase('pl-PL');
+  return lowered ? `${lowered.charAt(0).toLocaleUpperCase('pl-PL')}${lowered.slice(1)}` : '';
+}
+
+function extractLocalizedOrString(obj: Record<string, unknown>, key: string): string {
+  const localized = obj[key];
+  if (localized && typeof localized === 'object') {
+    return firstNonEmpty(
+      (localized as Record<string, unknown>).pl,
+      (localized as Record<string, unknown>).en,
+    );
+  }
+  return firstNonEmpty(obj[key]);
+}
+
+function formatOutstandingBalance(amountText: string | null): string | null {
+  if (!amountText) return null;
+  return amountText.startsWith('-') ? amountText : `-${amountText}`;
+}
+
+function isUsosPaymentPaid(row: Record<string, unknown>): boolean {
+  const statusValue = row.status;
+  const statusSymbol = statusValue && typeof statusValue === 'object'
+    ? firstNonEmpty((statusValue as Record<string, unknown>).symbol)
+    : firstNonEmpty(statusValue);
+
+  return statusSymbol.toLowerCase() === 'paid'
+    || statusSymbol === '1'
+    || row.is_paid === true;
+}
+
 export async function login(loginValue: string, password: string): Promise<SessionData> {
   const login = normalizeLoginIdentifier(loginValue);
   const cleanPassword = password.trim();
@@ -459,6 +502,71 @@ export async function fetchGrades(session: SessionData, semesterId: string): Pro
       type: form,
       teacher: firstNonEmpty(row.pracownik),
       date: firstNonEmpty(`${term} ${date}`.trim(), date, term),
+    };
+  });
+}
+
+export async function fetchFinance(session: SessionData, studyId: string | null): Promise<FinanceRecord[]> {
+  const resolvedStudyId = studyId || session.activeStudyId;
+  const preferPolishLabels = typeof navigator === 'undefined'
+    ? true
+    : navigator.language.toLowerCase().startsWith('pl');
+
+  if (session.usos) {
+    const payload = await proxyUsos<Array<Record<string, unknown>>>(session, 'services/payments/user_payments');
+
+    return ensureArray<Record<string, unknown>>(payload).map((row) => {
+      const title = firstNonEmpty(
+        extractLocalizedOrString(row, 'name'),
+        extractLocalizedOrString(row, 'title'),
+        row.id,
+      );
+      const amountText = normalizeOptionalText(row.amount);
+      const amountValue = parseFlexibleDouble(amountText);
+      const paid = isUsosPaymentPaid(row);
+
+      return {
+        title,
+        amountText,
+        paidText: paid ? amountText : '0',
+        dueDateText: normalizeOptionalText(row.due_date),
+        paidDateText: null,
+        balanceText: paid ? '0' : formatOutstandingBalance(amountText),
+        accountText: null,
+        amountValue,
+        paidValue: paid ? amountValue : 0,
+        balanceValue: paid ? 0 : -amountValue,
+      };
+    });
+  }
+
+  if (!resolvedStudyId) return [];
+
+  const payload = await proxyMzut<Record<string, unknown>>('getPayment', {
+    login: session.userId,
+    token: session.authKey,
+    przynaleznoscId: resolvedStudyId,
+  });
+
+  return ensureArray<Record<string, unknown>>(payload.Oplata).map((row) => {
+    const amountText = normalizeOptionalText(row.naleznosc);
+    const paidText = normalizeOptionalText(row.wplata);
+    const balanceText = normalizeOptionalText(row.saldo);
+    const titleSource = preferPolishLabels
+      ? firstNonEmpty(row.nazwa, row.nazwaO)
+      : firstNonEmpty(row.nazwaO, row.nazwa);
+
+    return {
+      title: normalizeLegacyFinanceTitle(titleSource),
+      amountText,
+      paidText,
+      dueDateText: normalizeOptionalText(row.dataPlatnosci),
+      paidDateText: normalizeOptionalText(row.dataWplaty),
+      balanceText,
+      accountText: normalizeOptionalText(row.konto),
+      amountValue: parseFlexibleDouble(amountText),
+      paidValue: parseFlexibleDouble(paidText),
+      balanceValue: parseFlexibleDouble(balanceText),
     };
   });
 }

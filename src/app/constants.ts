@@ -9,6 +9,7 @@ export const SCREEN_I18N_KEY: Record<ScreenKey, string> = {
   home: 'screen.home',
   plan: 'screen.plan',
   grades: 'screen.grades',
+  finance: 'screen.finance',
   info: 'screen.info',
   news: 'screen.news',
   'news-detail': 'screen.newsDetail',
