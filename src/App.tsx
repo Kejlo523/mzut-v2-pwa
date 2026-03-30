@@ -2083,7 +2083,6 @@ function App() {
         financeRecords={financeSnapshot.records}
         financeLoading={financeLoading}
         financeFetchedAt={financeSnapshot.fetchedAt}
-        onRefresh={() => void loadFinanceData(true)}
         onToast={showToast}
       />
     );

@@ -93,14 +93,7 @@ function FinanceLoadingSkeleton() {
     <>
       <div className="finance-header-wrapper">
         <div className="finance-hero skeleton-panel">
-          <div className="finance-hero-head">
-            <div className="finance-hero-copy">
-              <Skeleton className="skeleton-line skeleton-line-xs" style={{ width: '94px' }} />
-              <Skeleton className="skeleton-line skeleton-line-md" style={{ width: '180px' }} />
-              <Skeleton className="skeleton-line skeleton-line-sm" style={{ width: '88%' }} />
-            </div>
-            <Skeleton className="skeleton-circle finance-refresh-skeleton" />
-          </div>
+          <Skeleton className="skeleton-line skeleton-line-sm" style={{ width: '88%' }} />
           <div className="metrics-row">
             {Array.from({ length: 4 }).map((_, idx) => (
               <div key={idx} className="metric-card metric-card-skeleton">
@@ -563,7 +556,6 @@ interface FinanceScreenProps {
   financeRecords: FinanceRecord[];
   financeLoading: boolean;
   financeFetchedAt: number;
-  onRefresh: () => void;
   onToast: (message: string) => void;
 }
 
@@ -575,7 +567,6 @@ export function FinanceScreen({
   financeRecords,
   financeLoading,
   financeFetchedAt,
-  onRefresh,
   onToast,
 }: FinanceScreenProps) {
   const [filter, setFilter] = useState<FinanceFilterKey>('all');
@@ -653,23 +644,7 @@ export function FinanceScreen({
         <>
           <div className="finance-header-wrapper">
             <div className="finance-hero">
-              <div className="finance-hero-head">
-                <div className="finance-hero-copy">
-                  <div className="finance-eyebrow">{t('screen.finance')}</div>
-                  <div className="finance-hero-title">{t('finance.title')}</div>
-                  <div className="finance-hero-subtitle">{t('finance.subtitle')}</div>
-                </div>
-                <button
-                  type="button"
-                  className="finance-refresh-btn"
-                  onClick={onRefresh}
-                  aria-label={t('finance.refresh')}
-                  title={t('finance.refresh')}
-                  disabled={financeLoading}
-                >
-                  <Ic n="refresh" />
-                </button>
-              </div>
+              <div className="finance-hero-subtitle">{t('finance.subtitle')}</div>
 
               <div className="metrics-row finance-summary-grid">
                 <div className="metric-card">
