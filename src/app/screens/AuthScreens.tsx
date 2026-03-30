@@ -150,6 +150,7 @@ export function HomeScreen({ session, isOnline, t, openScreen }: HomeScreenProps
           {([
             { key: 'plan' as const, label: t('home.tilePlan'), desc: t('home.tilePlanDesc'), icon: 'calendar' },
             { key: 'grades' as const, label: t('home.tileGrades'), desc: t('home.tileGradesDesc'), icon: 'grade' },
+            { key: 'finance' as const, label: t('home.tileFinance'), desc: t('home.tileFinanceDesc'), icon: 'wallet' },
             { key: 'info' as const, label: t('home.tileInfo'), desc: t('home.tileInfoDesc'), icon: 'user' },
             { key: 'news' as const, label: t('home.tileNews'), desc: t('home.tileNewsDesc'), icon: 'news' },
             { key: 'links' as const, label: t('home.tileLinks'), desc: t('home.tileLinksDesc'), icon: 'link' },
