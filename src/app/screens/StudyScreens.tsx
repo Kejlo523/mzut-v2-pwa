@@ -646,7 +646,7 @@ export function FinanceScreen({
   })();
 
   return (
-    <section className="screen finance-screen">
+    <section className={`screen finance-screen${noticeOpen ? ' notice-open' : ''}`}>
       {showSkeleton ? (
         <FinanceLoadingSkeleton />
       ) : (
