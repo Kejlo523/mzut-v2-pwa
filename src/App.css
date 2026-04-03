@@ -7,6 +7,10 @@
 :root {
   color-scheme: dark;
 
+  --font-ui: 'Manrope', 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Manrope', 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+
   --mz-bg: #050505;
   --mz-bg-soft: #121212;
   --mz-surface: #1e1e1e;
@@ -180,14 +184,16 @@ body,
 }
 
 body {
-  font-family: Roboto, 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
   line-height: 1.5;
+  letter-spacing: -0.01em;
   background: var(--mz-bg);
   color: var(--mz-text);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -203,7 +209,9 @@ h2,
 h3,
 h4 {
   margin: 0;
+  font-family: var(--font-display);
   font-weight: 600;
+  letter-spacing: -0.03em;
 }
 
 input,
@@ -211,6 +219,37 @@ select,
 button,
 textarea {
   font: inherit;
+}
+
+.android-appbar h1,
+.login-title,
+.login-card-title,
+.home-hero-name,
+.tile-label,
+.day-tl-head-date,
+.metric-value,
+.grade-group-name,
+.news-title,
+.news-detail-title,
+.settings-side-title,
+.settings-card-title,
+.about-app-name,
+.drawer-header-title,
+.finance-hero-title,
+.finance-record-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.field-label,
+.home-tiles-label,
+.section-title,
+.legend-section-title,
+.about-section-title,
+.finance-eyebrow,
+.finance-status-chip {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
 }
 
 /* ── App shell ───────────────────────────────────────────────────────── */
@@ -673,8 +712,9 @@ button {
   color: #fff;
   border-radius: var(--r-inner);
   padding: 12px 18px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
+  letter-spacing: -0.015em;
   transition: background 120ms, transform 80ms;
   cursor: pointer;
 }
@@ -6406,7 +6446,7 @@ button.outline {
 }
 
 .finance-account-value {
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 16px;
   line-height: 1.35;
   font-weight: 700;
