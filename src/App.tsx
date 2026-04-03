@@ -17,21 +17,23 @@ import type {
   ViewMode,
 } from './types';
 import {
+  buildPlanResultFromWindow,
   fetchCombinedGrades,
   fetchCombinedSemesters,
   fetchCombinedStudies,
   fetchFinance,
   fetchInfo,
   fetchNews,
-  fetchPlan,
   fetchPlanHiddenSubjects,
   fetchPlanSemesterExport,
   fetchPlanSuggestions,
+  fetchPlanWindow,
   fetchUsosRequestToken,
   isSessionExpiredError,
   login,
   loginWithUsos,
   savePlanHiddenSubjects as savePlanHiddenSubjectsByAlbum,
+  type PlanWindowData,
   validateSession,
 } from './services/api';
 import {
@@ -76,6 +78,8 @@ import { FinanceScreen, GradesScreen, InfoScreen } from './app/screens/StudyScre
 
 const SESSION_VALIDATE_INTERVAL_MS = 30 * 24 * 60 * 60_000;
 const EMPTY_FINANCE_SNAPSHOT: FinanceSnapshot = { records: [], fetchedAt: 0 };
+const PLAN_PREFETCH_DAYS_BACK = 7;
+const PLAN_PREFETCH_DAYS_FORWARD = 21;
 
 function normalizePlanHiddenSubjectKeys(keys: string[]): string[] {
   return [...new Set(
@@ -88,6 +92,58 @@ function normalizePlanHiddenSubjectKeys(keys: string[]): string[] {
 
 function arePlanHiddenSubjectListsEqual(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function parsePlanDate(value: string): Date {
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isFinite(parsed.getTime()) ? parsed : new Date();
+}
+
+function addPlanDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function formatPlanDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function resolvePlanVisibleRange(viewMode: ViewMode, currentDateText: string): { rangeStart: string; rangeEnd: string } {
+  const current = parsePlanDate(currentDateText);
+
+  if (viewMode === 'day') {
+    const ymd = formatPlanDate(current);
+    return { rangeStart: ymd, rangeEnd: ymd };
+  }
+
+  if (viewMode === 'month') {
+    return {
+      rangeStart: formatPlanDate(new Date(current.getFullYear(), current.getMonth(), 1)),
+      rangeEnd: formatPlanDate(new Date(current.getFullYear(), current.getMonth() + 1, 0)),
+    };
+  }
+
+  const dayOfWeek = current.getDay() || 7;
+  const rangeStart = addPlanDays(current, -(dayOfWeek - 1));
+  return {
+    rangeStart: formatPlanDate(rangeStart),
+    rangeEnd: formatPlanDate(addPlanDays(rangeStart, 6)),
+  };
+}
+
+function doesPlanWindowCoverView(planWindow: PlanWindowData, viewMode: ViewMode, currentDateText: string): boolean {
+  const { rangeStart, rangeEnd } = resolvePlanVisibleRange(viewMode, currentDateText);
+  return planWindow.rangeStart <= rangeStart && planWindow.rangeEnd >= rangeEnd;
+}
+
+function buildPlanWindowCacheKey(studyId: string | null, search: { category: string; query: string }): string {
+  const query = search.query.trim();
+  if (query) {
+    const category = (search.category || 'album').trim().toLowerCase() || 'album';
+    return `search:${category}:${query.toLowerCase()}`;
+  }
+  return `study:${studyId ?? 'nostudy'}`;
 }
 
 function App() {
@@ -194,6 +250,8 @@ function App() {
   const [expandedGradeSubjects, setExpandedGradeSubjects] = useState<Record<string, boolean>>({});
   const selSemPrev = useRef('');
   const planRequestIdRef = useRef<string>('');
+  const planWindowCacheRef = useRef<Record<string, PlanWindowData>>({});
+  const planWindowRequestsRef = useRef<Record<string, Promise<PlanWindowData>>>({});
 
   // Finance
   const [financeSnapshot, setFinanceSnapshot] = useState<FinanceSnapshot>(EMPTY_FINANCE_SNAPSHOT);
@@ -390,6 +448,9 @@ function App() {
   useEffect(() => {
     activeSessionKeyRef.current = sessionKey;
     sessionExpiryHandledRef.current = false;
+    planWindowCacheRef.current = {};
+    planWindowRequestsRef.current = {};
+    planRequestIdRef.current = '';
 
     if (!sessionKey) {
       sessionCheckInFlightRef.current = null;
@@ -641,12 +702,62 @@ function App() {
     void loadStudiesData(session);
   }, [session, loadStudiesData]);
 
+  const resolveActivePlanSearch = useCallback((search?: { category: string; query: string }) => {
+    const query = (search?.query ?? planSearchQ).trim();
+    if (!query) {
+      return { category: 'album', query: '' };
+    }
+
+    return {
+      category: (search?.category ?? planSearchCat).trim() || 'album',
+      query,
+    };
+  }, [planSearchCat, planSearchQ]);
+
+  const loadPlanWindowData = useCallback(async (
+    windowCacheKey: string,
+    windowRequestKey: string,
+    dateToUse: string,
+    searchParam: { category: string; query: string },
+    forceRefresh: boolean,
+  ) => {
+    const existingPromise = !forceRefresh ? planWindowRequestsRef.current[windowRequestKey] : undefined;
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const requestPromise = fetchPlanWindow(session as SessionData, {
+      viewMode: planViewMode,
+      currentDate: dateToUse,
+      studyId: activeStudyId,
+      search: searchParam,
+      prefetchDaysBefore: PLAN_PREFETCH_DAYS_BACK,
+      prefetchDaysAfter: PLAN_PREFETCH_DAYS_FORWARD,
+    }).then((planWindow) => {
+      planWindowCacheRef.current[windowCacheKey] = planWindow;
+      return planWindow;
+    });
+
+    const trackedPromise = requestPromise.finally(() => {
+      if (planWindowRequestsRef.current[windowRequestKey] === trackedPromise) {
+        delete planWindowRequestsRef.current[windowRequestKey];
+      }
+    });
+
+    planWindowRequestsRef.current[windowRequestKey] = trackedPromise;
+    return trackedPromise;
+  }, [activeStudyId, planViewMode, session]);
+
   const loadPlanData = useCallback(async (search?: { category: string; query: string }, forceRefresh = false, newDate?: string) => {
     if (!session) return;
     const dateToUse = newDate || planDate;
     const cacheKey = planCacheKey(planViewMode, dateToUse, activeStudyId);
-    const isSearch = !!(search?.query?.trim());
-    const searchParam = isSearch && search ? search : { category: 'album', query: '' };
+    const searchParam = resolveActivePlanSearch(search);
+    const isSearch = !!searchParam.query;
+    const windowCacheKey = buildPlanWindowCacheKey(activeStudyId, searchParam);
+    const windowRequestKey = `${windowCacheKey}:${planViewMode}:${dateToUse}`;
+    const cachedPlanWindow = !forceRefresh ? planWindowCacheRef.current[windowCacheKey] : null;
+    const hasCoveringPlanWindow = !!(cachedPlanWindow && doesPlanWindowCoverView(cachedPlanWindow, planViewMode, dateToUse));
 
     // Create unique request ID to cancel old requests
     const requestId = Math.random().toString(36).substr(2, 9);
@@ -661,7 +772,20 @@ function App() {
 
     // Show cached immediately without spinner (but not if forcing refresh)
     let hasCached = false;
-    if (!isSearch && !forceRefresh) {
+    if (hasCoveringPlanWindow && cachedPlanWindow) {
+      hasCached = true;
+      const bufferedResult = buildPlanResultFromWindow(cachedPlanWindow, {
+        viewMode: planViewMode,
+        currentDate: dateToUse,
+      });
+      const bufferedHiddenSubjectKeys = await loadPersistedPlanHiddenSubjects(bufferedResult.debug.album || '');
+      if (planRequestIdRef.current !== requestId) {
+        return;
+      }
+      setPlanHiddenSubjectsForAlbum(bufferedResult.debug.album || '', bufferedHiddenSubjectKeys);
+      if (!isSearch) cache.savePlan(cacheKey, bufferedResult);
+      setPlanResult(bufferedResult);
+    } else if (!isSearch && !forceRefresh) {
       const cached = cache.loadPlanForce(cacheKey);
       if (cached) {
         hasCached = true;
@@ -700,14 +824,32 @@ function App() {
       setPlanLoading(true);
     }
     setGlobalError('');
+
+    if (hasCoveringPlanWindow && !forceRefresh) {
+      if (planRequestIdRef.current === requestId) {
+        setPlanLoading(false);
+      }
+      return;
+    }
+
     try {
-      const result = await fetchPlan(session, { viewMode: planViewMode, currentDate: dateToUse, studyId: activeStudyId, search: searchParam });
+      const planWindow = await loadPlanWindowData(
+        windowCacheKey,
+        windowRequestKey,
+        dateToUse,
+        searchParam,
+        forceRefresh,
+      );
 
       // Check if this request is still current (not cancelled by newer request)
       if (planRequestIdRef.current !== requestId) {
         return; // Newer request is in progress, discard this result
       }
 
+      const result = buildPlanResultFromWindow(planWindow, {
+        viewMode: planViewMode,
+        currentDate: dateToUse,
+      });
       const resultHiddenSubjectKeys = await loadPersistedPlanHiddenSubjects(result.debug.album || '');
       if (planRequestIdRef.current !== requestId) {
         return;
@@ -736,6 +878,8 @@ function App() {
     planDate,
     activeStudyId,
     planResult,
+    resolveActivePlanSearch,
+    loadPlanWindowData,
     ensureSessionStillValid,
     handleSessionError,
     loadPersistedPlanHiddenSubjects,
