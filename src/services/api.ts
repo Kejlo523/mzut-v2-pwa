@@ -22,6 +22,67 @@ const CARR = [...'23456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'];
 const CARR2 = [...'vwxyz23456789ABCDEFGHJKkmnopqrstuvwxyzabcdefghijWXYZLMNPQRSTUV'];
 const DEVICE_ID = loadOrCreateDeviceId();
 
+type UsosLocalizedValue = string | { pl?: string; en?: string };
+
+interface UsosProgramme {
+  id?: string | number;
+  description?: UsosLocalizedValue;
+  mode_of_studies?: string | number;
+  level_of_studies?: UsosLocalizedValue;
+}
+
+interface UsosProgrammeRow {
+  programme?: UsosProgramme | null;
+  status?: string;
+}
+
+interface UsosCourseEdition {
+  course_id?: string;
+  course_name?: UsosLocalizedValue;
+}
+
+interface UsosCoursesUserResponse {
+  course_editions?: Record<string, UsosCourseEdition[]>;
+  terms?: Array<{ id?: string }>;
+}
+
+interface UsosTermDetails {
+  id?: string;
+  name?: UsosLocalizedValue;
+  is_active?: boolean;
+}
+
+interface UsosGradeEntry {
+  value_symbol?: string | number;
+  date_modified?: string;
+  date_acquisition?: string;
+}
+
+interface UsosCourseGrades {
+  course_grades?: UsosGradeEntry[];
+  course_units_grades?: Record<string, UsosGradeEntry[]>;
+}
+
+interface UsosFaculty {
+  id?: string | number;
+  name?: UsosLocalizedValue;
+}
+
+interface UsosCardRow {
+  id?: string | number;
+  expiration_date?: string;
+  is_active?: boolean;
+}
+
+interface UsosCalendarEventRow {
+  id?: string | number;
+  name?: UsosLocalizedValue;
+  start_date?: string;
+  end_date?: string;
+  type?: string;
+  is_day_off?: boolean;
+}
+
 function firstNonEmpty(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === 'string') {
@@ -254,11 +315,15 @@ async function proxyUsos<T = unknown>(
   return body as T;
 }
 
-function extractLocalized(obj: any, key: string): string {
+function extractLocalized<T extends object>(obj: T | null | undefined, key: string): string {
   if (!obj || typeof obj !== 'object') return '';
-  const val = obj[key];
+  const source = obj as Record<string, unknown>;
+  const val = source[key];
   if (val && typeof val === 'object') {
-    return val.pl || val.en || '';
+    return firstNonEmpty(
+      (val as Record<string, unknown>).pl,
+      (val as Record<string, unknown>).en,
+    );
   }
   return String(val ?? '');
 }
@@ -573,7 +638,7 @@ export async function fetchFinance(session: SessionData, studyId: string | null)
 
 export async function fetchCombinedStudies(session: SessionData): Promise<Study[]> {
   if (session.usos) {
-    const payload = await proxyUsos<Array<{ programme: any }>>(session, 'services/progs/student', {
+    const payload = await proxyUsos<UsosProgrammeRow[]>(session, 'services/progs/student', {
       fields: 'programme[id|description|mode_of_studies|level_of_studies]|status',
       active_only: 'false',
     });
@@ -595,7 +660,7 @@ export async function fetchCombinedStudies(session: SessionData): Promise<Study[
 
 export async function fetchCombinedSemesters(session: SessionData, studyId: string | null): Promise<Semester[]> {
   if (session.usos) {
-    const ceResp = await proxyUsos<{ course_editions: Record<string, any[]> }>(session, 'services/courses/user', {
+    const ceResp = await proxyUsos<UsosCoursesUserResponse>(session, 'services/courses/user', {
       active_terms_only: 'false',
       fields: 'course_editions',
     });
@@ -603,7 +668,7 @@ export async function fetchCombinedSemesters(session: SessionData, studyId: stri
     const termIds = Object.keys(ceResp.course_editions || {}).sort();
     if (termIds.length === 0) return [];
 
-    const tDetails = await proxyUsos<Record<string, any>>(session, 'services/terms/terms', {
+    const tDetails = await proxyUsos<Record<string, UsosTermDetails>>(session, 'services/terms/terms', {
       term_ids: termIds.join('|'),
       fields: 'id|name|is_active',
     });
@@ -625,9 +690,9 @@ export async function fetchCombinedSemesters(session: SessionData, studyId: stri
 export async function fetchCombinedGrades(session: SessionData, semesterId: string): Promise<Grade[]> {
   if (session.usos) {
     const [courseNamesResp, courseEctsResp, gradesResp] = await Promise.all([
-      proxyUsos<any>(session, 'services/courses/user', { active_terms_only: 'false' }),
-      proxyUsos<any>(session, 'services/courses/user_ects_points'),
-      proxyUsos<Record<string, Record<string, any>>>(session, 'services/grades/terms2', {
+      proxyUsos<UsosCoursesUserResponse>(session, 'services/courses/user', { active_terms_only: 'false' }),
+      proxyUsos<Record<string, Record<string, unknown>>>(session, 'services/courses/user_ects_points'),
+      proxyUsos<Record<string, Record<string, UsosCourseGrades>>>(session, 'services/grades/terms2', {
         term_ids: semesterId,
         fields: 'value_symbol|passes|value_description|counts_into_average|date_modified|date_acquisition|comment',
       }),
@@ -648,7 +713,7 @@ export async function fetchCombinedGrades(session: SessionData, semesterId: stri
       const ects = parseFlexibleDouble(ectsMap[courseId]);
       let hasAny = false;
 
-      const addUsosGrade = (gObj: any, type: string) => {
+      const addUsosGrade = (gObj: UsosGradeEntry | null | undefined, type: string) => {
         if (!gObj) return;
         const dateRaw = gObj.date_acquisition || gObj.date_modified || '';
         results.push({
@@ -662,9 +727,9 @@ export async function fetchCombinedGrades(session: SessionData, semesterId: stri
         hasAny = true;
       };
 
-      for (const g of courseData.course_grades || []) addUsosGrade(g, 'Ocena końcowa');
-      for (const list of Object.values(courseData.course_units_grades || {})) {
-        for (const g of (list as any[])) addUsosGrade(g, 'Zaliczenie');
+      for (const g of courseData.course_grades ?? []) addUsosGrade(g, 'Ocena końcowa');
+      for (const list of Object.values(courseData.course_units_grades ?? {})) {
+        for (const g of list) addUsosGrade(g, 'Zaliczenie');
       }
 
       if (!hasAny) {
@@ -700,7 +765,7 @@ export async function fetchInfo(
         semestrLabel: '',
       };
 
-      const progs = await proxyUsos<Array<{ programme: any; status: string }>>(session, 'services/progs/student', {
+      const progs = await proxyUsos<UsosProgrammeRow[]>(session, 'services/progs/student', {
         fields: 'programme[id|description|mode_of_studies|level_of_studies]|status',
         active_only: 'false',
       });
@@ -716,7 +781,7 @@ export async function fetchInfo(
         details.kierunek = extractLocalized(prog, 'description') || pid;
 
         try {
-          const facultyObj = await proxyUsos<{ faculty: any }>(session, 'services/progs/programme', {
+          const facultyObj = await proxyUsos<{ faculty?: UsosFaculty }>(session, 'services/progs/programme', {
             programme_id: pid,
             fields: 'faculty[id|name]',
           });
@@ -746,7 +811,7 @@ export async function fetchInfo(
 
       // Fetch active term for rok/semestr
       try {
-        const ceResp = await proxyUsos<{ course_editions: Record<string, any> }>(session, 'services/courses/user', {
+        const ceResp = await proxyUsos<{ course_editions: Record<string, unknown> }>(session, 'services/courses/user', {
           active_terms_only: 'true',
           fields: 'course_editions',
         });
@@ -765,9 +830,9 @@ export async function fetchInfo(
       }
 
       // Fetch history terms
-      let historyItems: StudyHistoryItem[] = [];
+      const historyItems: StudyHistoryItem[] = [];
       try {
-        const termsResp = await proxyUsos<{ terms: Array<{ id: string }> }>(session, 'services/courses/user', {
+        const termsResp = await proxyUsos<{ terms: Array<{ id?: string }> }>(session, 'services/courses/user', {
           fields: 'terms',
         });
         if (termsResp.terms) {
@@ -788,7 +853,7 @@ export async function fetchInfo(
       // Fetch ELS cards
       let els: ElsCard | null = null;
       try {
-        const cards = await proxyUsos<any[]>(session, 'services/cards/user', {
+        const cards = await proxyUsos<UsosCardRow[]>(session, 'services/cards/user', {
           fields: 'id|expiration_date|is_active',
         });
         if (Array.isArray(cards) && cards.length > 0) {
@@ -819,7 +884,7 @@ export async function fetchInfo(
         };
         if (facultyIdStr) calParams.faculty_id = facultyIdStr;
 
-        const cals = await proxyUsos<any[]>(session, 'services/calendar/search', calParams);
+        const cals = await proxyUsos<UsosCalendarEventRow[]>(session, 'services/calendar/search', calParams);
 
         if (Array.isArray(cals)) {
           calendarEvents = cals.map(c => ({
