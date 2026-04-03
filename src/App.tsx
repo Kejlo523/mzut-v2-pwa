@@ -81,6 +81,19 @@ const EMPTY_FINANCE_SNAPSHOT: FinanceSnapshot = { records: [], fetchedAt: 0 };
 const PLAN_PREFETCH_DAYS_BACK = 7;
 const PLAN_PREFETCH_DAYS_FORWARD = 21;
 
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
+
+interface BeforeInstallPromptChoiceResult {
+  outcome: 'accepted' | 'dismissed';
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void> | void;
+  userChoice: Promise<BeforeInstallPromptChoiceResult>;
+}
+
 function normalizePlanHiddenSubjectKeys(keys: string[]): string[] {
   return [...new Set(
     keys
@@ -169,10 +182,10 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // PWA install prompt
-  const deferredPromptRef = useRef<Event | null>(null);
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-    || (window.navigator as any).standalone === true;
+    || (window.navigator as NavigatorWithStandalone).standalone === true;
   // iOS Safari detection — beforeinstallprompt never fires on iOS
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -190,7 +203,7 @@ function App() {
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      deferredPromptRef.current = e;
+      deferredPromptRef.current = e as BeforeInstallPromptEvent;
       setCanInstallPwa(true);
     };
     window.addEventListener('beforeinstallprompt', handler);
@@ -203,9 +216,9 @@ function App() {
       setShowIosInstructions(true);
       return;
     }
-    const prompt = deferredPromptRef.current as any;
+    const prompt = deferredPromptRef.current;
     if (!prompt?.prompt) return;
-    prompt.prompt();
+    await prompt.prompt();
     const result = await prompt.userChoice;
     if (result?.outcome === 'accepted') {
       setCanInstallPwa(false);

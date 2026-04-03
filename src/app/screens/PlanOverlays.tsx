@@ -18,9 +18,17 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSe
   const [renderedPlanEvent, setRenderedPlanEvent] = useState<SelectedPlanEvent | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
+  const stateFrameRef = useRef<number | null>(null);
   const enterFrameRef = useRef<number | null>(null);
   const enterFrameNestedRef = useRef<number | null>(null);
   const shouldAnimateOpenRef = useRef(false);
+
+  const clearStateFrame = () => {
+    if (stateFrameRef.current !== null) {
+      window.cancelAnimationFrame(stateFrameRef.current);
+      stateFrameRef.current = null;
+    }
+  };
 
   const clearEnterFrames = () => {
     if (enterFrameRef.current !== null) {
@@ -38,11 +46,14 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSe
       if (closeTimerRef.current !== null) {
         window.clearTimeout(closeTimerRef.current);
       }
+      clearStateFrame();
       clearEnterFrames();
     };
   }, []);
 
   useEffect(() => {
+    clearStateFrame();
+
     if (selectedPlanEvent) {
       if (closeTimerRef.current !== null) {
         window.clearTimeout(closeTimerRef.current);
@@ -51,8 +62,13 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSe
 
       clearEnterFrames();
       shouldAnimateOpenRef.current = !renderedPlanEvent || !isOpen;
-      if (shouldAnimateOpenRef.current) setIsOpen(false);
-      setRenderedPlanEvent(selectedPlanEvent);
+      stateFrameRef.current = window.requestAnimationFrame(() => {
+        if (shouldAnimateOpenRef.current) {
+          setIsOpen(false);
+        }
+        setRenderedPlanEvent(selectedPlanEvent);
+        stateFrameRef.current = null;
+      });
       return;
     }
 
@@ -60,11 +76,14 @@ export function PlanEventSheet({ selectedPlanEvent, onClose, language, onQuickSe
 
     clearEnterFrames();
     shouldAnimateOpenRef.current = false;
-    setIsOpen(false);
-    closeTimerRef.current = window.setTimeout(() => {
-      setRenderedPlanEvent(null);
-      closeTimerRef.current = null;
-    }, PLAN_EVENT_SHEET_TRANSITION_MS);
+    stateFrameRef.current = window.requestAnimationFrame(() => {
+      setIsOpen(false);
+      closeTimerRef.current = window.setTimeout(() => {
+        setRenderedPlanEvent(null);
+        closeTimerRef.current = null;
+      }, PLAN_EVENT_SHEET_TRANSITION_MS);
+      stateFrameRef.current = null;
+    });
   }, [isOpen, renderedPlanEvent, selectedPlanEvent]);
 
   useEffect(() => {

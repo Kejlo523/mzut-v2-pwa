@@ -32,7 +32,6 @@ function isInteractiveTarget(el: EventTarget | null): boolean {
 export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawer, canCloseDrawer, onCloseDrawer }: UseSwipeOptions): SwipeHandlers {
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
-  const isFromEdge = useRef(false);
   const blocked = useRef(false);
 
   const onTouchStart = useCallback((e: React.TouchEvent<HTMLElement>) => {
@@ -50,10 +49,9 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     blocked.current = false;
     startX.current = x;
     startY.current = e.touches[0].clientY;
-    isFromEdge.current = fromEdge;
   }, []);
 
-  const onTouchMove = useCallback((_e: React.TouchEvent<HTMLElement>) => {
+  const onTouchMove = useCallback(() => {
     // nothing — we decide on touchEnd
   }, []);
 
@@ -87,7 +85,7 @@ export function useSwipeGestures({ canGoBack, onBack, canOpenDrawer, onOpenDrawe
     if (dx > 80 && dy < 70 && origX <= 80 && canGoBack) {
       onBack();
     }
-  }, [canGoBack, onBack, canOpenDrawer, onOpenDrawer]);
+  }, [canCloseDrawer, canGoBack, canOpenDrawer, onBack, onCloseDrawer, onOpenDrawer]);
 
   const onTouchCancel = useCallback(() => {
     startX.current = null;
