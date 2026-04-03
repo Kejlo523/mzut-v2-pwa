@@ -1295,75 +1295,26 @@ export async function fetchSessionPeriods(): Promise<SessionPeriod[]> {
   }
 }
 
-export async function fetchPlan(
-  session: SessionData,
-  payload: { viewMode: ViewMode; currentDate: string; studyId: string | null; search: { category: string; query: string } },
-): Promise<PlanResult> {
-  const viewMode = payload.viewMode;
-  const { current, rangeStart, rangeEnd, prev, next } = resolveViewRange(viewMode, payload.currentDate);
+export interface PlanWindowData {
+  rangeStart: string;
+  rangeEnd: string;
+  album: string;
+  events: Record<string, string>[];
+  sessionPeriods: SessionPeriod[];
+  entriesTotal: number;
+  daysWithData: string[];
+}
 
-  let urlParams: Record<string, string>;
-  let album = '';
-
-  let fetchStart = rangeStart;
-  let fetchEnd = rangeEnd;
-  if (viewMode === 'day') {
-    const dow = current.getDay() || 7;
-    fetchStart = addDays(current, -(dow - 1));
-    fetchEnd = addDays(fetchStart, 6);
-  }
-
-  if (firstNonEmpty(payload.search.query)) {
-    album = resolveSearchAlbum(payload.search.category, payload.search.query);
-    urlParams = {
-      [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
-      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
-      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
-    };
-  } else {
-    const resolvedStudyId = payload.studyId || session.activeStudyId;
-    if (!resolvedStudyId) {
-      return {
-        viewMode,
-        currentDate: formatYmd(current),
-        rangeStart: formatYmd(rangeStart),
-        rangeEnd: formatYmd(rangeEnd),
-        dayColumns: [],
-        hasAnyEventsInRange: false,
-        monthGrid: [],
-        subjectFilters: [],
-        prevDate: formatYmd(prev),
-        nextDate: formatYmd(next),
-        todayDate: formatYmd(startOfDay(new Date())),
-        headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
-        sessionPeriods: [],
-        debug: {
-          album: '',
-          entriesTotal: 0,
-          daysWithData: [],
-        },
-      };
-    }
-
-    album = await resolvePlanAlbum(session, resolvedStudyId);
-
-    urlParams = {
-      number: album,
-      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
-      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
-    };
-  }
-
-  const [rawEvents, sessionPeriods] = await Promise.all([
-    proxyPlanStudent(urlParams),
-    fetchSessionPeriods(),
-  ]);
-  const events = rawEvents.map(parsePlanEventRow).filter((event): event is Record<string, string> => Boolean(event));
-  const grouped = groupPlanEventsByDay(events);
+export function buildPlanResultFromWindow(
+  planWindow: PlanWindowData,
+  payload: { viewMode: ViewMode; currentDate: string },
+): PlanResult {
+  const { current, rangeStart, rangeEnd, prev, next } = resolveViewRange(payload.viewMode, payload.currentDate);
+  const grouped = groupPlanEventsByDay(planWindow.events);
   const { dayColumns, hasAnyEventsInRange } = buildPlanDayColumns(grouped, rangeStart, rangeEnd);
 
   const monthGrid: PlanResult['monthGrid'] = [];
-  if (viewMode === 'month') {
+  if (payload.viewMode === 'month') {
     const first = new Date(current.getFullYear(), current.getMonth(), 1);
     const dow = first.getDay() || 7;
     const gridStart = addDays(first, -(dow - 1));
@@ -1383,28 +1334,103 @@ export async function fetchPlan(
     }
   }
 
-  const subjectFilters = buildPlanSubjectFilters(dayColumns);
-
   return {
-    viewMode,
+    viewMode: payload.viewMode,
     currentDate: formatYmd(current),
     rangeStart: formatYmd(rangeStart),
     rangeEnd: formatYmd(rangeEnd),
     dayColumns,
     hasAnyEventsInRange,
     monthGrid,
-    subjectFilters,
+    subjectFilters: buildPlanSubjectFilters(dayColumns),
     prevDate: formatYmd(prev),
     nextDate: formatYmd(next),
     todayDate: formatYmd(startOfDay(new Date())),
-    headerLabel: formatHeaderLabel(viewMode, current, rangeStart, rangeEnd),
-    sessionPeriods,
+    headerLabel: formatHeaderLabel(payload.viewMode, current, rangeStart, rangeEnd),
+    sessionPeriods: planWindow.sessionPeriods,
     debug: {
-      album,
-      entriesTotal: events.length,
-      daysWithData: [...grouped.keys()].sort(),
+      album: planWindow.album,
+      entriesTotal: planWindow.entriesTotal,
+      daysWithData: planWindow.daysWithData,
     },
   };
+}
+
+export async function fetchPlanWindow(
+  session: SessionData,
+  payload: {
+    viewMode: ViewMode;
+    currentDate: string;
+    studyId: string | null;
+    search: { category: string; query: string };
+    prefetchDaysBefore?: number;
+    prefetchDaysAfter?: number;
+  },
+): Promise<PlanWindowData> {
+  const { rangeStart, rangeEnd } = resolveViewRange(payload.viewMode, payload.currentDate);
+  const fetchStart = addDays(rangeStart, -(Math.max(0, payload.prefetchDaysBefore ?? 0)));
+  const fetchEnd = addDays(rangeEnd, Math.max(0, payload.prefetchDaysAfter ?? 0));
+
+  let urlParams: Record<string, string>;
+  let album = '';
+
+  if (firstNonEmpty(payload.search.query)) {
+    album = resolveSearchAlbum(payload.search.category, payload.search.query);
+    urlParams = {
+      [mapSearchCategory(payload.search.category || 'number')]: firstNonEmpty(payload.search.query),
+      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
+    };
+  } else {
+    const resolvedStudyId = payload.studyId || session.activeStudyId;
+    if (!resolvedStudyId) {
+      return {
+        rangeStart: formatYmd(fetchStart),
+        rangeEnd: formatYmd(fetchEnd),
+        album: '',
+        events: [],
+        sessionPeriods: [],
+        entriesTotal: 0,
+        daysWithData: [],
+      };
+    }
+
+    album = await resolvePlanAlbum(session, resolvedStudyId);
+
+    urlParams = {
+      number: album,
+      start: toOffsetIso(new Date(fetchStart.getFullYear(), fetchStart.getMonth(), fetchStart.getDate(), 0, 0, 0)),
+      end: toOffsetIso(new Date(fetchEnd.getFullYear(), fetchEnd.getMonth(), fetchEnd.getDate(), 23, 59, 59)),
+    };
+  }
+
+  const [rawEvents, sessionPeriods] = await Promise.all([
+    proxyPlanStudent(urlParams),
+    fetchSessionPeriods(),
+  ]);
+  const events = rawEvents.map(parsePlanEventRow).filter((event): event is Record<string, string> => Boolean(event));
+  const grouped = groupPlanEventsByDay(events);
+
+  return {
+    rangeStart: formatYmd(fetchStart),
+    rangeEnd: formatYmd(fetchEnd),
+    album,
+    events,
+    sessionPeriods,
+    entriesTotal: events.length,
+    daysWithData: [...grouped.keys()].sort(),
+  };
+}
+
+export async function fetchPlan(
+  session: SessionData,
+  payload: { viewMode: ViewMode; currentDate: string; studyId: string | null; search: { category: string; query: string } },
+): Promise<PlanResult> {
+  const planWindow = await fetchPlanWindow(session, payload);
+  return buildPlanResultFromWindow(planWindow, {
+    viewMode: payload.viewMode,
+    currentDate: payload.currentDate,
+  });
 }
 
 export async function fetchPlanSemesterExport(
